@@ -1,15 +1,15 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 
 const ORIGINAL = { ...process.env };
 
 function resetEnv() {
   for (const key of Object.keys(process.env)) delete process.env[key];
   Object.assign(process.env, ORIGINAL);
+  vi.resetModules();
 }
 
-// 每个 case 用不同的 query 串让 Vite 视作不同模块，绕过 import cache。
-function importFresh() {
-  return import(`./env?t=${Date.now()}_${Math.random()}`);
+async function importFresh() {
+  return await import('./env');
 }
 
 describe('env', () => {
