@@ -35,6 +35,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitest/ui": "^2.1.9",
     "autoprefixer": "~10.4.27",
+    "dotenv": "^16.6.1",
     "drizzle-kit": "~0.21.4",
     "eslint": "~8.57.1",
     "eslint-config-next": "~14.2.35",
