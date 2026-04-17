@@ -1,0 +1,35 @@
+# deps
+node_modules
+.pnpm-store
+
+# next
+.next
+out
+
+# env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# vitest/coverage
+coverage
+.vitest
+
+# logs
+*.log
+
+# IDE
+.idea
+.vscode/*
+!.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# drizzle meta cache (migrations themselves are committed)
+drizzle/.cache
+
+# public/uploads runtime
+public/uploads
