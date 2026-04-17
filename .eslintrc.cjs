@@ -34,5 +34,12 @@ module.exports = {
       files: ['drizzle.config.ts', 'vitest.config.ts', 'next.config.mjs'],
       rules: { 'no-process-env': 'off' },
     },
+    {
+      files: ['src/db/seed.ts'],
+      rules: {
+        'no-process-env': 'off',
+        'no-restricted-imports': 'off',
+      },
+    },
   ],
 };

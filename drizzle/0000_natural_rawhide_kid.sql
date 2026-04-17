@@ -55,7 +55,8 @@ CREATE TABLE IF NOT EXISTS "works" (
 	"view_count" integer DEFAULT 0 NOT NULL,
 	"featured_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"reviewed_at" timestamp with time zone
+	"reviewed_at" timestamp with time zone,
+	CONSTRAINT "works_action_target_required" CHECK ("qr_url" is not null or "web_url" is not null)
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "tags" (
@@ -94,6 +95,12 @@ END $$;
 --> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "invite_codes" ADD CONSTRAINT "invite_codes_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;

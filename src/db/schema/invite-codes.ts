@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  foreignKey,
   pgTable,
   text,
   varchar,
@@ -8,6 +9,7 @@ import {
   uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core';
+import { users } from './users';
 
 export const inviteCodes = pgTable(
   'invite_codes',
@@ -21,7 +23,6 @@ export const inviteCodes = pgTable(
       .default('single'),
     maxUses: integer('max_uses').notNull().default(1),
     usedCount: integer('used_count').notNull().default(0),
-    // 注：FK → users.id 由 Task 16 的手写 migration 补丁添加，避免 TS 模块循环。
     createdBy: text('created_by').notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     status: text('status', { enum: ['active', 'revoked', 'used'] })
@@ -34,6 +35,11 @@ export const inviteCodes = pgTable(
   (t) => ({
     codeUniq: uniqueIndex('idx_invite_codes_code').on(t.code),
     statusIdx: index('idx_invite_codes_status').on(t.status),
+    createdByFk: foreignKey({
+      columns: [t.createdBy],
+      foreignColumns: [users.id],
+      name: 'invite_codes_created_by_users_id_fk',
+    }),
   })
 );
 

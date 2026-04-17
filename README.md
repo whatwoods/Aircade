@@ -37,6 +37,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```bash
 pnpm install
 pnpm db:migrate      # 建好 PRD §6 的 8 张表
+pnpm db:seed         # 生成本地开发管理员 + 测试邀请码
 pnpm dev             # http://localhost:3000
 ```
 
@@ -53,7 +54,22 @@ pnpm dev             # http://localhost:3000
 | `pnpm test:watch` | Vitest watch 模式 |
 | `pnpm db:gen` | 从 schema 生成 migration 文件 |
 | `pnpm db:migrate` | 把 migration 应用到数据库 |
+| `pnpm db:seed` | 写入本地开发管理员和测试邀请码 |
 | `pnpm db:studio` | 启动 Drizzle Studio（浏览器查表） |
+
+## 认证验收
+
+执行 `pnpm db:seed` 后，本地会确保存在一组开发用凭据：
+
+- 管理员用户名：`admin`
+- 管理员密码：`admin123456`
+- 测试邀请码：`AIRCADE-DEV-001`
+
+然后可以直接访问：
+
+- `/register`：邀请码注册
+- `/login`：用户名密码登录
+- `/account`：已登录账号页（未登录会跳回 `/login`）
 
 ## 目录结构
 
