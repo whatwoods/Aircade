@@ -1,4 +1,7 @@
 export * from './users';
 export * from './sessions';
 export * from './invite-codes';
-// works / tags / likes / favorites 等会在 Task 13-15 增量追加
+export * from './works';
+export * from './tags';
+export * from './work-tags';
+// likes / favorites 会在 Task 15 追加
