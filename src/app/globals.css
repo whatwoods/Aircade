@@ -1,3 +1,51 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* 中性色 —— 覆盖 shadcn 默认 neutral 为 Aircade 暖调 */
+    --background: 36 100% 98%; /* brand.milk #FFFBF5 */
+    --foreground: 30 35% 18%; /* brand.coffee #3D2E1F */
+
+    --card: 36 100% 98%;
+    --card-foreground: 30 35% 18%;
+
+    --popover: 36 100% 98%;
+    --popover-foreground: 30 35% 18%;
+
+    /* primary = brand.orange #FF9F6B */
+    --primary: 20 100% 71%;
+    --primary-foreground: 36 100% 98%;
+
+    /* secondary = brand.cream #FFE9B8 */
+    --secondary: 42 100% 86%;
+    --secondary-foreground: 30 35% 18%;
+
+    --muted: 36 40% 92%;
+    --muted-foreground: 30 25% 40%;
+
+    /* accent = brand.mint #9FE3C9 */
+    --accent: 155 55% 76%;
+    --accent-foreground: 30 35% 18%;
+
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 36 100% 98%;
+
+    --border: 30 25% 85%;
+    --input: 30 25% 85%;
+    --ring: 20 100% 71%;
+
+    --radius: 12px;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body {
+    @apply bg-background text-foreground;
+  }
+}
