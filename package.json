@@ -17,7 +17,17 @@
     "test:watch": "vitest",
     "db:gen": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css,md,mjs}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
