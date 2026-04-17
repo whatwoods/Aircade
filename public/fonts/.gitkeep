@@ -1,0 +1,6 @@
+# 放置自托管字体文件：
+# - HarmonyOS_Sans_SC_Regular.woff2（华为 HarmonyOS Sans 简中）
+# - LXGWWenKai-Regular.woff2（霞鹜文楷）
+# 文件缺失时 fonts.ts 会让 next/font 构建报错；Task 4 的处理办法是：
+# 本期只接入 Inter（Google Fonts），Harmony/LXGW 的 next/font/local
+# 调用留在 fonts.ts 里但注释掉，等你放好 woff2 再启用。
