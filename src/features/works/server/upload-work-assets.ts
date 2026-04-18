@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import sharp from 'sharp';
 import { env } from '@/lib/env';
 import { createWorkInputSchema, type CreateWorkInput } from '../schemas';
 import { WorkError } from './errors';
 
 const maxImageBytes = 8 * 1024 * 1024;
 const maxScreenshotCount = 6;
+const maxInputPixels = 40_000_000;
 
 const allowedMimeTypeToExt = new Map<string, string>([
   ['image/png', '.png'],
@@ -30,6 +32,36 @@ type StoredUpload = {
   publicUrl: string;
 };
 
+type ImageBucket = 'cover' | 'screenshot' | 'qr';
+
+type UploadTransformConfig = {
+  maxWidth: number;
+  maxHeight: number;
+  targetBytes?: number;
+  qualitySteps?: number[];
+  lossless?: boolean;
+};
+
+const transformConfigByBucket: Record<ImageBucket, UploadTransformConfig> = {
+  cover: {
+    maxWidth: 1600,
+    maxHeight: 1600,
+    targetBytes: 500 * 1024,
+    qualitySteps: [82, 76, 70, 64, 58, 52],
+  },
+  screenshot: {
+    maxWidth: 1920,
+    maxHeight: 1920,
+    targetBytes: 800 * 1024,
+    qualitySteps: [84, 78, 72, 66, 60, 54],
+  },
+  qr: {
+    maxWidth: 1200,
+    maxHeight: 1200,
+    lossless: true,
+  },
+};
+
 function readTextField(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === 'string' ? value : '';
@@ -43,34 +75,108 @@ function asFile(value: FormDataEntryValue | null) {
   return value;
 }
 
-function inferFileExtension(file: File) {
+function ensureAllowedImageInput(file: File) {
   if (file.type) {
     const mimeExt = allowedMimeTypeToExt.get(file.type);
     if (!mimeExt) {
       throw new WorkError('图片仅支持 PNG、JPG、WEBP、GIF、AVIF');
     }
 
-    return mimeExt;
+    return;
   }
 
   const ext = path.extname(file.name).toLowerCase();
   if (!allowedExtensions.has(ext)) {
     throw new WorkError('图片仅支持 PNG、JPG、WEBP、GIF、AVIF');
   }
-
-  return ext === '.jpeg' ? '.jpg' : ext;
 }
 
-async function storeImage(file: File, bucket: 'cover' | 'screenshot' | 'qr') {
+function createSharpPipeline(buffer: Buffer, bucket: ImageBucket) {
+  const config = transformConfigByBucket[bucket];
+
+  return sharp(buffer, {
+    animated: bucket !== 'qr',
+    limitInputPixels: maxInputPixels,
+    failOn: 'error',
+  })
+    .rotate()
+    .resize({
+      width: config.maxWidth,
+      height: config.maxHeight,
+      fit: 'inside',
+      withoutEnlargement: true,
+      kernel: bucket === 'qr' ? sharp.kernel.nearest : sharp.kernel.lanczos3,
+    });
+}
+
+async function encodeImageToWebp(buffer: Buffer, bucket: ImageBucket) {
+  const config = transformConfigByBucket[bucket];
+
+  try {
+    const metadata = await sharp(buffer, {
+      animated: bucket !== 'qr',
+      limitInputPixels: maxInputPixels,
+      failOn: 'error',
+    }).metadata();
+
+    if ((metadata.pages ?? 1) > 1) {
+      throw new WorkError('暂不支持上传动图，请改传静态图片');
+    }
+  } catch (error) {
+    if (error instanceof WorkError) {
+      throw error;
+    }
+
+    throw new WorkError('图片文件已损坏或格式不支持');
+  }
+
+  if (config.lossless) {
+    return await createSharpPipeline(buffer, bucket)
+      .webp({
+        lossless: true,
+        effort: 6,
+      })
+      .toBuffer();
+  }
+
+  let fallbackBuffer: Buffer | null = null;
+
+  for (const quality of config.qualitySteps ?? [80]) {
+    const encoded = await createSharpPipeline(buffer, bucket)
+      .webp({
+        quality,
+        effort: 6,
+        smartSubsample: true,
+      })
+      .toBuffer();
+
+    fallbackBuffer = encoded;
+
+    if (!config.targetBytes || encoded.byteLength <= config.targetBytes) {
+      return encoded;
+    }
+  }
+
+  if (!fallbackBuffer) {
+    throw new WorkError('图片处理失败，请稍后再试');
+  }
+
+  return fallbackBuffer;
+}
+
+async function storeImage(file: File, bucket: ImageBucket) {
   if (file.size > maxImageBytes) {
     throw new WorkError('单张图片不能超过 8MB');
   }
 
-  const ext = inferFileExtension(file);
+  ensureAllowedImageInput(file);
+
+  const inputBuffer = Buffer.from(await file.arrayBuffer());
+  const outputBuffer = await encodeImageToWebp(inputBuffer, bucket);
   const now = new Date();
   const year = String(now.getFullYear());
   const month = String(now.getMonth() + 1).padStart(2, '0');
-  const fileName = `${bucket}-${randomUUID()}${ext}`;
+  const fileName = `${bucket}-${randomUUID()}.webp`;
   const relativeDir = path.join(year, month);
   const targetDir = path.join(env.UPLOAD_DIR, relativeDir);
   const diskPath = path.join(targetDir, fileName);
@@ -78,8 +184,7 @@ async function storeImage(file: File, bucket: 'cover' | 'screenshot' | 'qr') {
   const publicUrl = `${publicBase}/${relativeDir.replaceAll(path.sep, '/')}/${fileName}`;
 
   await mkdir(targetDir, { recursive: true });
-  const bytes = Buffer.from(await file.arrayBuffer());
-  await writeFile(diskPath, bytes);
+  await writeFile(diskPath, outputBuffer);
 
   return {
     diskPath,

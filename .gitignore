@@ -57,3 +57,6 @@ desktop.ini
 # cache
 .eslintcache
 .stylelintcache
+
+# local git bundles
+*.bundle

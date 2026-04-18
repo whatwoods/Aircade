@@ -120,7 +120,13 @@ UPLOAD_DIR=/var/aircade/uploads
 UPLOAD_PUBLIC_BASE=/uploads
 ```
 
-上传图片现在会直接写入 `UPLOAD_DIR`，数据库只保存相对访问路径。单机云服务器建议保持：
+上传图片现在会直接写入 `UPLOAD_DIR`，数据库只保存相对访问路径。服务端会在入库前统一转成 `webp`：
+
+- 封面目标压到约 `500KB` 内
+- 截图目标压到约 `800KB` 内
+- 二维码走无损 `webp`，优先保证扫码可读性
+
+单机云服务器建议保持：
 
 - `UPLOAD_DIR` 指向代码目录外的持久化磁盘路径，例如 `/var/aircade/uploads`
 - `UPLOAD_PUBLIC_BASE` 维持 `/uploads`

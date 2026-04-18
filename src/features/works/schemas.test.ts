@@ -20,6 +20,27 @@ describe('createWorkInputSchema', () => {
     expect(parsed.qrUrl).toBeUndefined();
   });
 
+  it('accepts uploaded asset paths for images', () => {
+    const parsed = createWorkInputSchema.parse({
+      title: '地牢小电视',
+      type: 'game',
+      tagline: '把上传图片当成站内资源也应该通过',
+      description:
+        '这是一段足够长的介绍，用来验证封面、截图和二维码都可以使用站内 uploads 相对路径。',
+      coverUrl: '/uploads/2026/04/cover-demo.webp',
+      screenshots: [
+        '/uploads/2026/04/shot-1.webp',
+        '/uploads/2026/04/shot-2.webp',
+      ],
+      webUrl: '',
+      qrUrl: '/uploads/2026/04/qr-demo.png',
+    });
+
+    expect(parsed.coverUrl).toBe('/uploads/2026/04/cover-demo.webp');
+    expect(parsed.screenshots).toHaveLength(2);
+    expect(parsed.qrUrl).toBe('/uploads/2026/04/qr-demo.png');
+  });
+
   it('rejects when both action targets are missing', () => {
     expect(() =>
       createWorkInputSchema.parse({

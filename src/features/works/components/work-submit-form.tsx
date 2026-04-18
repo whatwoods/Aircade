@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ImagePlus, QrCode, Upload, X } from 'lucide-react';
 import { Cover, TypeChip } from '@/components/brand';
 import { createWorkAction } from '../actions';
 import { workTypeValues } from '../schemas';
@@ -38,8 +39,15 @@ export function WorkSubmitForm() {
   const [description, setDescription] = useState('');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState('');
-  const [screenshotCount, setScreenshotCount] = useState(0);
-  const [qrFileName, setQrFileName] = useState('');
+  const [coverInputKey, setCoverInputKey] = useState(0);
+  const [screenshotFiles, setScreenshotFiles] = useState<File[]>([]);
+  const [screenshotPreviewUrls, setScreenshotPreviewUrls] = useState<string[]>(
+    []
+  );
+  const [screenshotInputKey, setScreenshotInputKey] = useState(0);
+  const [qrFile, setQrFile] = useState<File | null>(null);
+  const [qrPreviewUrl, setQrPreviewUrl] = useState('');
+  const [qrInputKey, setQrInputKey] = useState(0);
 
   useEffect(() => {
     if (!coverFile) {
@@ -55,6 +63,34 @@ export function WorkSubmitForm() {
     };
   }, [coverFile]);
 
+  useEffect(() => {
+    if (!qrFile) {
+      setQrPreviewUrl('');
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(qrFile);
+    setQrPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [qrFile]);
+
+  useEffect(() => {
+    if (screenshotFiles.length === 0) {
+      setScreenshotPreviewUrls([]);
+      return;
+    }
+
+    const objectUrls = screenshotFiles.map((file) => URL.createObjectURL(file));
+    setScreenshotPreviewUrls(objectUrls);
+
+    return () => {
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [screenshotFiles]);
+
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[1fr_340px]">
       <form
@@ -62,7 +98,6 @@ export function WorkSubmitForm() {
         encType="multipart/form-data"
         className="ac-card p-6 sm:p-7"
       >
-        {/* hidden input to carry chosen type since select is replaced */}
         <input type="hidden" name="type" value={type} />
 
         <Section title="基本信息" note="这一段会显示在卡片和详情页。">
@@ -146,43 +181,78 @@ export function WorkSubmitForm() {
 
         <Section title="图片" note="封面在卡片，截图在详情页，支持直接上传。">
           <Field label="封面上传" htmlFor="coverFile" required>
-            <input
+            <UploadSurface
+              inputKey={coverInputKey}
               id="coverFile"
               name="coverFile"
-              type="file"
               accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
               required
-              className={inputClass}
-              style={inputStyle}
-              onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
-            />
-            <UploadHint
-              text={
+              selected={Boolean(coverFile)}
+              icon={<ImagePlus size={18} strokeWidth={2.1} />}
+              title={coverFile ? coverFile.name : '投一张封面图'}
+              subtitle={
                 coverFile
-                  ? `已选择：${coverFile.name}`
+                  ? `${formatFileSize(coverFile.size)} · 会展示在卡片正面`
                   : '支持 PNG / JPG / WEBP / GIF / AVIF'
               }
+              text={
+                coverFile
+                  ? '拖进来可直接替换封面'
+                  : '点一下选择，或者像投币一样把封面拖进来'
+              }
+              accent="var(--ac-primary)"
+              previewUrl={coverPreviewUrl || undefined}
+              previewAlt="封面预览"
+              onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
+              onClear={() => {
+                setCoverFile(null);
+                setCoverInputKey((value) => value + 1);
+              }}
             />
           </Field>
 
           <Field
             label="截图上传"
             note={
-              screenshotCount > 0
-                ? `已选择 ${screenshotCount} 张，最多 6 张`
+              screenshotFiles.length > 0
+                ? `已选择 ${screenshotFiles.length} 张，最多 6 张`
                 : '可多选，最多 6 张，可留空'
             }
             htmlFor="screenshots"
           >
-            <input
+            <UploadSurface
+              inputKey={screenshotInputKey}
               id="screenshots"
               name="screenshots"
-              type="file"
               accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
               multiple
-              className={inputClass}
-              style={inputStyle}
-              onChange={(e) => setScreenshotCount(e.target.files?.length ?? 0)}
+              selected={screenshotFiles.length > 0}
+              icon={<Upload size={18} strokeWidth={2.1} />}
+              title={
+                screenshotFiles.length > 0
+                  ? `已装入 ${screenshotFiles.length} 张截图`
+                  : '补几张过程图'
+              }
+              subtitle={
+                screenshotFiles.length > 0
+                  ? '详情页会按上传顺序展示'
+                  : '建议放玩法、界面、结果页，不要全是一张图'
+              }
+              text={
+                screenshotFiles.length > 0
+                  ? '拖进来可直接替换这一组截图'
+                  : '支持直接拖进来，做一组像贴在街机机身上的快照'
+              }
+              accent="var(--ac-mint)"
+              previewUrls={screenshotPreviewUrls}
+              fileNames={screenshotFiles.map((file) => file.name)}
+              onChange={(e) =>
+                setScreenshotFiles(Array.from(e.target.files ?? []))
+              }
+              onClear={() => {
+                setScreenshotFiles([]);
+                setScreenshotInputKey((value) => value + 1);
+              }}
             />
           </Field>
         </Section>
@@ -201,21 +271,32 @@ export function WorkSubmitForm() {
             />
           </Field>
           <Field label="二维码图片上传" htmlFor="qrFile" note="可留空">
-            <input
+            <UploadSurface
+              inputKey={qrInputKey}
               id="qrFile"
               name="qrFile"
-              type="file"
               accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-              className={inputClass}
-              style={inputStyle}
-              onChange={(e) => setQrFileName(e.target.files?.[0]?.name ?? '')}
-            />
-            <UploadHint
+              selected={Boolean(qrFile)}
+              icon={<QrCode size={18} strokeWidth={2.1} />}
+              title={qrFile ? qrFile.name : '没有 H5 就传二维码'}
+              subtitle={
+                qrFile
+                  ? `${formatFileSize(qrFile.size)} · 详情页会展示扫码入口`
+                  : '适合小程序、公众号或群里口令入口'
+              }
               text={
-                qrFileName
-                  ? `已选择：${qrFileName}`
+                qrFile
+                  ? '拖进来可直接替换二维码'
                   : '如果没填 Web 链接，至少上传一张二维码'
               }
+              accent="var(--ac-cream)"
+              previewUrl={qrPreviewUrl || undefined}
+              previewAlt="二维码预览"
+              onChange={(e) => setQrFile(e.target.files?.[0] ?? null)}
+              onClear={() => {
+                setQrFile(null);
+                setQrInputKey((value) => value + 1);
+              }}
             />
           </Field>
         </Section>
@@ -328,10 +409,274 @@ function Divider() {
   );
 }
 
-function UploadHint({ text }: { text: string }) {
+function formatFileSize(size: number) {
+  if (size < 1024 * 1024) {
+    return `${Math.max(1, Math.round(size / 1024))} KB`;
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function UploadSurface({
+  inputKey,
+  id,
+  name,
+  accept,
+  required,
+  multiple,
+  selected,
+  icon,
+  title,
+  subtitle,
+  text,
+  accent,
+  previewUrl,
+  previewUrls,
+  previewAlt,
+  fileNames,
+  onChange,
+  onClear,
+}: {
+  inputKey: number;
+  id: string;
+  name: string;
+  accept: string;
+  required?: boolean;
+  multiple?: boolean;
+  selected: boolean;
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  text?: string;
+  accent: string;
+  previewUrl?: string;
+  previewUrls?: string[];
+  previewAlt?: string;
+  fileNames?: string[];
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+  onClear?: () => void;
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const showPreviewGrid = Boolean(previewUrls && previewUrls.length > 0);
+
   return (
-    <div className="mt-2 text-[12px]" style={{ color: 'var(--ac-fg-faint)' }}>
-      {text}
+    <div className="space-y-3">
+      <input
+        key={inputKey}
+        id={id}
+        name={name}
+        type="file"
+        accept={accept}
+        required={required}
+        multiple={multiple}
+        className="sr-only"
+        onChange={onChange}
+      />
+
+      <label
+        htmlFor={id}
+        className="group relative block cursor-pointer overflow-hidden rounded-[18px] border transition-all duration-200"
+        onDragEnter={() => setIsDragging(true)}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (
+            event.currentTarget.contains(event.relatedTarget as Node | null)
+          ) {
+            return;
+          }
+          setIsDragging(false);
+        }}
+        onDrop={() => setIsDragging(false)}
+        style={{
+          borderColor: isDragging
+            ? 'color-mix(in oklch, var(--ac-primary) 72%, var(--ac-border))'
+            : selected
+              ? 'color-mix(in oklch, var(--ac-primary) 36%, var(--ac-border))'
+              : 'var(--ac-border)',
+          outline: isDragging
+            ? '2px solid color-mix(in oklch, var(--ac-primary) 55%, transparent)'
+            : 'none',
+          outlineOffset: '-2px',
+          background: isDragging
+            ? 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,244,227,0.98) 100%)'
+            : 'linear-gradient(180deg, var(--ac-surface) 0%, var(--ac-surface-soft) 100%)',
+          boxShadow: isDragging
+            ? '0 0 0 6px rgba(255, 159, 107, 0.12), 0 22px 54px rgba(61, 46, 31, 0.12)'
+            : selected
+              ? '0 18px 44px rgba(61, 46, 31, 0.08)'
+              : '0 10px 26px rgba(61, 46, 31, 0.04)',
+          transform: isDragging ? 'translateY(-2px)' : 'translateY(0)',
+        }}
+      >
+        <div
+          className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+          style={{
+            opacity: isDragging ? 1 : undefined,
+            background:
+              'linear-gradient(135deg, rgba(255,159,107,0.08) 0%, transparent 42%, rgba(159,227,201,0.12) 100%)',
+          }}
+        />
+
+        <div className="relative grid gap-4 p-4 sm:grid-cols-[1fr_120px] sm:items-center">
+          <div className="min-w-0">
+            <div className="mb-3 flex items-center gap-2">
+              <span
+                className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] transition-transform duration-200"
+                style={{
+                  background: `color-mix(in oklch, ${accent} 24%, white)`,
+                  color: 'var(--ac-fg)',
+                  border: '1px solid var(--ac-border)',
+                  transform: isDragging ? 'scale(1.06)' : 'scale(1)',
+                }}
+              >
+                {icon}
+              </span>
+              <div className="min-w-0">
+                <div
+                  className="truncate text-[14px] font-semibold"
+                  style={{ color: 'var(--ac-fg)' }}
+                >
+                  {title}
+                </div>
+                {subtitle ? (
+                  <div
+                    className="text-[12px]"
+                    style={{ color: 'var(--ac-fg-faint)' }}
+                  >
+                    {subtitle}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className="ac-pill"
+                style={{
+                  background: isDragging ? 'var(--ac-primary)' : 'var(--ac-bg)',
+                  borderColor: isDragging
+                    ? 'var(--ac-primary)'
+                    : 'var(--ac-border-strong)',
+                  color: isDragging ? 'var(--ac-primary-ink)' : 'var(--ac-fg)',
+                }}
+              >
+                {isDragging ? '松手投进来' : '点击或拖拽文件'}
+              </span>
+              {onClear && selected ? (
+                <button
+                  type="button"
+                  className="ac-btn ac-btn-sm ac-btn-ghost pointer-events-auto"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onClear();
+                  }}
+                >
+                  <X size={14} />
+                  清空
+                </button>
+              ) : null}
+            </div>
+
+            {text ? (
+              <div
+                className="mt-3 text-[12px] leading-6"
+                style={{ color: 'var(--ac-fg-faint)' }}
+              >
+                {text}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex items-center justify-start sm:justify-end">
+            {showPreviewGrid ? (
+              <div className="grid grid-cols-2 gap-2">
+                {previewUrls?.slice(0, 4).map((url, index) => (
+                  <div
+                    key={`${url}-${index}`}
+                    className="relative h-[52px] w-[52px] overflow-hidden rounded-[12px] border"
+                    style={{
+                      borderColor: 'var(--ac-border)',
+                      background: 'var(--ac-bg-tint)',
+                    }}
+                  >
+                    <img
+                      src={url}
+                      alt={`${previewAlt ?? title} ${index + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                    {index === 3 && (previewUrls?.length ?? 0) > 4 ? (
+                      <div
+                        className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold"
+                        style={{
+                          background: 'rgba(61, 46, 31, 0.52)',
+                          color: '#fffdf8',
+                        }}
+                      >
+                        +{(previewUrls?.length ?? 0) - 4}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : previewUrl ? (
+              <div
+                className="h-[108px] w-[108px] overflow-hidden rounded-[16px] border"
+                style={{
+                  borderColor: 'var(--ac-border)',
+                  background: 'var(--ac-bg-tint)',
+                }}
+              >
+                <img
+                  src={previewUrl}
+                  alt={previewAlt ?? title}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : (
+              <div
+                className="flex h-[108px] w-[108px] flex-col items-center justify-center rounded-[16px] border border-dashed text-center transition-all duration-200"
+                style={{
+                  borderColor: isDragging
+                    ? 'var(--ac-primary)'
+                    : 'var(--ac-border-strong)',
+                  background: isDragging
+                    ? 'linear-gradient(180deg, rgba(255,239,228,0.96) 0%, rgba(255,248,239,1) 100%)'
+                    : 'linear-gradient(180deg, rgba(255,255,255,0.72) 0%, rgba(255,244,227,0.92) 100%)',
+                  color: isDragging
+                    ? 'var(--ac-primary)'
+                    : 'var(--ac-fg-faint)',
+                  transform: isDragging ? 'scale(1.04)' : 'scale(1)',
+                }}
+              >
+                <Upload size={18} />
+                <div className="mt-2 text-[11px] leading-5">PNG / JPG</div>
+                <div className="text-[11px] leading-5">WEBP / GIF / AVIF</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </label>
+
+      {fileNames && fileNames.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {fileNames.map((fileName) => (
+            <span
+              key={fileName}
+              className="rounded-full px-3 py-1 text-[12px]"
+              style={{
+                background: 'var(--ac-bg-tint)',
+                border: '1px solid var(--ac-border)',
+                color: 'var(--ac-fg-soft)',
+              }}
+            >
+              {fileName}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

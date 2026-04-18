@@ -14,8 +14,18 @@ const urlFieldSchema = z
   .transform((value) => (value === '' ? undefined : value))
   .pipe(z.string().url('请输入合法的链接').optional());
 
+const uploadedAssetPathSchema = z
+  .string()
+  .trim()
+  .regex(/^\/uploads\/[\w/-]+\.[a-z0-9]+$/i, '图片地址格式不正确');
+
+const imageSourceSchema = z.union([
+  z.string().trim().url('图片地址格式不正确'),
+  uploadedAssetPathSchema,
+]);
+
 const screenshotUrlsSchema = z
-  .array(z.string().trim().url('截图地址格式不正确'))
+  .array(imageSourceSchema)
   .max(6, '最多填写 6 张截图');
 
 export const createWorkInputSchema = z
@@ -38,10 +48,14 @@ export const createWorkInputSchema = z
       .trim()
       .min(20, '作品介绍至少 20 个字符')
       .max(300, '作品介绍不能超过 300 个字符'),
-    coverUrl: z.string().trim().url('封面链接格式不正确'),
+    coverUrl: imageSourceSchema,
     screenshots: screenshotUrlsSchema,
     webUrl: urlFieldSchema,
-    qrUrl: urlFieldSchema,
+    qrUrl: z
+      .string()
+      .trim()
+      .transform((value) => (value === '' ? undefined : value))
+      .pipe(imageSourceSchema.optional()),
   })
   .refine((value) => Boolean(value.webUrl || value.qrUrl), {
     message: '至少提供网页链接或二维码链接之一',
