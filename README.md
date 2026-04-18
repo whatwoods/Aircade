@@ -70,6 +70,9 @@ pnpm dev             # http://localhost:3000
 - `/register`：邀请码注册
 - `/login`：用户名密码登录
 - `/account`：已登录账号页（未登录会跳回 `/login`）
+- `/submit`：登录后提交作品，进入审核队列
+- `/admin/works`：管理员审核作品，通过后会上首页
+- `/works/:id`：作品详情页，未上线作品仅作者和管理员可见
 
 ## 目录结构
 
@@ -89,7 +92,7 @@ src/
 
 - [ ] `public/fonts/HarmonyOS_Sans_SC_Regular.woff2` —— 自行放置后在 `src/app/fonts.ts` 取消对应 `localFont` 调用的注释
 - [ ] `public/fonts/LXGWWenKai-Regular.woff2` —— 同上
-- [ ] 业务功能：见 PRD §3.1 MVP 清单，每个模块会有独立的 spec + plan
+- [ ] 业务功能：继续沿 PRD §3.1 推进标签、精选、点赞收藏、作者主页与投稿编辑
 
 ## 备份、部署
 
