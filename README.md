@@ -93,6 +93,84 @@ src/
 - [ ] `public/fonts/LXGWWenKai-Regular.woff2` —— 同上
 - [ ] 业务功能：继续沿 PRD §3.1 推进标签、精选、点赞收藏、作者主页与投稿编辑
 
-## 备份、部署
+## 生产部署
 
-脚手架阶段不涉及。参考 PRD §7.4 / §7.5 的方案，会在独立子项目实施。
+当前仓库已经验证可生产构建，默认部署方式推荐：
+
+- 应用：`pnpm build && pnpm start`
+- 进程托管：PM2
+- 反向代理：Nginx
+- 数据库：本机 PostgreSQL
+- 缓存 / session：本机 Redis
+
+### 生产环境变量
+
+生产机至少需要配置以下变量：
+
+```bash
+NODE_ENV=production
+DATABASE_URL=postgres://aircade:<strong-password>@127.0.0.1:5432/aircade
+REDIS_URL=redis://127.0.0.1:6379
+AUTH_SECRET=<32+ chars random secret>
+AUTH_SESSION_COOKIE=aircade_sid
+AUTH_SESSION_TTL_DAYS=30
+NEXT_PUBLIC_SITE_NAME=Aircade
+NEXT_PUBLIC_SITE_URL=https://your-domain.example.com
+UPLOAD_DIR=/var/aircade/uploads
+UPLOAD_PUBLIC_BASE=/uploads
+```
+
+### Ubuntu 24.04 / PM2 + Nginx 部署步骤
+
+```bash
+# 1) 安装依赖
+sudo apt update
+sudo apt install -y nginx postgresql redis-server
+
+# 2) 安装 Node.js 20 + pnpm + pm2
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+sudo npm install -g pnpm pm2
+
+# 3) 初始化数据库
+sudo -u postgres psql -c "CREATE USER aircade WITH PASSWORD '<strong-password>';"
+sudo -u postgres psql -c "CREATE DATABASE aircade OWNER aircade;"
+
+# 4) 部署代码
+git clone <repo-url>
+cd Aircade
+cp .env.example .env.production
+
+# 5) 修改 .env.production 后执行
+pnpm install --frozen-lockfile
+pnpm db:migrate
+pnpm db:seed   # 可选：初始化管理员
+pnpm build
+
+# 6) 用 PM2 启动
+pm2 start "pnpm start" --name aircade
+pm2 save
+pm2 startup
+```
+
+Nginx 需要把 80/443 请求反代到本地 `3000` 端口。典型站点配置：
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+完成反代后，再用 `certbot` 或其他 ACME 客户端签发 HTTPS 证书。
