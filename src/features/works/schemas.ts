@@ -14,20 +14,9 @@ const urlFieldSchema = z
   .transform((value) => (value === '' ? undefined : value))
   .pipe(z.string().url('请输入合法的链接').optional());
 
-const screenshotLinesSchema = z
-  .string()
-  .trim()
-  .transform((value) =>
-    value === ''
-      ? []
-      : value
-          .split(/\r?\n/)
-          .map((item) => item.trim())
-          .filter(Boolean)
-  )
-  .pipe(
-    z.array(z.string().url('截图链接格式不正确')).max(6, '最多填写 6 张截图')
-  );
+const screenshotUrlsSchema = z
+  .array(z.string().trim().url('截图地址格式不正确'))
+  .max(6, '最多填写 6 张截图');
 
 export const createWorkInputSchema = z
   .object({
@@ -50,7 +39,7 @@ export const createWorkInputSchema = z
       .min(20, '作品介绍至少 20 个字符')
       .max(300, '作品介绍不能超过 300 个字符'),
     coverUrl: z.string().trim().url('封面链接格式不正确'),
-    screenshots: screenshotLinesSchema,
+    screenshots: screenshotUrlsSchema,
     webUrl: urlFieldSchema,
     qrUrl: urlFieldSchema,
   })
@@ -88,13 +77,19 @@ export type CreateWorkInput = z.infer<typeof createWorkInputSchema>;
 export type ReviewWorkInput = z.infer<typeof reviewWorkInputSchema>;
 
 export function parseCreateWorkFormData(formData: FormData): CreateWorkInput {
+  const screenshotLines = String(formData.get('screenshots') ?? '')
+    .trim()
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
   return createWorkInputSchema.parse({
     title: formData.get('title'),
     type: formData.get('type'),
     tagline: formData.get('tagline'),
     description: formData.get('description'),
     coverUrl: formData.get('coverUrl'),
-    screenshots: formData.get('screenshots'),
+    screenshots: screenshotLines,
     webUrl: formData.get('webUrl'),
     qrUrl: formData.get('qrUrl'),
   });

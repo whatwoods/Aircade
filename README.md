@@ -120,6 +120,12 @@ UPLOAD_DIR=/var/aircade/uploads
 UPLOAD_PUBLIC_BASE=/uploads
 ```
 
+上传图片现在会直接写入 `UPLOAD_DIR`，数据库只保存相对访问路径。单机云服务器建议保持：
+
+- `UPLOAD_DIR` 指向代码目录外的持久化磁盘路径，例如 `/var/aircade/uploads`
+- `UPLOAD_PUBLIC_BASE` 维持 `/uploads`
+- Nginx 直接托管 `/uploads/`，或者在 Nginx 未配置前由应用内置路由兜底返回图片
+
 ### Ubuntu 24.04 / PM2 + Nginx 部署步骤
 
 ```bash

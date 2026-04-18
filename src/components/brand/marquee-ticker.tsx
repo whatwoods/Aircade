@@ -1,8 +1,6 @@
 const defaultItems = [
   '★ INSERT COIN TO START ★',
   '◆ 群友 × AI × 街机 ◆',
-  '▲ 15+ 作品等你点赞 ▲',
-  '● 邀请码制 · 群里自取 ●',
   '◇ MADE WITH CAFFEINE ◇',
 ];
 

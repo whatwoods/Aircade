@@ -10,7 +10,7 @@ describe('createWorkInputSchema', () => {
       description:
         '玩家需要在狭小空间里调度不同性格的猫猫成员，让它们把混乱的基地重新运转起来。',
       coverUrl: 'https://example.com/cover.png',
-      screenshots: 'https://example.com/1.png\nhttps://example.com/2.png',
+      screenshots: ['https://example.com/1.png', 'https://example.com/2.png'],
       webUrl: 'https://example.com/play',
       qrUrl: '',
     });
@@ -28,7 +28,7 @@ describe('createWorkInputSchema', () => {
         tagline: '一句够长的介绍',
         description: '这是一段足够长的作品介绍，用来验证动作目标缺失时会失败。',
         coverUrl: 'https://example.com/cover.png',
-        screenshots: '',
+        screenshots: [],
         webUrl: '',
         qrUrl: '',
       })

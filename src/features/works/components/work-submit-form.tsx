@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Cover, TypeChip } from '@/components/brand';
 import { createWorkAction } from '../actions';
 import { workTypeValues } from '../schemas';
@@ -36,11 +36,32 @@ export function WorkSubmitForm() {
   const [title, setTitle] = useState('');
   const [tagline, setTagline] = useState('');
   const [description, setDescription] = useState('');
-  const [coverUrl, setCoverUrl] = useState('');
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState('');
+  const [screenshotCount, setScreenshotCount] = useState(0);
+  const [qrFileName, setQrFileName] = useState('');
+
+  useEffect(() => {
+    if (!coverFile) {
+      setCoverPreviewUrl('');
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(coverFile);
+    setCoverPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [coverFile]);
 
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[1fr_340px]">
-      <form action={createWorkAction} className="ac-card p-6 sm:p-7">
+      <form
+        action={createWorkAction}
+        encType="multipart/form-data"
+        className="ac-card p-6 sm:p-7"
+      >
         {/* hidden input to carry chosen type since select is replaced */}
         <input type="hidden" name="type" value={type} />
 
@@ -123,29 +144,45 @@ export function WorkSubmitForm() {
 
         <Divider />
 
-        <Section title="图片" note="封面在卡片，截图在详情页。">
-          <Field label="封面链接" htmlFor="coverUrl" required>
+        <Section title="图片" note="封面在卡片，截图在详情页，支持直接上传。">
+          <Field label="封面上传" htmlFor="coverFile" required>
             <input
-              id="coverUrl"
-              name="coverUrl"
-              type="url"
+              id="coverFile"
+              name="coverFile"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
               required
-              value={coverUrl}
-              onChange={(e) => setCoverUrl(e.target.value)}
               className={inputClass}
               style={inputStyle}
-              placeholder="https://..."
+              onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
+            />
+            <UploadHint
+              text={
+                coverFile
+                  ? `已选择：${coverFile.name}`
+                  : '支持 PNG / JPG / WEBP / GIF / AVIF'
+              }
             />
           </Field>
 
-          <Field label="截图链接" note="每行一张，可留空" htmlFor="screenshots">
-            <textarea
+          <Field
+            label="截图上传"
+            note={
+              screenshotCount > 0
+                ? `已选择 ${screenshotCount} 张，最多 6 张`
+                : '可多选，最多 6 张，可留空'
+            }
+            htmlFor="screenshots"
+          >
+            <input
               id="screenshots"
               name="screenshots"
-              rows={4}
-              className={`${inputClass} resize-y`}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+              multiple
+              className={inputClass}
               style={inputStyle}
-              placeholder={'https://...\nhttps://...'}
+              onChange={(e) => setScreenshotCount(e.target.files?.length ?? 0)}
             />
           </Field>
         </Section>
@@ -163,14 +200,22 @@ export function WorkSubmitForm() {
               placeholder="https://"
             />
           </Field>
-          <Field label="二维码图片链接" htmlFor="qrUrl">
+          <Field label="二维码图片上传" htmlFor="qrFile" note="可留空">
             <input
-              id="qrUrl"
-              name="qrUrl"
-              type="url"
+              id="qrFile"
+              name="qrFile"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
               className={inputClass}
               style={inputStyle}
-              placeholder="https://"
+              onChange={(e) => setQrFileName(e.target.files?.[0]?.name ?? '')}
+            />
+            <UploadHint
+              text={
+                qrFileName
+                  ? `已选择：${qrFileName}`
+                  : '如果没填 Web 链接，至少上传一张二维码'
+              }
             />
           </Field>
         </Section>
@@ -202,7 +247,7 @@ export function WorkSubmitForm() {
         >
           <Cover
             seed={`preview-${type}`}
-            coverUrl={coverUrl || undefined}
+            coverUrl={coverPreviewUrl || undefined}
             ratio="4 / 3"
           />
           <div className="p-4">
@@ -280,6 +325,14 @@ function Section({
 function Divider() {
   return (
     <div className="my-7 h-px" style={{ background: 'var(--ac-border)' }} />
+  );
+}
+
+function UploadHint({ text }: { text: string }) {
+  return (
+    <div className="mt-2 text-[12px]" style={{ color: 'var(--ac-fg-faint)' }}>
+      {text}
+    </div>
   );
 }
 

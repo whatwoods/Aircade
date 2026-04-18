@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireUser } from '@/features/auth';
-import { parseCreateWorkFormData, parseReviewWorkFormData } from './schemas';
+import { parseReviewWorkFormData } from './schemas';
 import { getWorkErrorMessage } from './server/errors';
+import { parseCreateWorkUploadFormData } from './server/upload-work-assets';
 import { createWork, reviewWork } from './server/works';
 
 function buildRedirectUrl(
@@ -27,7 +28,8 @@ export async function createWorkAction(formData: FormData) {
   const user = await requireUser('/submit');
 
   try {
-    const work = await createWork(parseCreateWorkFormData(formData), user.id);
+    const input = await parseCreateWorkUploadFormData(formData);
+    const work = await createWork(input, user.id);
 
     revalidatePath('/');
     revalidatePath('/account');
