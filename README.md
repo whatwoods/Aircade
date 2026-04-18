@@ -174,3 +174,40 @@ server {
 ```
 
 完成反代后，再用 `certbot` 或其他 ACME 客户端签发 HTTPS 证书。
+
+### 健康检查
+
+生产环境提供健康检查路由：
+
+```bash
+curl https://your-domain.example.com/api/health
+```
+
+返回 `200` 代表应用、PostgreSQL、Redis 均可用；返回 `503` 代表服务已启动，但至少一个依赖不可用。
+
+### 一键更新脚本
+
+仓库内置生产更新脚本：
+
+```bash
+cd /var/www/Aircade
+chmod +x scripts/deploy-production.sh
+./scripts/deploy-production.sh
+```
+
+可选参数：
+
+```bash
+APP_NAME=aircade BRANCH=main ./scripts/deploy-production.sh
+RUN_SEED=1 ./scripts/deploy-production.sh
+HEALTHCHECK_URL=http://127.0.0.1:3000/api/health ./scripts/deploy-production.sh
+```
+
+默认流程包括：
+
+1. 拉取最新 `origin/<branch>`
+2. `pnpm install --frozen-lockfile`
+3. `pnpm db:migrate`
+4. `pnpm build`
+5. `pm2 restart/start`
+6. 轮询 `/api/health` 做部署后自检
