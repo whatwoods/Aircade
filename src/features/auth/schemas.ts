@@ -10,10 +10,6 @@ function normalizeDisplayName(value: string) {
   return value.trim().normalize('NFKC');
 }
 
-function normalizeInviteCode(value: string) {
-  return value.trim().normalize('NFKC').toUpperCase();
-}
-
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
@@ -43,13 +39,6 @@ export const passwordSchema = z
   .min(8, '密码至少 8 位')
   .max(72, '密码长度不能超过 72 位');
 
-export const inviteCodeSchema = z
-  .string()
-  .transform(normalizeInviteCode)
-  .refine((value) => value.length >= 4 && value.length <= 32, {
-    message: '邀请码格式不正确',
-  });
-
 export const optionalEmailSchema = z
   .string()
   .trim()
@@ -62,7 +51,6 @@ export const loginInputSchema = z.object({
 });
 
 export const registerInputSchema = z.object({
-  inviteCode: inviteCodeSchema,
   username: usernameSchema,
   displayName: displayNameSchema,
   email: optionalEmailSchema,
@@ -83,16 +71,11 @@ export function parseRegisterFormData(formData: FormData): RegisterInput {
   const rawUsername = String(formData.get('username') ?? '');
 
   return registerInputSchema.parse({
-    inviteCode: formData.get('inviteCode'),
     username: rawUsername,
     displayName: rawUsername,
     email: formData.get('email'),
     password: formData.get('password'),
   });
-}
-
-export function normalizeSeedInviteCode(value: string): string {
-  return inviteCodeSchema.parse(value);
 }
 
 export function normalizeSeedUsername(value: string): {

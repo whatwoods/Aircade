@@ -39,6 +39,7 @@ public/uploads
 .turbo
 
 # IDE / Editor
+.claude
 .idea
 .vscode/*
 !.vscode/settings.json

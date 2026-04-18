@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
-import { inter, harmony, lxgw } from './fonts';
+import { getCurrentUser } from '@/features/auth';
+import { countPendingWorks } from '@/features/works';
+import { Footer, Navbar } from '@/components/brand';
+import { harmony, inter, lxgw, mono } from './fonts';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Aircade',
+    default: 'Aircade · 群友造的街机厅',
     template: '%s · Aircade',
   },
   description: '群友造的街机厅——AI 时代的小作品展示站。',
@@ -21,18 +24,31 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const user = await getCurrentUser();
+  const pendingCount = user?.role === 'admin' ? await countPendingWorks() : 0;
+
+  const navUser = user
+    ? {
+        username: user.username,
+        nickname: user.nickname,
+        role: user.role,
+      }
+    : null;
+
   return (
     <html
       lang="zh-CN"
-      className={`${inter.variable} ${harmony.variable} ${lxgw.variable}`}
+      className={`${inter.variable} ${harmony.variable} ${lxgw.variable} ${mono.variable}`}
     >
-      <body className="min-h-screen bg-brand-milk font-sans text-brand-coffee antialiased">
-        {children}
+      <body className="min-h-screen bg-[var(--ac-bg)] font-sans text-[var(--ac-fg)] antialiased">
+        <Navbar user={navUser} pendingCount={pendingCount} />
+        <div className="min-h-[calc(100vh-64px)]">{children}</div>
+        <Footer />
       </body>
     </html>
   );

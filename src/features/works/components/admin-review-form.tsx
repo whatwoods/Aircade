@@ -1,35 +1,119 @@
+'use client';
+
+import { useRef } from 'react';
 import Link from 'next/link';
+import { Avatar, Cover, TypeChip } from '@/components/brand';
 import type { WorkSummary } from '../server/works';
 import { reviewWorkAction } from '../actions';
 
-const textareaClassName =
-  'border-brand-coffee/12 min-h-24 w-full rounded-input border bg-white px-4 py-3 text-sm text-brand-coffee outline-none transition placeholder:text-brand-coffee/35 focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10';
+const statusPillClass: Record<WorkSummary['status'], string> = {
+  pending: 'ac-type-social',
+  live: 'ac-type-tool',
+  rejected: 'ac-type-game',
+  unlisted: 'ac-type-other',
+};
+
+const statusLabel: Record<WorkSummary['status'], string> = {
+  pending: '待审核',
+  live: '已上线',
+  rejected: '已驳回',
+  unlisted: '隐藏',
+};
+
+function formatDate(value: Date) {
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(value);
+}
 
 export function AdminReviewForm({ work }: { work: WorkSummary }) {
+  const authorName = work.author.nickname || work.author.username;
+  const formRef = useRef<HTMLFormElement>(null);
+  const approveRef = useRef<HTMLButtonElement>(null);
+  const rejectRef = useRef<HTMLButtonElement>(null);
+
+  function handleShortcut(event: React.KeyboardEvent<HTMLFormElement>) {
+    if (!event.metaKey && !event.ctrlKey) {
+      return;
+    }
+
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      formRef.current?.requestSubmit(approveRef.current ?? undefined);
+      return;
+    }
+
+    if ((event.key === 'R' || event.key === 'r') && event.shiftKey) {
+      event.preventDefault();
+      formRef.current?.requestSubmit(rejectRef.current ?? undefined);
+    }
+  }
+
   return (
-    <article className="rounded-card border border-brand-coffee/10 bg-white p-5 shadow-[0_18px_50px_rgba(61,46,31,0.08)]">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.18em] text-brand-coffee/45">
-            <span>{work.status === 'pending' ? '待审核' : '已驳回'}</span>
-            <span>@{work.author.username}</span>
+    <article className="ac-card overflow-hidden">
+      <div className="grid gap-5 p-5 lg:grid-cols-[240px_1fr]">
+        <Cover
+          seed={`${work.id}-${work.type}`}
+          coverUrl={work.coverUrl}
+          ratio="4 / 3"
+          label={`#${work.id.slice(0, 6).toUpperCase()}`}
+        />
+
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <TypeChip type={work.type} />
+            <span className={`ac-pill ${statusPillClass[work.status]}`}>
+              {statusLabel[work.status]}
+            </span>
+            <span className="ac-micro" style={{ color: 'var(--ac-fg-faint)' }}>
+              {formatDate(work.createdAt)}
+            </span>
           </div>
-          <div className="space-y-2">
-            <h2 className="font-display text-2xl tracking-tight text-brand-coffee">
+
+          <div>
+            <h3
+              className="font-display text-[24px] leading-tight tracking-tight"
+              style={{ color: 'var(--ac-fg)' }}
+            >
               {work.title}
-            </h2>
-            <p className="text-sm font-medium text-brand-orange">
+            </h3>
+            <p
+              className="mt-1 text-[14px] font-semibold"
+              style={{ color: 'var(--ac-primary)' }}
+            >
               {work.tagline}
-            </p>
-            <p className="max-w-3xl text-sm leading-7 text-brand-coffee/70">
-              {work.description}
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3 text-sm">
+          <p
+            className="max-w-3xl text-[13.5px] leading-7"
+            style={{ color: 'var(--ac-fg-soft)' }}
+          >
+            {work.description}
+          </p>
+
+          <div className="flex items-center gap-2">
+            <Avatar name={authorName} seed={work.author.username} size={28} />
+            <div className="leading-tight">
+              <div
+                className="text-[13px] font-semibold"
+                style={{ color: 'var(--ac-fg)' }}
+              >
+                {authorName}
+              </div>
+              <div className="ac-micro" style={{ color: 'var(--ac-fg-faint)' }}>
+                @{work.author.username}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
             <Link
               href={`/works/${work.id}`}
-              className="rounded-btn border border-brand-coffee/10 bg-brand-milk px-4 py-2 font-medium text-brand-coffee transition hover:border-brand-orange/30 hover:bg-brand-cream/55"
+              className="ac-btn ac-btn-sm ac-btn-ghost"
             >
               查看详情
             </Link>
@@ -38,9 +122,9 @@ export function AdminReviewForm({ work }: { work: WorkSummary }) {
                 href={work.webUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-btn border border-brand-coffee/10 bg-white px-4 py-2 font-medium text-brand-coffee transition hover:border-brand-orange/30 hover:text-brand-orange"
+                className="ac-btn ac-btn-sm ac-btn-ghost"
               >
-                打开网页
+                打开网页 ↗
               </a>
             ) : null}
             {work.qrUrl ? (
@@ -48,57 +132,81 @@ export function AdminReviewForm({ work }: { work: WorkSummary }) {
                 href={work.qrUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-btn border border-brand-coffee/10 bg-white px-4 py-2 font-medium text-brand-coffee transition hover:border-brand-orange/30 hover:text-brand-orange"
+                className="ac-btn ac-btn-sm ac-btn-ghost"
               >
-                查看二维码
+                看二维码
               </a>
             ) : null}
           </div>
         </div>
-
-        <div
-          className="h-40 w-full rounded-2xl bg-brand-coffee/10 bg-cover bg-center lg:w-64"
-          style={{
-            backgroundImage: `linear-gradient(180deg, rgba(61,46,31,0.05), rgba(61,46,31,0.25)), url(${work.coverUrl})`,
-          }}
-        />
       </div>
 
-      <form action={reviewWorkAction} className="mt-5 space-y-4">
+      <form
+        ref={formRef}
+        action={reviewWorkAction}
+        className="space-y-3 border-t p-5"
+        style={{
+          borderColor: 'var(--ac-border)',
+          background: 'var(--ac-bg-tint)',
+        }}
+        onKeyDown={handleShortcut}
+      >
         <input type="hidden" name="workId" value={work.id} />
-        <div className="space-y-2">
+        <div>
           <label
             htmlFor={`rejectReason-${work.id}`}
-            className="text-sm font-medium text-brand-coffee/80"
+            className="ac-micro mb-2 block"
+            style={{ color: 'var(--ac-fg-faint)' }}
           >
-            驳回原因
+            REVIEW NOTE · 驳回时填写
           </label>
           <textarea
             id={`rejectReason-${work.id}`}
             name="rejectReason"
             defaultValue={work.rejectReason ?? ''}
-            placeholder="拒绝时填写。通过时可以留空。"
-            className={textareaClassName}
+            rows={2}
+            className="ac-field w-full resize-y rounded-[12px] px-4 py-3 text-[14px] outline-none"
+            style={{
+              background: 'var(--ac-surface)',
+              border: '1px solid var(--ac-border)',
+              color: 'var(--ac-fg)',
+              minHeight: 64,
+            }}
+            placeholder="驳回时写清楚具体改哪里，通过时可留空。"
           />
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="submit"
-            name="decision"
-            value="approve"
-            className="hover:bg-brand-coffee/92 rounded-btn bg-brand-coffee px-4 py-2 text-sm font-semibold text-white transition"
-          >
-            通过并上线
-          </button>
-          <button
-            type="submit"
-            name="decision"
-            value="reject"
-            className="rounded-btn bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-          >
-            驳回
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="ac-micro" style={{ color: 'var(--ac-fg-faint)' }}>
+            键盘快捷键 · ⌘Enter 通过 · ⌘⇧R 驳回
+          </div>
+          <div className="flex gap-2">
+            <button
+              ref={rejectRef}
+              type="submit"
+              name="decision"
+              value="reject"
+              className="ac-btn ac-btn-sm"
+              aria-keyshortcuts="Meta+Shift+R Control+Shift+R"
+              style={{
+                background: 'rgba(220, 38, 38, 0.08)',
+                borderColor: 'rgba(220, 38, 38, 0.35)',
+                color: '#b91c1c',
+              }}
+            >
+              驳回
+            </button>
+            <button
+              ref={approveRef}
+              type="submit"
+              name="decision"
+              value="approve"
+              className="ac-btn ac-btn-sm ac-btn-primary"
+              aria-keyshortcuts="Meta+Enter Control+Enter"
+            >
+              通过并上线 →
+            </button>
+          </div>
         </div>
       </form>
     </article>

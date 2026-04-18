@@ -51,6 +51,7 @@ const config: Config = {
         btn: '12px',
         card: '20px',
         input: '10px',
+        pill: '999px',
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
@@ -69,6 +70,42 @@ const config: Config = {
           'var(--font-inter)',
           'sans-serif',
         ],
+        mono: [
+          'var(--font-mono)',
+          'ui-monospace',
+          'SFMono-Regular',
+          'monospace',
+        ],
+      },
+      keyframes: {
+        heartPop: {
+          '0%': { transform: 'scale(1)' },
+          '35%': { transform: 'scale(1.35) rotate(-6deg)' },
+          '60%': { transform: 'scale(0.95)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        sparkle: {
+          '0%': { transform: 'translate(0,0) scale(0.4)', opacity: '0' },
+          '30%': { opacity: '1' },
+          '100%': {
+            transform: 'translate(var(--dx), var(--dy)) scale(1)',
+            opacity: '0',
+          },
+        },
+        pageIn: {
+          from: { opacity: '0', transform: 'translateY(6px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        marquee: {
+          from: { transform: 'translateX(0)' },
+          to: { transform: 'translateX(-50%)' },
+        },
+      },
+      animation: {
+        heartPop: 'heartPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+        sparkle: 'sparkle 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) forwards',
+        pageIn: 'pageIn 0.35s cubic-bezier(0.22, 0.61, 0.36, 1)',
+        marquee: 'marquee 40s linear infinite',
       },
     },
   },

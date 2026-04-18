@@ -2,7 +2,7 @@
 
 > 群友造的街机厅——AI 做游戏社群的作品展示站。
 
-完整产品需求见 [`PRD.md`](./PRD.md)。脚手架设计见 [`docs/superpowers/specs/2026-04-17-scaffold-design.md`](./docs/superpowers/specs/2026-04-17-scaffold-design.md)。
+完整产品需求见 [`docs/PRD.md`](./docs/PRD.md)。设计基线见 [`docs/design/README.md`](./docs/design/README.md)。
 
 ## 快速开始
 
@@ -37,7 +37,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```bash
 pnpm install
 pnpm db:migrate      # 建好 PRD §6 的 8 张表
-pnpm db:seed         # 生成本地开发管理员 + 测试邀请码
+pnpm db:seed         # 生成本地开发管理员
 pnpm dev             # http://localhost:3000
 ```
 
@@ -54,7 +54,7 @@ pnpm dev             # http://localhost:3000
 | `pnpm test:watch` | Vitest watch 模式 |
 | `pnpm db:gen` | 从 schema 生成 migration 文件 |
 | `pnpm db:migrate` | 把 migration 应用到数据库 |
-| `pnpm db:seed` | 写入本地开发管理员和测试邀请码 |
+| `pnpm db:seed` | 写入本地开发管理员 |
 | `pnpm db:studio` | 启动 Drizzle Studio（浏览器查表） |
 
 ## 认证验收
@@ -63,11 +63,10 @@ pnpm dev             # http://localhost:3000
 
 - 管理员用户名：`admin`
 - 管理员密码：`admin123456`
-- 测试邀请码：`AIRCADE-DEV-001`
 
 然后可以直接访问：
 
-- `/register`：邀请码注册
+- `/register`：直接注册
 - `/login`：用户名密码登录
 - `/account`：已登录账号页（未登录会跳回 `/login`）
 - `/submit`：登录后提交作品，进入审核队列

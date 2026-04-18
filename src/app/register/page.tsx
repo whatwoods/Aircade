@@ -8,7 +8,7 @@ import {
 
 export const metadata: Metadata = {
   title: '注册',
-  description: '使用邀请码注册 Aircade，创建账号后即可直接登录。',
+  description: '注册 Aircade，创建账号后即可直接登录。',
 };
 
 type RegisterPageProps = {
@@ -34,10 +34,10 @@ export default async function RegisterPage({
 
   return (
     <AuthShell
-      title="拿着邀请码进门"
-      subtitle="V1 先用邀请码把社区边界收住。注册成功后会自动登录，后面提交作品就不用再绕一次。"
-      sideTitle="邀请码是当前版本的闸机"
-      sideBody="这一步只做最核心的校验：邀请码可用、用户名合规、密码足够长。真正的作品提交、审核、后台管理，会在这套身份基础上继续叠。"
+      title="创建你的账号"
+      subtitle="现在直接注册就能进站。注册成功后会自动登录，后面提交作品就不用再绕一次。"
+      sideTitle="先把身份打稳"
+      sideBody="这一步只做最核心的校验：用户名合规、邮箱格式正确、密码足够长。真正的作品提交、审核、后台管理，会在这套身份基础上继续叠。"
       sideLinks={[
         { href: '/login', label: '已经有账号，去登录' },
         { href: '/', label: '先回首页看看' },

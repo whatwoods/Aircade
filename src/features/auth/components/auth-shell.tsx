@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { MarqueeTicker } from '@/components/brand';
 
 type Tone = 'error' | 'notice';
 
@@ -32,74 +32,139 @@ export function AuthShell({
   message,
 }: AuthShellProps) {
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,159,107,0.28),_transparent_30%),linear-gradient(135deg,_#fffaf3_0%,_#fff3df_45%,_#fefcf7_100%)] px-4 py-10 sm:px-6">
-      <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <section className="rounded-card border border-brand-orange/20 bg-white/85 p-6 shadow-[0_24px_80px_rgba(61,46,31,0.12)] backdrop-blur sm:p-8">
-          <div className="mb-8 flex items-start justify-between gap-4">
-            <div className="space-y-2">
-              <span className="inline-flex rounded-full bg-brand-orange/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-brand-orange">
-                Aircade Access
-              </span>
-              <h1 className="font-display text-3xl tracking-tight text-brand-coffee sm:text-4xl">
-                {title}
-              </h1>
-              <p className="max-w-xl text-sm leading-6 text-brand-coffee/70 sm:text-base">
-                {subtitle}
-              </p>
-            </div>
-            <Link
-              href="/"
-              className="rounded-btn border border-brand-coffee/10 bg-brand-milk px-4 py-2 text-sm font-medium text-brand-coffee transition hover:border-brand-orange/30 hover:bg-brand-cream/60"
+    <div className="ac-page-in">
+      <div className="ac-hero-bg relative overflow-hidden">
+        <div className="ac-dither pointer-events-none absolute inset-0" />
+        <div className="ac-scanlines pointer-events-none absolute inset-0" />
+
+        <div className="relative mx-auto max-w-6xl px-6 py-16 sm:px-8">
+          <div className="grid items-start gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+            {/* Form card */}
+            <section className="ac-card p-6 sm:p-8">
+              <div className="mb-6">
+                <div
+                  className="ac-micro mb-2"
+                  style={{ color: 'var(--ac-primary)' }}
+                >
+                  AIRCADE ACCESS
+                </div>
+                <h1
+                  className="font-display text-[34px] leading-tight tracking-tight sm:text-[40px]"
+                  style={{ color: 'var(--ac-fg)' }}
+                >
+                  {title}
+                </h1>
+                <p
+                  className="mt-2 max-w-xl text-[14px] leading-7"
+                  style={{ color: 'var(--ac-fg-soft)' }}
+                >
+                  {subtitle}
+                </p>
+              </div>
+
+              {message ? (
+                <div
+                  className="mb-5 rounded-[14px] px-4 py-3 text-sm"
+                  style={
+                    message.tone === 'error'
+                      ? {
+                          background: 'rgba(254, 226, 226, 0.6)',
+                          border: '1px solid rgba(220, 38, 38, 0.25)',
+                          color: '#b91c1c',
+                        }
+                      : {
+                          background:
+                            'color-mix(in oklch, var(--ac-mint) 30%, var(--ac-surface))',
+                          border: '1px solid var(--ac-border)',
+                          color: 'var(--ac-fg)',
+                        }
+                  }
+                >
+                  {message.text}
+                </div>
+              ) : null}
+
+              {children}
+            </section>
+
+            {/* Side brand panel */}
+            <aside
+              className="relative flex flex-col justify-between overflow-hidden rounded-[22px] p-7 sm:p-8"
+              style={{
+                background:
+                  'linear-gradient(160deg, var(--ac-fg) 0%, #2a1f14 100%)',
+                color: 'var(--ac-bg)',
+                boxShadow: 'var(--ac-card-shadow)',
+                minHeight: 420,
+              }}
             >
-              返回首页
-            </Link>
+              <div
+                aria-hidden
+                className="absolute -right-16 -top-16 h-72 w-72 rounded-full"
+                style={{
+                  background:
+                    'radial-gradient(circle, color-mix(in oklch, var(--ac-primary) 60%, transparent), transparent 70%)',
+                }}
+              />
+              <div
+                aria-hidden
+                className="absolute -bottom-10 -left-10 h-56 w-56 rounded-full"
+                style={{
+                  background:
+                    'radial-gradient(circle, color-mix(in oklch, var(--ac-mint) 45%, transparent), transparent 70%)',
+                }}
+              />
+
+              <div className="relative">
+                <div
+                  className="ac-micro mb-5"
+                  style={{
+                    color: 'color-mix(in oklch, var(--ac-bg) 60%, transparent)',
+                  }}
+                >
+                  ★ INSERT COIN
+                </div>
+                <h2
+                  className="font-display text-[28px] leading-tight tracking-tight sm:text-[32px]"
+                  style={{ color: 'var(--ac-bg)' }}
+                >
+                  {sideTitle}
+                </h2>
+                <p
+                  className="mt-3 max-w-sm text-[14px] leading-[1.85]"
+                  style={{
+                    color: 'color-mix(in oklch, var(--ac-bg) 72%, transparent)',
+                  }}
+                >
+                  {sideBody}
+                </p>
+              </div>
+
+              <div className="relative mt-8 grid gap-2">
+                {sideLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="rounded-[12px] px-4 py-3 text-[13px] font-medium transition-colors"
+                    style={{
+                      border:
+                        '1px solid color-mix(in oklch, var(--ac-bg) 25%, transparent)',
+                      background:
+                        'color-mix(in oklch, var(--ac-bg) 8%, transparent)',
+                      color: 'var(--ac-bg)',
+                    }}
+                  >
+                    {link.label} →
+                  </Link>
+                ))}
+              </div>
+            </aside>
           </div>
+        </div>
 
-          {message ? (
-            <div
-              className={cn(
-                'mb-6 rounded-input border px-4 py-3 text-sm',
-                message.tone === 'error'
-                  ? 'border-red-200 bg-red-50 text-red-700'
-                  : 'border-brand-mint/40 bg-brand-mint/20 text-brand-coffee'
-              )}
-            >
-              {message.text}
-            </div>
-          ) : null}
-
-          {children}
-        </section>
-
-        <aside className="flex flex-col justify-between rounded-card border border-brand-coffee/10 bg-brand-coffee p-6 text-brand-milk shadow-[0_24px_60px_rgba(61,46,31,0.18)] sm:p-8">
-          <div className="space-y-5">
-            <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-orange text-2xl font-bold text-white shadow-lg shadow-brand-orange/30">
-              A
-            </div>
-            <div className="space-y-3">
-              <h2 className="font-display text-2xl tracking-tight text-white">
-                {sideTitle}
-              </h2>
-              <p className="text-brand-milk/78 text-sm leading-7 sm:text-base">
-                {sideBody}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-10 grid gap-3">
-            {sideLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="border-white/12 bg-white/8 hover:bg-white/14 rounded-btn border px-4 py-3 text-sm font-medium text-white transition hover:border-brand-cream/40"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </aside>
+        <MarqueeTicker />
       </div>
-    </main>
+    </div>
   );
 }
 

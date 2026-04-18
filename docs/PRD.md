@@ -4,7 +4,7 @@
 **项目名**：Aircade
 **定位**：《AI 做游戏》群友作品展示站——群友们亲手造的街机厅
 **文档作者**：Way
-**最后更新**：2026-04-17
+**最后更新**：2026-04-18
 
 ---
 
@@ -331,16 +331,60 @@ git add . && git commit -m "backup $DATE" && git push
 
 ## 8. 视觉与交互原则
 
-**调性**：可爱派对、圆角、暖色、插画感。参考：即刻 App、Bento 卡片、Notion Calendar 插画风。
+**调性**：**群友造的街机厅**——暖调复古街机、圆角卡片、插画感、手工味。参考：即刻 App、Bento 卡片、Notion Calendar 插画风，再叠一层 AI 时代的做旧/扫描线气质。
 
-- **主色**：暖橙 `#FF9F6B` / 奶黄 `#FFE9B8`
-- **辅色**：薄荷绿 `#9FE3C9` / 樱粉 `#FFB7C5`
-- **中性**：奶白 `#FFFBF5` / 深棕 `#3D2E1F`（比纯黑柔和）
-- **字体**：中文霞鹜文楷 / HarmonyOS Sans，英文 Inter
-- **圆角**：按钮 12px、卡片 20px、输入框 10px
-- **空态**：用插画，不用纯文字，保持调性
-- **微动效**：点赞时爱心弹跳、卡片 hover 微浮起、页面切换淡入
-- **移动端优先**：主受众在手机上，H5 体验必须顺滑
+完整设计系统见 [`docs/design/README.md`](./design/README.md)，原始 Claude Design 原型保存在 [`docs/design/prototype/`](./design/prototype/)。以下是基线要点：
+
+### 8.1 色系（`--ac-*` 代币，声明于 `src/app/globals.css`）
+
+- **主色**：暖橙 `#FF9F6B`（`--ac-primary`）
+- **辅色**：奶黄 `#FFE9B8` · 薄荷绿 `#9FE3C9` · 樱粉 `#FFB7C5`
+- **中性**：奶白 `#FFFBF5`（`--ac-bg`）/ 深棕 `#3D2E1F`（`--ac-fg`，不用纯黑）
+- **类型 mood**：`--t-game` 粉 / `--t-tool` 绿 / `--t-social` 黄 / `--t-ai` 橙 / `--t-other` 灰棕，淡化时用 `color-mix(in oklch, … 70%, var(--ac-surface))`
+
+### 8.2 字体
+
+- **中文 Display**：霞鹜文楷（`--font-lxgw`）
+- **中文正文回落**：HarmonyOS Sans（`--font-harmony`）
+- **西文正文**：Inter（`--font-inter`）
+- **Mono / micro 标 / 邀请码**：JetBrains Mono（`--font-mono`），配 `letter-spacing: 0.22em · uppercase`
+
+### 8.3 圆角、间距、阴影
+
+- 圆角：按钮 12px · 输入框 12px · 卡片 20–22px · pill 9999px
+- 阴影：常规卡 `0 20px 60px rgba(61,46,31,.08)`；hover 加深；主 CTA 用橙影 `0 18px 32px rgba(255,159,107,.32)`
+- 分段线：`1px dashed var(--ac-border)`；占位容器用 `2px dashed var(--ac-border-strong)`
+
+### 8.4 微动效（克制，高光 ≤ 1 个）
+
+- 页面进场 `.ac-page-in` 淡入 + 6px 上推
+- 卡片 hover `.ac-lift` 浮起 4px
+- 点赞心弹跳（spring 缓动）+ 三色 sparkle
+- 首页底部 marquee 跑马灯持续滚动
+- 所有缓动统一走 `--ease-out` / `--ease-spring`
+
+### 8.5 背景与纹理
+
+- Hero 背景 `.ac-hero-bg`：双 radial + 180° linear 的暖调渐变
+- 叠加 `.ac-dither`（4px 点阵）+ `.ac-scanlines`（1px 横条）两层 pointer-events:none 纹理，模拟街机 CRT
+
+### 8.6 空态与占位
+
+- 作品封面缺图时用哈希选中的 12 档渐变 + emoji 回落（`Cover` 组件），绝不使用紫蓝渐变或纯灰占位
+- 头像缺图时基于 username 哈希出 hue，用 conic-gradient + 首字母生成（`Avatar` 组件）
+- 文案空态带一行 mono micro 标 + 一句人话引导，不堆信息
+
+### 8.7 移动端优先
+
+- 主受众在手机上，断点走 Tailwind 默认 `sm=640 / md=768 / lg=1024`
+- 主栅格 `max-w-6xl` + 24–32px 侧边内边距
+- Hero `HeroStack` 在 lg 以下自动隐藏，表单页在 lg 以下单栏堆叠
+
+### 8.8 可访问性基线
+
+- 可 focus 元素必须有 `var(--ac-primary)` 可见 ring
+- 状态不能只靠颜色传达，所有 chip 都带可读中文
+- 动效响应 `prefers-reduced-motion`（marquee 与 heart-pop 在该设置下静止）
 
 ## 9. 非功能需求
 

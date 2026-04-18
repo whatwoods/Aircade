@@ -1,6 +1,5 @@
 import { sql } from 'drizzle-orm';
 import {
-  type AnyPgColumn,
   pgTable,
   text,
   varchar,
@@ -9,7 +8,6 @@ import {
   uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core';
-import { inviteCodes } from './invite-codes';
 
 export const users = pgTable(
   'users',
@@ -30,12 +28,6 @@ export const users = pgTable(
     status: text('status', { enum: ['active', 'banned'] })
       .notNull()
       .default('active'),
-    inviteCodeUsed: text('invite_code_used').references(
-      (): AnyPgColumn => inviteCodes.id,
-      {
-        onDelete: 'set null',
-      }
-    ),
     failedLoginCount: integer('failed_login_count').notNull().default(0),
     lockedUntil: timestamp('locked_until', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })

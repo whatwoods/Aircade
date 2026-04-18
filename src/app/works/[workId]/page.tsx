@@ -1,8 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Avatar, HeartButton, TagChip, TypeChip } from '@/components/brand';
 import { getCurrentUser } from '@/features/auth';
-import { getWorkByIdForViewer } from '@/features/works';
+import {
+  WorkCard,
+  WorkGallery,
+  getWorkByIdForViewer,
+  listRecentWorksByAuthor,
+} from '@/features/works';
 
 type WorkDetailPageProps = {
   params: {
@@ -20,13 +26,12 @@ const statusLabelMap = {
   unlisted: '隐藏',
 } as const;
 
-const typeLabelMap = {
-  game: '游戏',
-  tool: '工具',
-  social: '社交',
-  ai: 'AI',
-  other: '其他',
-} as const;
+const statusToneMap: Record<keyof typeof statusLabelMap, string> = {
+  pending: 'ac-type-social',
+  live: 'ac-type-tool',
+  rejected: 'ac-type-game',
+  unlisted: 'ac-type-other',
+};
 
 function readMessage(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -37,8 +42,13 @@ function formatDate(value: Date) {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
+  }).format(value);
+}
+
+function formatShort(value: Date) {
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
   }).format(value);
 }
 
@@ -51,9 +61,7 @@ export async function generateMetadata({
   });
 
   if (!work) {
-    return {
-      title: '作品不存在',
-    };
+    return { title: '作品不存在' };
   }
 
   return {
@@ -73,177 +81,321 @@ export default async function WorkDetailPage({
     notFound();
   }
 
+  const moreRaw = await listRecentWorksByAuthor(work.author.id, 6);
+  const moreByAuthor = moreRaw
+    .filter((w) => w.id !== work.id && w.status === 'live')
+    .slice(0, 3);
+
   const notice = readMessage(searchParams?.notice);
   const canSeeReviewState =
     viewer?.role === 'admin' || viewer?.id === work.author.id;
+  const authorName = work.author.nickname || work.author.username;
+  const shortId = work.id.slice(0, 6).toUpperCase();
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,_#fff8ef_0%,_#fffdf8_100%)] px-4 py-8 sm:px-6">
-      <div className="mx-auto max-w-6xl space-y-6">
-        {notice ? (
-          <div className="rounded-input border border-brand-mint/40 bg-brand-mint/20 px-4 py-3 text-sm text-brand-coffee">
-            {notice}
+    <div className="ac-page-in mx-auto max-w-6xl px-6 py-10 sm:px-8">
+      <Link href="/" className="ac-btn ac-btn-sm ac-btn-ghost mb-6 inline-flex">
+        ← 返回
+      </Link>
+
+      {notice ? (
+        <div
+          className="mb-6 rounded-[14px] px-4 py-3 text-sm"
+          style={{
+            background:
+              'color-mix(in oklch, var(--ac-mint) 30%, var(--ac-surface))',
+            border: '1px solid var(--ac-border)',
+            color: 'var(--ac-fg)',
+          }}
+        >
+          {notice}
+        </div>
+      ) : null}
+
+      <div className="grid items-start gap-12 lg:grid-cols-[1fr_380px]">
+        {/* LEFT: gallery + description */}
+        <div>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <TypeChip type={work.type} size="lg" />
+            {work.featuredAt ? (
+              <span
+                className="ac-pill"
+                style={{
+                  background:
+                    'color-mix(in oklch, var(--ac-primary) 14%, var(--ac-surface))',
+                  color: 'var(--ac-primary)',
+                }}
+              >
+                ★ 本周精选
+              </span>
+            ) : null}
+            {canSeeReviewState ? (
+              <span className={`ac-pill ${statusToneMap[work.status]}`}>
+                {statusLabelMap[work.status]}
+              </span>
+            ) : null}
+            <span className="ac-micro" style={{ color: 'var(--ac-fg-faint)' }}>
+              #{shortId}
+            </span>
           </div>
-        ) : null}
 
-        <section className="overflow-hidden rounded-[30px] border border-brand-coffee/10 bg-white shadow-[0_28px_90px_rgba(61,46,31,0.1)]">
-          <div
-            className="min-h-[320px] bg-brand-coffee/10 bg-cover bg-center p-6 sm:p-8"
-            style={{
-              backgroundImage: `linear-gradient(180deg, rgba(61,46,31,0.18), rgba(61,46,31,0.55)), url(${work.coverUrl})`,
-            }}
+          <h1
+            className="font-display text-[42px] leading-[1.08] tracking-tight sm:text-[52px]"
+            style={{ color: 'var(--ac-fg)' }}
           >
-            <div className="flex min-h-[256px] flex-col justify-between">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="bg-white/82 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand-coffee">
-                  {typeLabelMap[work.type]}
-                </span>
-                {canSeeReviewState ? (
-                  <span className="rounded-full bg-brand-orange px-3 py-1 text-xs font-semibold text-white">
-                    {statusLabelMap[work.status]}
-                  </span>
-                ) : null}
-              </div>
+            {work.title}
+          </h1>
+          <p
+            className="mt-2 text-[17px] font-semibold sm:text-[18px]"
+            style={{ color: 'var(--ac-primary)' }}
+          >
+            {work.tagline}
+          </p>
 
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-brand-cream">
-                    {work.tagline}
-                  </p>
-                  <h1 className="mt-3 font-display text-4xl tracking-tight text-white sm:text-5xl">
-                    {work.title}
-                  </h1>
+          <div className="mt-6">
+            <WorkGallery work={work} />
+          </div>
+
+          {canSeeReviewState &&
+          work.status === 'rejected' &&
+          work.rejectReason ? (
+            <div
+              className="mt-6 rounded-[16px] border p-4 text-sm leading-7"
+              style={{
+                borderColor: 'rgba(220, 38, 38, 0.25)',
+                background: 'rgba(254, 226, 226, 0.6)',
+                color: '#b91c1c',
+              }}
+            >
+              <p className="font-semibold">当前驳回原因</p>
+              <p className="mt-2">{work.rejectReason}</p>
+            </div>
+          ) : null}
+
+          <div className="mt-8">
+            <div
+              className="ac-micro mb-2.5"
+              style={{ color: 'var(--ac-fg-faint)' }}
+            >
+              ABOUT · 关于这个作品
+            </div>
+            <p
+              className="text-[15px] leading-[1.9] sm:text-[16px]"
+              style={{ color: 'var(--ac-fg-soft)', textWrap: 'pretty' }}
+            >
+              {work.description}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <TagChip tag={work.type} />
+              {work.featuredAt ? <TagChip tag="featured" /> : null}
+            </div>
+          </div>
+
+          {moreByAuthor.length > 0 ? (
+            <div
+              className="mt-10 pt-8"
+              style={{ borderTop: '1px dashed var(--ac-border)' }}
+            >
+              <div
+                className="ac-micro mb-4"
+                style={{ color: 'var(--ac-fg-faint)' }}
+              >
+                MORE BY · 同一作者
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {moreByAuthor.map((w) => (
+                  <WorkCard key={w.id} work={w} />
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {/* RIGHT: action rail */}
+        <aside className="space-y-5 lg:sticky lg:top-[88px]">
+          {/* Author card */}
+          <div className="ac-card p-5">
+            <div className="flex items-center gap-3">
+              <Avatar name={authorName} seed={work.author.username} size={48} />
+              <div>
+                <div
+                  className="font-display text-[18px]"
+                  style={{ color: 'var(--ac-fg)' }}
+                >
+                  {authorName}
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  {work.webUrl ? (
-                    <a
-                      href={work.webUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="hover:bg-brand-orange/92 rounded-btn bg-brand-orange px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_30px_rgba(255,159,107,0.28)] transition"
-                    >
-                      打开作品
-                    </a>
-                  ) : null}
-                  {work.qrUrl ? (
-                    <a
-                      href={work.qrUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="border-white/18 hover:bg-white/16 rounded-btn border bg-white/10 px-5 py-3 text-sm font-semibold text-white transition"
-                    >
-                      查看二维码
-                    </a>
-                  ) : null}
-                  <Link
-                    href="/"
-                    className="border-white/18 hover:bg-white/16 rounded-btn border bg-white/10 px-5 py-3 text-sm font-semibold text-white transition"
-                  >
-                    返回首页
-                  </Link>
+                <div
+                  className="text-[12px]"
+                  style={{ color: 'var(--ac-fg-faint)' }}
+                >
+                  @{work.author.username}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-6 px-6 py-6 sm:px-8 lg:grid-cols-[1.1fr_0.9fr]">
-            <article className="space-y-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-coffee/45">
-                  About
-                </p>
-                <p className="text-brand-coffee/72 mt-3 text-sm leading-8">
-                  {work.description}
-                </p>
+          {/* QR / Web */}
+          <div className="ac-card p-6">
+            <div
+              className="ac-micro mb-3"
+              style={{ color: 'var(--ac-fg-faint)' }}
+            >
+              {work.qrUrl ? 'MINI-PROGRAM · 扫码试玩' : 'WEB · 在浏览器打开'}
+            </div>
+
+            {work.qrUrl ? (
+              <div
+                className="mb-4 flex aspect-square flex-col items-center justify-center overflow-hidden rounded-[14px] bg-cover bg-center"
+                style={{
+                  background: `url(${work.qrUrl}) center/contain no-repeat, var(--ac-bg-tint)`,
+                  border: '2px dashed var(--ac-border-strong)',
+                }}
+              />
+            ) : (
+              <div
+                className="mb-4 flex aspect-[16/10] items-center justify-center rounded-[14px] px-3 text-center"
+                style={{
+                  background: 'var(--ac-bg-tint)',
+                  border: '2px dashed var(--ac-border-strong)',
+                  fontFamily: 'var(--font-mono), ui-monospace, monospace',
+                  fontSize: 12,
+                  color: 'var(--ac-fg-faint)',
+                  letterSpacing: '0.14em',
+                  wordBreak: 'break-all',
+                }}
+              >
+                {work.webUrl ?? '暂无直链'}
               </div>
+            )}
 
-              {canSeeReviewState &&
-              work.status === 'rejected' &&
-              work.rejectReason ? (
-                <div className="rounded-card border border-red-200 bg-red-50 p-4 text-sm leading-7 text-red-700">
-                  <p className="font-semibold">当前驳回原因</p>
-                  <p className="mt-2">{work.rejectReason}</p>
-                </div>
-              ) : null}
-
-              {work.screenshots.length > 0 ? (
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-coffee/45">
-                    Screenshots
-                  </p>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {work.screenshots.map((screenshot) => (
-                      <a
-                        key={screenshot}
-                        href={screenshot}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="bg-brand-coffee/8 block overflow-hidden rounded-2xl border border-brand-coffee/10"
-                      >
-                        <div
-                          className="h-40 bg-cover bg-center"
-                          style={{ backgroundImage: `url(${screenshot})` }}
-                        />
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </article>
-
-            <aside className="space-y-4 rounded-card border border-brand-coffee/10 bg-brand-milk/70 p-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-coffee/45">
-                  Meta
-                </p>
-                <div className="mt-4 space-y-4 text-sm">
-                  <MetaRow label="作者" value={`@${work.author.username}`} />
-                  <MetaRow label="昵称" value={work.author.nickname} />
-                  <MetaRow
-                    label="创建时间"
-                    value={formatDate(work.createdAt)}
-                  />
-                  <MetaRow label="查看次数" value={`${work.viewCount}`} />
-                  <MetaRow label="点赞计数" value={`${work.likeCount}`} />
-                  {work.reviewedAt ? (
-                    <MetaRow
-                      label="最近审核"
-                      value={formatDate(work.reviewedAt)}
-                    />
-                  ) : null}
-                </div>
-              </div>
-
-              {viewer?.id === work.author.id ? (
-                <Link
-                  href="/submit"
-                  className="hover:bg-brand-coffee/92 inline-flex w-full items-center justify-center rounded-btn bg-brand-coffee px-4 py-3 text-sm font-semibold text-white transition"
-                >
-                  再投一个作品
-                </Link>
-              ) : null}
-
-              {viewer?.role === 'admin' ? (
-                <Link
-                  href="/admin/works"
-                  className="inline-flex w-full items-center justify-center rounded-btn border border-brand-coffee/10 bg-white px-4 py-3 text-sm font-semibold text-brand-coffee transition hover:border-brand-orange/30 hover:text-brand-orange"
-                >
-                  回审核后台
-                </Link>
-              ) : null}
-            </aside>
+            {work.webUrl ? (
+              <a
+                href={work.webUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="ac-btn ac-btn-primary w-full"
+              >
+                在新窗口打开 ↗
+              </a>
+            ) : work.qrUrl ? (
+              <a
+                href={work.qrUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="ac-btn ac-btn-ghost w-full"
+              >
+                查看大图二维码
+              </a>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="ac-btn ac-btn-ghost w-full cursor-not-allowed opacity-60"
+              >
+                作者暂未提供链接
+              </button>
+            )}
           </div>
-        </section>
+
+          {/* Stats + actions */}
+          <div className="ac-card p-5">
+            <div className="grid grid-cols-3 gap-2">
+              <Stat label="LIKES" value={work.likeCount} />
+              <Stat label="VIEWS" value={work.viewCount} />
+              <Stat label="上架" value={formatShort(work.createdAt)} small />
+            </div>
+            <div className="mt-4 flex items-center gap-2">
+              <HeartButton initial={work.likeCount} size="lg" />
+              <button
+                type="button"
+                className="ac-btn ac-btn-sm ac-btn-ghost flex-1"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+                收藏
+              </button>
+              <button
+                type="button"
+                className="ac-btn ac-btn-sm ac-btn-ghost flex-1"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <circle cx="18" cy="5" r="3" />
+                  <circle cx="6" cy="12" r="3" />
+                  <circle cx="18" cy="19" r="3" />
+                  <path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98" />
+                </svg>
+                分享
+              </button>
+            </div>
+            <div
+              className="ac-micro mt-4"
+              style={{ color: 'var(--ac-fg-faint)' }}
+            >
+              创建 · {formatDate(work.createdAt)}
+              {work.reviewedAt
+                ? ` · 审核 · ${formatDate(work.reviewedAt)}`
+                : null}
+            </div>
+          </div>
+
+          {viewer?.id === work.author.id ? (
+            <Link href="/submit" className="ac-btn w-full">
+              再投一个作品
+            </Link>
+          ) : null}
+          {viewer?.role === 'admin' ? (
+            <Link href="/admin/works" className="ac-btn w-full">
+              回审核后台
+            </Link>
+          ) : null}
+        </aside>
       </div>
-    </main>
+    </div>
   );
 }
 
-function MetaRow({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  small,
+}: {
+  label: string;
+  value: string | number;
+  small?: boolean;
+}) {
   return (
     <div>
-      <p className="text-brand-coffee/45">{label}</p>
-      <p className="mt-1 break-all font-medium text-brand-coffee">{value}</p>
+      <div
+        className="ac-micro"
+        style={{ fontSize: 10, color: 'var(--ac-fg-faint)' }}
+      >
+        {label}
+      </div>
+      <div
+        className="mt-1 font-display"
+        style={{
+          color: 'var(--ac-fg)',
+          fontSize: small ? 16 : 24,
+          lineHeight: 1.1,
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }

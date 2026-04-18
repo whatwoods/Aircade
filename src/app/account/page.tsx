@@ -1,25 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Avatar } from '@/components/brand';
 import { LogoutForm, requireUser } from '@/features/auth';
-import { listRecentWorksByAuthor } from '@/features/works';
+import { WorkCard, listRecentWorksByAuthor } from '@/features/works';
 
 export const metadata: Metadata = {
   title: '账号中心',
-  description: '查看当前登录账号与基础信息。',
+  description: '查看当前登录账号、最近投稿与可操作的动作。',
 };
 
-const statusLabelMap = {
-  pending: '待审核',
-  live: '已上线',
-  rejected: '已驳回',
-  unlisted: '隐藏',
-} as const;
-
 function formatDate(value: Date | null) {
-  if (!value) {
-    return '暂无';
-  }
-
+  if (!value) return '暂无';
   return new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
     month: '2-digit',
@@ -31,157 +22,309 @@ function formatDate(value: Date | null) {
 
 export default async function AccountPage() {
   const user = await requireUser('/account');
-  const recentWorks = await listRecentWorksByAuthor(user.id);
+  const recentWorks = await listRecentWorksByAuthor(user.id, 8);
+
+  const liveCount = recentWorks.filter((w) => w.status === 'live').length;
+  const pendingCount = recentWorks.filter((w) => w.status === 'pending').length;
+  const rejectedCount = recentWorks.filter(
+    (w) => w.status === 'rejected'
+  ).length;
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,_#fff8ef_0%,_#fffdf7_100%)] px-4 py-8 sm:px-6">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <section className="overflow-hidden rounded-card border border-brand-orange/20 bg-white shadow-[0_24px_70px_rgba(61,46,31,0.1)]">
-          <div className="bg-[linear-gradient(120deg,_rgba(255,159,107,0.22),_rgba(159,227,201,0.3))] px-6 py-8 sm:px-8">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-              <div className="space-y-3">
-                <span className="inline-flex rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-brand-coffee/70">
-                  Account
-                </span>
-                <div>
-                  <h1 className="font-display text-3xl tracking-tight text-brand-coffee sm:text-4xl">
+    <div className="ac-page-in mx-auto max-w-6xl px-6 py-10 sm:px-8">
+      <div className="grid items-start gap-8 lg:grid-cols-[260px_1fr]">
+        {/* Sidebar */}
+        <aside className="lg:sticky lg:top-[88px]">
+          <div className="ac-card overflow-hidden">
+            <div
+              className="px-5 py-5"
+              style={{
+                background:
+                  'linear-gradient(135deg, color-mix(in oklch, var(--ac-primary) 25%, var(--ac-surface)), var(--ac-surface))',
+                borderBottom: '1px solid var(--ac-border)',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <Avatar
+                  name={user.nickname || user.username}
+                  seed={user.username}
+                  size={48}
+                />
+                <div className="min-w-0">
+                  <div
+                    className="truncate font-display text-[18px] leading-tight"
+                    style={{ color: 'var(--ac-fg)' }}
+                  >
                     {user.nickname}
-                  </h1>
-                  <p className="mt-2 text-sm text-brand-coffee/70 sm:text-base">
-                    已登录账号：@{user.username}
-                  </p>
+                  </div>
+                  <div
+                    className="truncate text-[12px]"
+                    style={{ color: 'var(--ac-fg-faint)' }}
+                  >
+                    @{user.username}
+                  </div>
                 </div>
               </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <span
+                  className="ac-pill"
+                  style={{
+                    background:
+                      user.role === 'admin'
+                        ? 'color-mix(in oklch, var(--ac-primary) 18%, var(--ac-surface))'
+                        : 'var(--ac-surface-soft)',
+                    color:
+                      user.role === 'admin'
+                        ? 'var(--ac-primary)'
+                        : 'var(--ac-fg-soft)',
+                    fontSize: 11,
+                  }}
+                >
+                  {user.role === 'admin' ? '★ 管理员' : '群友作者'}
+                </span>
+                <span
+                  className="ac-pill"
+                  style={{ fontSize: 11, color: 'var(--ac-fg-soft)' }}
+                >
+                  {user.status === 'active' ? '正常' : '封禁'}
+                </span>
+              </div>
+            </div>
 
+            <nav className="flex flex-col p-2">
+              <SidebarLink href="#submissions" label="我的投稿" active />
+              <SidebarLink href="#account-meta" label="账号信息" />
+              <SidebarLink href="/submit" label="提交新作品" emphasis />
+              {user.role === 'admin' ? (
+                <SidebarLink href="/admin/works" label="审核后台" />
+              ) : null}
+              <SidebarLink href="/" label="回首页" />
+            </nav>
+
+            <div
+              className="border-t p-3"
+              style={{ borderColor: 'var(--ac-border)' }}
+            >
               <LogoutForm />
             </div>
           </div>
+        </aside>
 
-          <div className="grid gap-4 px-6 py-6 sm:grid-cols-2 sm:px-8">
-            <InfoCard
-              label="角色"
-              value={user.role === 'admin' ? '管理员' : '普通用户'}
-            />
-            <InfoCard
-              label="状态"
-              value={user.status === 'active' ? '正常' : '封禁'}
-            />
-            <InfoCard label="Slug" value={user.slug} />
-            <InfoCard
-              label="邀请码来源"
-              value={user.inviteCodeUsed ?? '未记录'}
-            />
-            <InfoCard label="邮箱" value={user.email ?? '未填写'} />
-            <InfoCard label="最近登录" value={formatDate(user.lastLoginAt)} />
-          </div>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <article className="rounded-card border border-brand-coffee/10 bg-white p-6 shadow-[0_20px_50px_rgba(61,46,31,0.08)]">
-            <h2 className="font-display text-2xl tracking-tight text-brand-coffee">
-              这一步已经打通的能力
-            </h2>
-            <ul className="text-brand-coffee/72 mt-4 space-y-3 text-sm leading-7">
-              <li>邀请码注册：注册时核销邀请码并记录来源。</li>
-              <li>密码登录：失败累计 5 次后锁定 30 分钟。</li>
-              <li>
-                服务端 session：cookie 里只放不透明 token，数据库保存哈希。
-              </li>
-              <li>账号页保护：未登录会被重定向回登录页。</li>
-              <li>作品投稿：登录用户可提交作品进入审核队列。</li>
-            </ul>
-          </article>
-
-          <article className="rounded-card border border-brand-coffee/10 bg-brand-coffee p-6 text-brand-milk shadow-[0_20px_50px_rgba(61,46,31,0.14)]">
-            <h2 className="font-display text-2xl tracking-tight text-white">
-              下一批自然接上的功能
-            </h2>
-            <ul className="text-brand-milk/78 mt-4 space-y-3 text-sm leading-7">
-              <li>用户中心细页：我的收藏、账号设置、投稿编辑。</li>
-              <li>首页内容流：通过审核的作品会直接出现在首页。</li>
-              <li>管理员后台：已能审核投稿，后续继续补标签和精选流。</li>
-            </ul>
-          </article>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-          <article className="rounded-card border border-brand-coffee/10 bg-white p-6 shadow-[0_20px_50px_rgba(61,46,31,0.08)]">
-            <h2 className="font-display text-2xl tracking-tight text-brand-coffee">
-              现在就能做的动作
-            </h2>
-            <div className="mt-5 grid gap-3">
-              <Link
-                href="/submit"
-                className="hover:bg-brand-orange/92 rounded-btn bg-brand-orange px-4 py-3 text-sm font-semibold text-white transition"
-              >
-                提交新作品
-              </Link>
-              <Link
-                href="/"
-                className="rounded-btn border border-brand-coffee/10 bg-brand-milk px-4 py-3 text-sm font-semibold text-brand-coffee transition hover:border-brand-orange/30 hover:bg-brand-cream/55"
-              >
-                回首页看已上线内容
-              </Link>
-              {user.role === 'admin' ? (
-                <Link
-                  href="/admin/works"
-                  className="rounded-btn border border-brand-coffee/10 bg-white px-4 py-3 text-sm font-semibold text-brand-coffee transition hover:border-brand-orange/30 hover:text-brand-orange"
-                >
-                  进入审核后台
-                </Link>
-              ) : null}
+        {/* Main */}
+        <main className="space-y-10">
+          {/* Greeting */}
+          <section>
+            <div
+              className="ac-micro mb-2"
+              style={{ color: 'var(--ac-primary)' }}
+            >
+              ACCOUNT · 账号中心
             </div>
-          </article>
+            <h1
+              className="font-display text-[36px] leading-tight tracking-tight sm:text-[40px]"
+              style={{ color: 'var(--ac-fg)' }}
+            >
+              嗨，{user.nickname}
+            </h1>
+            <p
+              className="mt-2 max-w-2xl text-[14px] leading-7"
+              style={{ color: 'var(--ac-fg-soft)' }}
+            >
+              这里能看到你的账号状态和最近投稿。想再丢一个作品就去提交页；想看别人最近做了啥就回首页。
+            </p>
 
-          <article className="rounded-card border border-brand-coffee/10 bg-white p-6 shadow-[0_20px_50px_rgba(61,46,31,0.08)]">
-            <h2 className="font-display text-2xl tracking-tight text-brand-coffee">
-              你的最近投稿
-            </h2>
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              <MiniStat label="已上线" value={liveCount} tone="tool" />
+              <MiniStat label="待审核" value={pendingCount} tone="social" />
+              <MiniStat label="已驳回" value={rejectedCount} tone="game" />
+            </div>
+          </section>
+
+          {/* Submissions */}
+          <section id="submissions">
+            <div className="mb-5 flex items-end justify-between">
+              <div>
+                <div
+                  className="ac-micro"
+                  style={{ color: 'var(--ac-fg-faint)' }}
+                >
+                  SUBMISSIONS · 你的投稿
+                </div>
+                <h2
+                  className="mt-1 font-display text-[26px] leading-tight"
+                  style={{ color: 'var(--ac-fg)' }}
+                >
+                  最近丢出来的
+                </h2>
+              </div>
+              <Link href="/submit" className="ac-btn ac-btn-sm ac-btn-primary">
+                + 新投稿
+              </Link>
+            </div>
+
             {recentWorks.length > 0 ? (
-              <div className="mt-5 space-y-3">
+              <div className="grid gap-5 md:grid-cols-2">
                 {recentWorks.map((work) => (
-                  <Link
-                    key={work.id}
-                    href={`/works/${work.id}`}
-                    className="border-brand-coffee/8 block rounded-2xl border bg-brand-milk/65 p-4 transition hover:border-brand-orange/30 hover:bg-brand-cream/60"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-medium text-brand-coffee">
-                          {work.title}
-                        </p>
-                        <p className="mt-1 text-sm text-brand-coffee/65">
-                          {work.tagline}
-                        </p>
-                      </div>
-                      <span className="text-brand-coffee/72 rounded-full bg-white px-3 py-1 text-xs font-semibold">
-                        {statusLabelMap[work.status]}
-                      </span>
-                    </div>
-                  </Link>
+                  <WorkCard key={work.id} work={work} showStatus />
                 ))}
               </div>
             ) : (
-              <p className="text-brand-coffee/62 mt-5 text-sm leading-7">
-                你还没有投稿记录。现在可以直接去提第一条。
-              </p>
+              <div
+                className="rounded-[22px] border border-dashed px-6 py-14 text-center"
+                style={{
+                  borderColor: 'var(--ac-border-strong)',
+                  background: 'var(--ac-surface-soft)',
+                }}
+              >
+                <div className="mb-3 text-[44px]">🎮</div>
+                <div
+                  className="font-display text-[22px]"
+                  style={{ color: 'var(--ac-fg)' }}
+                >
+                  还没有投稿记录
+                </div>
+                <p
+                  className="mx-auto mt-2 max-w-md text-[13.5px] leading-7"
+                  style={{ color: 'var(--ac-fg-soft)' }}
+                >
+                  丢一个最近做的小东西进来吧。审核一般 24h
+                  内，通过后就会出现在首页。
+                </p>
+                <Link
+                  href="/submit"
+                  className="ac-btn ac-btn-primary mt-5 inline-flex"
+                >
+                  提交第一个作品 →
+                </Link>
+              </div>
             )}
-          </article>
-        </section>
+          </section>
+
+          {/* Account meta */}
+          <section id="account-meta">
+            <div className="ac-micro" style={{ color: 'var(--ac-fg-faint)' }}>
+              META · 账号信息
+            </div>
+            <h2
+              className="mt-1 font-display text-[22px] leading-tight"
+              style={{ color: 'var(--ac-fg)' }}
+            >
+              系统登记的内容
+            </h2>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <InfoCell
+                label="角色"
+                value={user.role === 'admin' ? '管理员' : '普通用户'}
+              />
+              <InfoCell
+                label="状态"
+                value={user.status === 'active' ? '正常' : '封禁'}
+              />
+              <InfoCell label="Slug" value={user.slug} mono />
+              <InfoCell label="邮箱" value={user.email ?? '未填写'} />
+              <InfoCell label="注册方式" value="直接注册开放加入" />
+              <InfoCell label="最近登录" value={formatDate(user.lastLoginAt)} />
+            </div>
+          </section>
+        </main>
       </div>
-    </main>
+    </div>
   );
 }
 
-function InfoCard({ label, value }: { label: string; value: string }) {
+function SidebarLink({
+  href,
+  label,
+  active,
+  emphasis,
+}: {
+  href: string;
+  label: string;
+  active?: boolean;
+  emphasis?: boolean;
+}) {
   return (
-    <div className="border-brand-coffee/8 rounded-2xl border bg-brand-milk/70 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-coffee/45">
+    <Link
+      href={href}
+      className="flex items-center justify-between rounded-[12px] px-3 py-2.5 text-[13.5px] transition-colors"
+      style={{
+        background: active ? 'var(--ac-bg-tint)' : 'transparent',
+        color: emphasis ? 'var(--ac-primary)' : 'var(--ac-fg)',
+        fontWeight: active || emphasis ? 600 : 500,
+      }}
+    >
+      <span>{label}</span>
+      <span aria-hidden style={{ color: 'var(--ac-fg-faint)', fontSize: 12 }}>
+        ›
+      </span>
+    </Link>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: 'game' | 'tool' | 'social' | 'ai';
+}) {
+  return (
+    <div className="ac-card relative overflow-hidden p-4">
+      <div
+        aria-hidden
+        className="absolute -right-5 -top-5 h-16 w-16 rounded-full opacity-55 blur-[1px]"
+        style={{ background: `var(--t-${tone})` }}
+      />
+      <div
+        className="ac-micro relative"
+        style={{ color: 'var(--ac-fg-faint)' }}
+      >
         {label}
-      </p>
-      <p className="mt-2 break-all text-sm font-medium text-brand-coffee">
+      </div>
+      <div
+        className="relative mt-1 font-display text-[28px] leading-none"
+        style={{ color: 'var(--ac-fg)' }}
+      >
         {value}
-      </p>
+      </div>
+    </div>
+  );
+}
+
+function InfoCell({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div
+      className="rounded-[14px] p-4"
+      style={{
+        background: 'var(--ac-surface-soft)',
+        border: '1px solid var(--ac-border)',
+      }}
+    >
+      <div className="ac-micro" style={{ color: 'var(--ac-fg-faint)' }}>
+        {label}
+      </div>
+      <div
+        className="mt-1.5 break-all text-[14px] font-medium"
+        style={{
+          color: 'var(--ac-fg)',
+          fontFamily: mono
+            ? 'var(--font-mono), ui-monospace, monospace'
+            : undefined,
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }

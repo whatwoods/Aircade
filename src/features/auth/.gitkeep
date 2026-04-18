@@ -1,4 +1,4 @@
-# auth feature：登录/注册/session/邀请码核销等，本期不实现。
+# auth feature：登录/注册/session 等能力，本期不实现。
 # 内部可进一步拆 server/ client/ schemas/。
 # 对外只允许通过 `@/features/auth` 入口（未来的 index.ts）暴露 API，
 # 跨 feature 引用由 ESLint 规则 no-restricted-imports 限制。

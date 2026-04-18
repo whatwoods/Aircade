@@ -3,7 +3,7 @@ export { AuthShell, readFlashMessage } from './components/auth-shell';
 export { LoginForm } from './components/login-form';
 export { LogoutForm } from './components/logout-form';
 export { RegisterForm } from './components/register-form';
-export { normalizeSeedInviteCode, normalizeSeedUsername } from './schemas';
+export { normalizeSeedUsername } from './schemas';
 export {
   getCurrentUser,
   redirectIfAuthenticated,

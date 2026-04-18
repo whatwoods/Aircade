@@ -22,6 +22,7 @@ export type WorkSummary = {
   reviewedAt: Date | null;
   likeCount: number;
   viewCount: number;
+  featuredAt: Date | null;
   author: {
     id: string;
     username: string;
@@ -58,6 +59,7 @@ function mapWorkRow(row: {
   reviewedAt: Date | null;
   likeCount: number;
   viewCount: number;
+  featuredAt: Date | null;
   authorId: string;
   authorUsername: string;
   authorNickname: string;
@@ -79,6 +81,7 @@ function mapWorkRow(row: {
     reviewedAt: row.reviewedAt,
     likeCount: row.likeCount,
     viewCount: row.viewCount,
+    featuredAt: row.featuredAt,
     author: {
       id: row.authorId,
       username: row.authorUsername,
@@ -151,6 +154,7 @@ export async function listHomepageWorks(limit = 6): Promise<WorkSummary[]> {
       reviewedAt: works.reviewedAt,
       likeCount: works.likeCount,
       viewCount: works.viewCount,
+      featuredAt: works.featuredAt,
       authorId: users.id,
       authorUsername: users.username,
       authorNickname: users.nickname,
@@ -186,6 +190,7 @@ export async function listRecentWorksByAuthor(
       reviewedAt: works.reviewedAt,
       likeCount: works.likeCount,
       viewCount: works.viewCount,
+      featuredAt: works.featuredAt,
       authorId: users.id,
       authorUsername: users.username,
       authorNickname: users.nickname,
@@ -224,6 +229,7 @@ export async function getWorkByIdForViewer(
       reviewedAt: works.reviewedAt,
       likeCount: works.likeCount,
       viewCount: works.viewCount,
+      featuredAt: works.featuredAt,
       authorId: users.id,
       authorUsername: users.username,
       authorNickname: users.nickname,
@@ -258,6 +264,144 @@ export async function getWorkByIdForViewer(
   return work;
 }
 
+export async function listFeaturedWorks(limit = 4): Promise<WorkSummary[]> {
+  const rows = await db
+    .select({
+      id: works.id,
+      title: works.title,
+      tagline: works.tagline,
+      description: works.description,
+      type: works.type,
+      coverUrl: works.coverUrl,
+      screenshots: works.screenshots,
+      webUrl: works.webUrl,
+      qrUrl: works.qrUrl,
+      status: works.status,
+      rejectReason: works.rejectReason,
+      createdAt: works.createdAt,
+      reviewedAt: works.reviewedAt,
+      likeCount: works.likeCount,
+      viewCount: works.viewCount,
+      featuredAt: works.featuredAt,
+      authorId: users.id,
+      authorUsername: users.username,
+      authorNickname: users.nickname,
+      authorSlug: users.slug,
+    })
+    .from(works)
+    .innerJoin(users, eq(users.id, works.authorId))
+    .where(and(eq(works.status, 'live'), sql`${works.featuredAt} is not null`))
+    .orderBy(desc(works.featuredAt))
+    .limit(limit);
+
+  return rows.map((row) => toSummary(mapWorkRow(row)));
+}
+
+export async function listDiscoverWorks(options: {
+  type?: WorkType;
+  sort?: 'hot' | 'new' | 'featured';
+  limit?: number;
+  offset?: number;
+}): Promise<WorkSummary[]> {
+  const { type, sort = 'new', limit = 24, offset = 0 } = options;
+
+  const conditions = [eq(works.status, 'live')];
+  if (type) {
+    conditions.push(eq(works.type, type));
+  }
+
+  const base = db
+    .select({
+      id: works.id,
+      title: works.title,
+      tagline: works.tagline,
+      description: works.description,
+      type: works.type,
+      coverUrl: works.coverUrl,
+      screenshots: works.screenshots,
+      webUrl: works.webUrl,
+      qrUrl: works.qrUrl,
+      status: works.status,
+      rejectReason: works.rejectReason,
+      createdAt: works.createdAt,
+      reviewedAt: works.reviewedAt,
+      likeCount: works.likeCount,
+      viewCount: works.viewCount,
+      featuredAt: works.featuredAt,
+      authorId: users.id,
+      authorUsername: users.username,
+      authorNickname: users.nickname,
+      authorSlug: users.slug,
+    })
+    .from(works)
+    .innerJoin(users, eq(users.id, works.authorId))
+    .where(and(...conditions));
+
+  const rows =
+    sort === 'hot'
+      ? await base
+          .orderBy(desc(works.likeCount), desc(works.createdAt))
+          .limit(limit)
+          .offset(offset)
+      : sort === 'featured'
+        ? await base
+            .orderBy(desc(works.featuredAt), desc(works.createdAt))
+            .limit(limit)
+            .offset(offset)
+        : await base.orderBy(desc(works.createdAt)).limit(limit).offset(offset);
+  return rows.map((row) => toSummary(mapWorkRow(row)));
+}
+
+export type WorkTypeCount = { type: WorkType; count: number };
+
+export async function countLiveWorksByType(): Promise<WorkTypeCount[]> {
+  const rows = await db
+    .select({
+      type: works.type,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(works)
+    .where(eq(works.status, 'live'))
+    .groupBy(works.type);
+
+  return rows.map((r) => ({ type: r.type, count: r.count }));
+}
+
+export type SiteStats = {
+  works: number;
+  authors: number;
+  likes: number;
+  featured: number;
+};
+
+export async function getSiteStats(): Promise<SiteStats> {
+  const rows = await db
+    .select({
+      works: sql<number>`count(*)::int`,
+      authors: sql<number>`count(distinct ${works.authorId})::int`,
+      likes: sql<number>`coalesce(sum(${works.likeCount}), 0)::int`,
+      featured: sql<number>`count(*) filter (where ${works.featuredAt} is not null)::int`,
+    })
+    .from(works)
+    .where(eq(works.status, 'live'));
+
+  const row = rows[0];
+  return {
+    works: row?.works ?? 0,
+    authors: row?.authors ?? 0,
+    likes: row?.likes ?? 0,
+    featured: row?.featured ?? 0,
+  };
+}
+
+export async function countPendingWorks(): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(works)
+    .where(eq(works.status, 'pending'));
+  return rows[0]?.count ?? 0;
+}
+
 export async function listWorksForReview(
   status: Extract<WorkStatus, 'pending' | 'rejected'>,
   limit = 12
@@ -279,6 +423,7 @@ export async function listWorksForReview(
       reviewedAt: works.reviewedAt,
       likeCount: works.likeCount,
       viewCount: works.viewCount,
+      featuredAt: works.featuredAt,
       authorId: users.id,
       authorUsername: users.username,
       authorNickname: users.nickname,

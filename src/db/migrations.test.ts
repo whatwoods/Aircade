@@ -17,12 +17,6 @@ function readAllMigrations() {
 }
 
 describe('drizzle migrations', () => {
-  it('keeps invite_codes.created_by foreign key in SQL migrations', () => {
-    expect(readAllMigrations()).toContain(
-      'invite_codes_created_by_users_id_fk'
-    );
-  });
-
   it('keeps works action target check constraint in SQL migrations', () => {
     const migrations = readAllMigrations();
 
