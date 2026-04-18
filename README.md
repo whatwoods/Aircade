@@ -146,6 +146,8 @@ sudo -u postgres psql -c "CREATE DATABASE aircade OWNER aircade;"
 git clone <repo-url>
 cd Aircade
 cp .env.example .env.production
+sudo mkdir -p /var/aircade/uploads
+sudo chown -R <app-user>:<app-user> /var/aircade/uploads
 
 # 5) 修改 .env.production 后执行
 pnpm install --frozen-lockfile
@@ -159,25 +161,25 @@ pm2 save
 pm2 startup
 ```
 
-Nginx 需要把 80/443 请求反代到本地 `3000` 端口。典型站点配置：
+Nginx 需要把 80/443 请求反代到本地 `3000` 端口，并把 `/uploads/` 直接映射到 `UPLOAD_DIR`。仓库内提供了可直接改域名后使用的示例配置：[docs/deploy/nginx-aircade.conf.example](./docs/deploy/nginx-aircade.conf.example)。
+
+其中 `/uploads/` 的上线配置要点是：
 
 ```nginx
-server {
-    listen 80;
-    server_name your-domain.example.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
+location ^~ /uploads/ {
+    alias /var/aircade/uploads/;
+    try_files $uri =404;
+    access_log off;
+    expires 365d;
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+    add_header X-Content-Type-Options nosniff always;
 }
 ```
+
+注意两点：
+
+- `alias` 必须带尾部 `/`，并且要和 `UPLOAD_DIR` 指向的真实目录一致。
+- `try_files $uri =404;` 可以阻止路径穿越或误落到别的 location。
 
 完成反代后，再用 `certbot` 或其他 ACME 客户端签发 HTTPS 证书。
 
