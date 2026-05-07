@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { MarqueeTicker } from '@/components/brand';
 
 type Tone = 'error' | 'notice';
 
@@ -14,7 +13,7 @@ type AuthShellProps = {
   subtitle: string;
   children: ReactNode;
   sideTitle: string;
-  sideBody: string;
+  sideBody?: string;
   sideLinks: Array<{
     href: string;
     label: string;
@@ -88,81 +87,48 @@ export function AuthShell({
             </section>
 
             {/* Side brand panel */}
-            <aside
-              className="relative flex flex-col justify-between overflow-hidden rounded-[22px] p-7 sm:p-8"
-              style={{
-                background:
-                  'linear-gradient(160deg, var(--ac-fg) 0%, #2a1f14 100%)',
-                color: 'var(--ac-bg)',
-                boxShadow: 'var(--ac-card-shadow)',
-                minHeight: 420,
-              }}
-            >
-              <div
-                aria-hidden
-                className="absolute -right-16 -top-16 h-72 w-72 rounded-full"
-                style={{
-                  background:
-                    'radial-gradient(circle, color-mix(in oklch, var(--ac-primary) 60%, transparent), transparent 70%)',
-                }}
-              />
-              <div
-                aria-hidden
-                className="absolute -bottom-10 -left-10 h-56 w-56 rounded-full"
-                style={{
-                  background:
-                    'radial-gradient(circle, color-mix(in oklch, var(--ac-mint) 45%, transparent), transparent 70%)',
-                }}
-              />
-
-              <div className="relative">
+            <aside className="ac-card flex flex-col p-6 sm:p-8">
+              <div className="mb-6">
                 <div
-                  className="ac-micro mb-5"
-                  style={{
-                    color: 'color-mix(in oklch, var(--ac-bg) 60%, transparent)',
-                  }}
+                  className="ac-micro mb-2"
+                  style={{ color: 'var(--ac-primary)' }}
                 >
-                  ★ INSERT COIN
+                  ACCESS PASS
                 </div>
                 <h2
                   className="font-display text-[28px] leading-tight tracking-tight sm:text-[32px]"
-                  style={{ color: 'var(--ac-bg)' }}
+                  style={{ color: 'var(--ac-fg)' }}
                 >
                   {sideTitle}
                 </h2>
-                <p
-                  className="mt-3 max-w-sm text-[14px] leading-[1.85]"
-                  style={{
-                    color: 'color-mix(in oklch, var(--ac-bg) 72%, transparent)',
-                  }}
-                >
-                  {sideBody}
-                </p>
+                {sideBody ? (
+                  <p
+                    className="mt-2 max-w-xl text-[14px] leading-7"
+                    style={{ color: 'var(--ac-fg-soft)' }}
+                  >
+                    {sideBody}
+                  </p>
+                ) : null}
               </div>
 
-              <div className="relative mt-8 grid gap-2">
+              <div className="mt-2 grid gap-2">
                 {sideLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="rounded-[12px] px-4 py-3 text-[13px] font-medium transition-colors"
+                    className="ac-btn justify-between px-4 py-3 text-[13px]"
                     style={{
-                      border:
-                        '1px solid color-mix(in oklch, var(--ac-bg) 25%, transparent)',
-                      background:
-                        'color-mix(in oklch, var(--ac-bg) 8%, transparent)',
-                      color: 'var(--ac-bg)',
+                      background: 'var(--ac-surface)',
                     }}
                   >
-                    {link.label} →
+                    <span>{link.label}</span>
+                    <span aria-hidden>→</span>
                   </Link>
                 ))}
               </div>
             </aside>
           </div>
         </div>
-
-        <MarqueeTicker />
       </div>
     </div>
   );

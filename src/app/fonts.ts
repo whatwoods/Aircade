@@ -1,31 +1,11 @@
-import { Inter, JetBrains_Mono } from 'next/font/google';
-// 需要你在 public/fonts 下放置自托管字体后，取消下面两段注释：
-// import localFont from 'next/font/local';
+type FontVariable = {
+  variable: string;
+};
 
-export const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
-
-export const mono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-mono',
-  display: 'swap',
-});
-
-// export const harmony = localFont({
-//   src: '../../public/fonts/HarmonyOS_Sans_SC_Regular.woff2',
-//   variable: '--font-harmony',
-//   display: 'swap',
-// });
-
-// export const lxgw = localFont({
-//   src: '../../public/fonts/LXGWWenKai-Regular.woff2',
-//   variable: '--font-lxgw',
-//   display: 'swap',
-// });
-
-// 占位变量：在字体接入前，保证 layout 里组合 className 时不报错
-export const harmony = { variable: '' } as { variable: string };
-export const lxgw = { variable: '' } as { variable: string };
+// Keep the app boot fully local. next/font/google fetches remote CSS during
+// dev/build and can leave Next stuck at "Starting..." when the network is slow
+// or blocked. The CSS fallbacks in globals.css provide the actual fonts.
+export const inter = { variable: '' } satisfies FontVariable;
+export const mono = { variable: '' } satisfies FontVariable;
+export const harmony = { variable: '' } satisfies FontVariable;
+export const lxgw = { variable: '' } satisfies FontVariable;

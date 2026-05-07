@@ -93,11 +93,7 @@ export function WorkSubmitForm() {
 
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[1fr_340px]">
-      <form
-        action={createWorkAction}
-        encType="multipart/form-data"
-        className="ac-card p-6 sm:p-7"
-      >
+      <form action={createWorkAction} className="ac-card p-6 sm:p-7">
         <input type="hidden" name="type" value={type} />
 
         <Section title="基本信息" note="这一段会显示在卡片和详情页。">
@@ -107,6 +103,7 @@ export function WorkSubmitForm() {
               name="title"
               type="text"
               required
+              minLength={2}
               maxLength={30}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -148,6 +145,7 @@ export function WorkSubmitForm() {
               name="tagline"
               type="text"
               required
+              minLength={4}
               maxLength={30}
               value={tagline}
               onChange={(e) => setTagline(e.target.value)}
@@ -167,6 +165,7 @@ export function WorkSubmitForm() {
               name="description"
               required
               rows={5}
+              minLength={20}
               maxLength={300}
               value={description}
               onChange={(e) => setDescription(e.target.value)}

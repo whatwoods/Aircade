@@ -306,19 +306,18 @@ export default async function HomePage() {
             </div>
 
             <div
-              className="flex aspect-square flex-col items-center justify-center rounded-[20px]"
+              className="flex aspect-square flex-col items-center justify-center overflow-hidden rounded-[20px] p-3"
               style={{
-                border: '2px dashed var(--ac-border-strong)',
-                background: 'var(--ac-surface-soft)',
-                fontFamily: 'var(--font-mono), ui-monospace, monospace',
-                fontSize: 11,
-                color: 'var(--ac-fg-faint)',
-                letterSpacing: '0.18em',
+                border: '1px solid var(--ac-border)',
+                background: 'var(--ac-surface)',
+                boxShadow: 'var(--ac-card-shadow)',
               }}
             >
-              <div className="mb-2 text-[60px]">🎟️</div>
-              <div>[ QR / 群二维码占位 ]</div>
-              <div className="mt-1">WECHAT GROUP QR</div>
+              <img
+                src="/images/wechat-group-qr.jpg"
+                alt="微信群聊二维码"
+                className="h-full w-full rounded-[14px] object-contain"
+              />
             </div>
           </div>
         </div>
@@ -434,16 +433,17 @@ function HeroStack({ featured }: { featured: WorkSummary[] }) {
       <div
         className="absolute -bottom-5 right-0 rounded-full px-3.5 py-2"
         style={{
-          background: 'var(--ac-fg)',
-          color: 'var(--ac-bg)',
+          background: 'var(--ac-surface)',
+          color: 'var(--ac-primary)',
+          border: '1px solid var(--ac-border)',
           fontSize: 12,
           fontWeight: 700,
           fontFamily: 'var(--font-mono), ui-monospace, monospace',
           letterSpacing: '0.16em',
-          boxShadow: '0 12px 30px rgba(0,0,0,0.2)',
+          boxShadow: 'var(--ac-card-shadow)',
         }}
       >
-        ★ 本周 Top 3
+        本周 Top 3
       </div>
     </div>
   );

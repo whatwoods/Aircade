@@ -3,7 +3,6 @@ export { Cover } from './cover';
 export { Footer } from './footer';
 export { HeartButton } from './heart-button';
 export { Logo } from './logo';
-export { MarqueeTicker } from './marquee-ticker';
 export { Navbar } from './navbar';
 export { TagChip } from './tag-chip';
 export { TypeChip, type WorkType } from './type-chip';

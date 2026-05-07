@@ -52,7 +52,7 @@ export default function NotFound() {
             className="ac-micro mt-12"
             style={{ color: 'var(--ac-fg-faint)' }}
           >
-            · GAME OVER · INSERT COIN TO CONTINUE ·
+            · PAGE LOST · BACK TO AIRCADE ·
           </div>
         </div>
       </section>

@@ -19,9 +19,11 @@ export function TagChip({
 }: TagChipProps) {
   const style: React.CSSProperties = active
     ? {
-        background: 'var(--ac-fg)',
-        color: 'var(--ac-bg)',
-        borderColor: 'var(--ac-fg)',
+        background:
+          'color-mix(in oklch, var(--ac-primary) 18%, var(--ac-surface))',
+        color: 'var(--ac-primary)',
+        borderColor:
+          'color-mix(in oklch, var(--ac-primary) 44%, var(--ac-border))',
       }
     : {
         background: 'var(--ac-surface-soft)',
