@@ -27,27 +27,35 @@ function buildRedirectUrl(
 export async function createWorkAction(formData: FormData) {
   const user = await requireUser('/submit');
 
+  let createdWorkId: string | null = null;
+  let errorMessage: string | null = null;
+
   try {
     const input = await parseCreateWorkUploadFormData(formData);
     const work = await createWork(input, user.id);
+    createdWorkId = work.id;
+  } catch (error) {
+    errorMessage = getWorkErrorMessage(error);
+  }
 
+  if (createdWorkId) {
     revalidatePath('/');
     revalidatePath('/account');
     revalidatePath('/submit');
     revalidatePath('/admin/works');
 
     redirect(
-      buildRedirectUrl(`/works/${work.id}`, {
+      buildRedirectUrl(`/works/${createdWorkId}`, {
         notice: '投稿已提交，等待管理员审核',
       })
     );
-  } catch (error) {
-    redirect(
-      buildRedirectUrl('/submit', {
-        error: getWorkErrorMessage(error),
-      })
-    );
   }
+
+  redirect(
+    buildRedirectUrl('/submit', {
+      error: errorMessage ?? '作品请求失败，请稍后再试',
+    })
+  );
 }
 
 export async function reviewWorkAction(formData: FormData) {
@@ -57,28 +65,38 @@ export async function reviewWorkAction(formData: FormData) {
     redirect('/account');
   }
 
+  let reviewedId: string | null = null;
+  let reviewedStatus: 'live' | 'rejected' | null = null;
+  let errorMessage: string | null = null;
+
   try {
     const input = parseReviewWorkFormData(formData);
     const reviewed = await reviewWork(input);
+    reviewedId = reviewed.id;
+    reviewedStatus = reviewed.status === 'live' ? 'live' : 'rejected';
+  } catch (error) {
+    errorMessage = getWorkErrorMessage(error);
+  }
 
+  if (reviewedId && reviewedStatus) {
     revalidatePath('/');
     revalidatePath('/account');
-    revalidatePath(`/works/${reviewed.id}`);
+    revalidatePath(`/works/${reviewedId}`);
     revalidatePath('/admin/works');
 
     redirect(
       buildRedirectUrl('/admin/works', {
         notice:
-          reviewed.status === 'live'
+          reviewedStatus === 'live'
             ? '作品已通过并对外展示'
             : '作品已标记为驳回',
       })
     );
-  } catch (error) {
-    redirect(
-      buildRedirectUrl('/admin/works', {
-        error: getWorkErrorMessage(error),
-      })
-    );
   }
+
+  redirect(
+    buildRedirectUrl('/admin/works', {
+      error: errorMessage ?? '作品请求失败，请稍后再试',
+    })
+  );
 }

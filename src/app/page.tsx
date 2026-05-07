@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { MarqueeTicker, TypeChip, Cover } from '@/components/brand';
+import { TypeChip, Cover } from '@/components/brand';
 import { getCurrentUser } from '@/features/auth';
 import {
   WorkCard,
@@ -165,8 +165,6 @@ export default async function HomePage() {
             <HeroStack featured={featured} />
           </div>
         </div>
-
-        <MarqueeTicker />
       </section>
 
       {/* FEATURED */}

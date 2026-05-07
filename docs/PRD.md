@@ -136,7 +136,7 @@
 **V1.0 登录方式**：用户名 + 密码
 
 **注册流程**：
-1. 访问注册页，必填邀请码
+1. 访问注册页，必填邀请码（已取消）
 2. 填写用户名（唯一，3-20 字符，字母数字下划线中文）
 3. 设置密码（≥8 位）
 4. 邮箱选填（用于后续找回密码，V1.0 不做邮箱验证）
@@ -331,7 +331,7 @@ git add . && git commit -m "backup $DATE" && git push
 
 ## 8. 视觉与交互原则
 
-**调性**：**群友造的街机厅**——暖调复古街机、圆角卡片、插画感、手工味。参考：即刻 App、Bento 卡片、Notion Calendar 插画风，再叠一层 AI 时代的做旧/扫描线气质。
+**调性**：**群友造的街机厅**——暖调复古街机、圆角卡片、插画感、手工味。参考：即刻 App、Bento 卡片、Notion Calendar 插画风。
 
 完整设计系统见 [`docs/design/README.md`](./design/README.md)，原始 Claude Design 原型保存在 [`docs/design/prototype/`](./design/prototype/)。以下是基线要点：
 
@@ -360,7 +360,6 @@ git add . && git commit -m "backup $DATE" && git push
 - 页面进场 `.ac-page-in` 淡入 + 6px 上推
 - 卡片 hover `.ac-lift` 浮起 4px
 - 点赞心弹跳（spring 缓动）+ 三色 sparkle
-- 首页底部 marquee 跑马灯持续滚动
 - 所有缓动统一走 `--ease-out` / `--ease-spring`
 
 ### 8.5 背景与纹理
