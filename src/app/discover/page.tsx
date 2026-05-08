@@ -14,11 +14,18 @@ export const metadata: Metadata = {
   description: '看看群友们都做了什么小东西。',
 };
 
-export default async function DiscoverPage() {
-  const [works, typeCounts] = await Promise.all([
+export default async function DiscoverPage({
+  searchParams,
+}: {
+  searchParams?: { cursor?: string };
+}) {
+  const cursor = searchParams?.cursor;
+
+  const [{ works, nextCursor }, typeCounts] = await Promise.all([
     listDiscoverWorks({
       sort: 'new',
-      limit: 48,
+      limit: 24,
+      cursor,
     }),
     countLiveWorksByType(),
   ]);
@@ -205,6 +212,9 @@ export default async function DiscoverPage() {
               style={{ color: 'var(--ac-fg-faint)' }}
             >
               <span>RESULTS · 当前显示 {works.length} 件</span>
+              {nextCursor && (
+                <span style={{ color: 'var(--ac-fg-faint)' }}>还有更多 ↓</span>
+              )}
               {/* 清空筛选 — 暂时隐藏
               {activeType || activeSort !== 'new' ? (
                 <Link
@@ -257,6 +267,18 @@ export default async function DiscoverPage() {
           </div>
         )}
       </section>
+
+      {/* Load more button */}
+      {nextCursor && (
+        <section className="mx-auto max-w-6xl px-6 pb-16 pt-0 text-center sm:px-8">
+          <Link
+            href={`/discover?cursor=${nextCursor}`}
+            className="ac-btn ac-btn--ghost"
+          >
+            加载更多
+          </Link>
+        </section>
+      )}
     </div>
   );
 }

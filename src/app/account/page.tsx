@@ -93,7 +93,9 @@ export default async function AccountPage() {
 
             <nav className="flex flex-col p-2">
               <SidebarLink href="#submissions" label="我的投稿" active />
+              <SidebarLink href="/account/favorites" label="我的收藏" />
               <SidebarLink href="/account/profile" label="编辑资料" />
+              <SidebarLink href="/account/security" label="安全设置" />
               <SidebarLink href="#account-meta" label="账号信息" />
               <SidebarLink href="/submit" label="提交新作品" emphasis />
               {user.role === 'admin' ? (

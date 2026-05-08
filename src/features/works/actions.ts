@@ -11,6 +11,7 @@ import {
 } from './server/upload-work-assets';
 import {
   createWork,
+  deleteWork,
   reviewWork,
   setFeaturedWork,
   unlistWork,
@@ -184,4 +185,22 @@ export async function updateWorkAction(formData: FormData) {
       error: errorMessage ?? '更新失败，请稍后再试',
     })
   );
+}
+
+export async function deleteWorkAction(formData: FormData) {
+  const user = await requireUser('/account');
+  const workId = formData.get('workId');
+  if (typeof workId !== 'string' || !workId)
+    redirect('/account?error=无效的作品ID');
+  try {
+    await deleteWork(workId, user.id);
+    revalidatePath('/');
+    revalidatePath('/account');
+    revalidatePath('/discover');
+    redirect('/account?notice=作品已删除');
+  } catch (err) {
+    redirect(
+      `/works/${workId}?error=${encodeURIComponent(err instanceof Error ? err.message : '删除失败')}`
+    );
+  }
 }

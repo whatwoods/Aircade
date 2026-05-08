@@ -14,6 +14,7 @@ import { getCurrentUser } from '@/features/auth';
 import {
   WorkCard,
   WorkGallery,
+  deleteWorkAction,
   getWorkByIdForViewer,
   getUserFavoritedWorkIds,
   getUserLikedWorkIds,
@@ -26,6 +27,7 @@ type WorkDetailPageProps = {
   };
   searchParams?: {
     notice?: string | string[];
+    error?: string | string[];
   };
 };
 
@@ -104,6 +106,7 @@ export default async function WorkDetailPage({
     : [new Set<string>(), new Set<string>()];
 
   const notice = readMessage(searchParams?.notice);
+  const error = readMessage(searchParams?.error);
   const canSeeReviewState =
     viewer?.role === 'admin' || viewer?.id === work.author.id;
   const authorName = work.author.nickname || work.author.username;
@@ -126,6 +129,19 @@ export default async function WorkDetailPage({
           }}
         >
           {notice}
+        </div>
+      ) : null}
+
+      {error ? (
+        <div
+          className="mb-6 rounded-[14px] px-4 py-3 text-sm"
+          style={{
+            background: 'rgba(254, 226, 226, 0.6)',
+            border: '1px solid rgba(220, 38, 38, 0.25)',
+            color: '#b91c1c',
+          }}
+        >
+          {error}
         </div>
       ) : null}
 
@@ -357,6 +373,21 @@ export default async function WorkDetailPage({
               >
                 编辑作品
               </Link>
+              <form action={deleteWorkAction}>
+                <input type="hidden" name="workId" value={work.id} />
+                <button
+                  type="submit"
+                  className="ac-btn w-full"
+                  style={{ color: '#dc2626' }}
+                  onClick={(e) => {
+                    if (!confirm('确定要删除这个作品吗？此操作不可撤销。')) {
+                      e.preventDefault();
+                    }
+                  }}
+                >
+                  删除作品
+                </button>
+              </form>
               <Link href="/submit" className="ac-btn w-full">
                 再投一个作品
               </Link>

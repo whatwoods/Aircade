@@ -4,6 +4,7 @@ import { likes, favorites, users, works, type Work } from '@/db/schema';
 import type { CurrentUser } from '@/features/auth';
 import type { CreateWorkInput, ReviewWorkInput, WorkType } from '../schemas';
 import { WorkError } from './errors';
+import { redis } from '@/lib/redis';
 
 type WorkStatus = 'pending' | 'live' | 'rejected' | 'unlisted';
 
@@ -252,13 +253,28 @@ export async function getWorkByIdForViewer(
   }
 
   if (work.status === 'live' && options?.incrementView !== false) {
-    await db
-      .update(works)
-      .set({
-        viewCount: sql`${works.viewCount} + 1`,
-      })
-      .where(eq(works.id, work.id));
-    work.viewCount += 1;
+    let shouldIncrement = true;
+
+    if (viewer?.id) {
+      try {
+        const viewKey = `view:${workId}:${viewer.id}`;
+        const setResult = await redis.set(viewKey, '1', 'EX', 3600, 'NX');
+        // setResult is null if key already exists → already viewed this hour
+        shouldIncrement = setResult !== null;
+      } catch {
+        // Redis down → fall through and increment anyway
+      }
+    }
+
+    if (shouldIncrement) {
+      await db
+        .update(works)
+        .set({
+          viewCount: sql`${works.viewCount} + 1`,
+        })
+        .where(eq(works.id, work.id));
+      work.viewCount += 1;
+    }
   }
 
   return work;
@@ -302,12 +318,27 @@ export async function listDiscoverWorks(options: {
   sort?: 'hot' | 'new' | 'featured';
   limit?: number;
   offset?: number;
-}): Promise<WorkSummary[]> {
-  const { type, sort = 'new', limit = 24, offset = 0 } = options;
+  cursor?: string;
+}): Promise<{ works: WorkSummary[]; nextCursor: string | null }> {
+  const { type, sort = 'new', limit = 24, offset = 0, cursor } = options;
 
   const conditions = [eq(works.status, 'live')];
   if (type) {
     conditions.push(eq(works.type, type));
+  }
+
+  // Cursor-based pagination: fetch cursor's createdAt and filter
+  let cursorCreatedAt: Date | null = null;
+  if (cursor) {
+    const cursorRow = await db
+      .select({ createdAt: works.createdAt })
+      .from(works)
+      .where(eq(works.id, cursor))
+      .limit(1);
+    if (cursorRow[0]) {
+      cursorCreatedAt = cursorRow[0].createdAt;
+      conditions.push(sql`${works.createdAt} < ${cursorCreatedAt}`);
+    }
   }
 
   const base = db
@@ -337,19 +368,32 @@ export async function listDiscoverWorks(options: {
     .innerJoin(users, eq(users.id, works.authorId))
     .where(and(...conditions));
 
+  // Fetch limit+1 to detect if there's a next page
+  const fetchLimit = limit + 1;
+
   const rows =
     sort === 'hot'
       ? await base
           .orderBy(desc(works.likeCount), desc(works.createdAt))
-          .limit(limit)
+          .limit(fetchLimit)
           .offset(offset)
       : sort === 'featured'
         ? await base
             .orderBy(desc(works.featuredAt), desc(works.createdAt))
-            .limit(limit)
+            .limit(fetchLimit)
             .offset(offset)
-        : await base.orderBy(desc(works.createdAt)).limit(limit).offset(offset);
-  return rows.map((row) => toSummary(mapWorkRow(row)));
+        : await base
+            .orderBy(desc(works.createdAt))
+            .limit(fetchLimit)
+            .offset(offset);
+
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const worksList = pageRows.map((row) => toSummary(mapWorkRow(row)));
+  const lastRow = pageRows[pageRows.length - 1];
+  const nextCursor = hasMore && lastRow ? lastRow.id : null;
+
+  return { works: worksList, nextCursor };
 }
 
 export type WorkTypeCount = { type: WorkType; count: number };
@@ -639,4 +683,61 @@ export async function updateWork(
     .returning();
 
   if (!updated) throw new WorkError('作品状态已变化，请刷新后重试');
+}
+
+export async function getFavoritedWorksByUser(
+  userId: string
+): Promise<WorkSummary[]> {
+  const rows = await db
+    .select({ workId: favorites.workId, createdAt: favorites.createdAt })
+    .from(favorites)
+    .where(eq(favorites.userId, userId))
+    .orderBy(desc(favorites.createdAt));
+
+  if (rows.length === 0) return [];
+
+  const workIds = rows.map((r) => r.workId);
+  const workRows = await db
+    .select({
+      id: works.id,
+      title: works.title,
+      tagline: works.tagline,
+      description: works.description,
+      type: works.type,
+      coverUrl: works.coverUrl,
+      screenshots: works.screenshots,
+      webUrl: works.webUrl,
+      qrUrl: works.qrUrl,
+      status: works.status,
+      rejectReason: works.rejectReason,
+      createdAt: works.createdAt,
+      reviewedAt: works.reviewedAt,
+      likeCount: works.likeCount,
+      viewCount: works.viewCount,
+      featuredAt: works.featuredAt,
+      authorId: users.id,
+      authorUsername: users.username,
+      authorNickname: users.nickname,
+      authorSlug: users.slug,
+    })
+    .from(works)
+    .innerJoin(users, eq(users.id, works.authorId))
+    .where(and(inArray(works.id, workIds), eq(works.status, 'live')));
+  return workRows.map((row) => toSummary(mapWorkRow(row)));
+}
+
+export async function deleteWork(
+  workId: string,
+  authorId: string
+): Promise<void> {
+  const existing = await db
+    .select({ id: works.id, authorId: works.authorId })
+    .from(works)
+    .where(eq(works.id, workId))
+    .limit(1);
+  if (!existing[0]) throw new WorkError('作品不存在');
+  if (existing[0].authorId !== authorId) throw new WorkError('无权删除此作品');
+  await db
+    .delete(works)
+    .where(and(eq(works.id, workId), eq(works.authorId, authorId)));
 }

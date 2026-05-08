@@ -1,5 +1,6 @@
 export {
   createWorkAction,
+  deleteWorkAction,
   reviewWorkAction,
   setFeaturedAction,
   unlistWorkAction,
@@ -19,6 +20,8 @@ export {
 export {
   countLiveWorksByType,
   countPendingWorks,
+  deleteWork,
+  getFavoritedWorksByUser,
   getSiteStats,
   getWorkByIdForViewer,
   getUserFavoritedWorkIds,

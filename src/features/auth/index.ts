@@ -11,3 +11,4 @@ export {
 } from './server/auth';
 export type { CurrentUser } from './server/auth';
 export { hashPassword } from './server/password';
+export { changePasswordAction, deleteAccountAction } from './security-actions';
