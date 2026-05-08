@@ -11,6 +11,9 @@ export const metadata: Metadata = {
     template: '%s · Aircade',
   },
   description: '群友造的街机厅——AI 时代的小作品展示站。',
+  icons: {
+    icon: '/favicon.svg',
+  },
   openGraph: {
     title: 'Aircade',
     description: '群友造的街机厅',
@@ -45,6 +48,9 @@ export default async function RootLayout({
       lang="zh-CN"
       className={`${inter.variable} ${harmony.variable} ${lxgw.variable} ${mono.variable}`}
     >
+      <head>
+        <meta name="theme-color" content="#FFFBF5" />
+      </head>
       <body className="min-h-screen bg-[var(--ac-bg)] font-sans text-[var(--ac-fg)] antialiased">
         <Navbar user={navUser} pendingCount={pendingCount} />
         <div className="min-h-[calc(100vh-64px)]">{children}</div>

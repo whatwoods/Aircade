@@ -6,6 +6,7 @@ type WorkCardProps = {
   work: WorkSummary;
   variant?: 'default' | 'featured';
   showStatus?: boolean;
+  initialLiked?: boolean;
 };
 
 const statusLabelMap: Record<WorkSummary['status'], string> = {
@@ -34,6 +35,7 @@ export function WorkCard({
   work,
   variant = 'default',
   showStatus = false,
+  initialLiked = false,
 }: WorkCardProps) {
   const href = `/works/${work.id}`;
   const isFeatured = variant === 'featured';
@@ -132,7 +134,11 @@ export function WorkCard({
             <span className="ac-micro" style={{ color: 'var(--ac-fg-soft)' }}>
               {work.viewCount}👁
             </span>
-            <HeartButton initial={work.likeCount} />
+            <HeartButton
+              workId={work.id}
+              initialLiked={initialLiked}
+              initialCount={work.likeCount}
+            />
           </div>
         </div>
       </div>

@@ -6,7 +6,12 @@ import { requireUser } from '@/features/auth';
 import { parseReviewWorkFormData } from './schemas';
 import { getWorkErrorMessage } from './server/errors';
 import { parseCreateWorkUploadFormData } from './server/upload-work-assets';
-import { createWork, reviewWork } from './server/works';
+import {
+  createWork,
+  reviewWork,
+  setFeaturedWork,
+  unlistWork,
+} from './server/works';
 
 function buildRedirectUrl(
   pathname: string,
@@ -99,4 +104,35 @@ export async function reviewWorkAction(formData: FormData) {
       error: errorMessage ?? '作品请求失败，请稍后再试',
     })
   );
+}
+
+export async function setFeaturedAction(formData: FormData) {
+  const user = await requireUser('/admin/works');
+  if (user.role !== 'admin') redirect('/account');
+  const workId = formData.get('workId') as string;
+  if (typeof workId !== 'string' || !workId) {
+    redirect('/admin/works?error=无效的作品ID');
+  }
+  const featured = formData.get('featured') === 'true';
+  await setFeaturedWork(workId, featured);
+  revalidatePath('/admin/works');
+  revalidatePath('/');
+  redirect(
+    '/admin/works?notice=' +
+      encodeURIComponent(featured ? '已设为精选' : '已取消精选')
+  );
+}
+
+export async function unlistWorkAction(formData: FormData) {
+  const user = await requireUser('/admin/works');
+  if (user.role !== 'admin') redirect('/account');
+  const workId = formData.get('workId') as string;
+  if (typeof workId !== 'string' || !workId) {
+    redirect('/admin/works?error=无效的作品ID');
+  }
+  await unlistWork(workId);
+  revalidatePath('/admin/works');
+  revalidatePath('/');
+  revalidatePath('/discover');
+  redirect('/admin/works?notice=' + encodeURIComponent('已设为隐藏'));
 }

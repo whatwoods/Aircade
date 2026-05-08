@@ -1,4 +1,9 @@
-export { createWorkAction, reviewWorkAction } from './actions';
+export {
+  createWorkAction,
+  reviewWorkAction,
+  setFeaturedAction,
+  unlistWorkAction,
+} from './actions';
 export { AdminReviewForm } from './components/admin-review-form';
 export { WorkCard } from './components/work-card';
 export { WorkGallery } from './components/work-gallery';
@@ -15,11 +20,17 @@ export {
   countPendingWorks,
   getSiteStats,
   getWorkByIdForViewer,
+  getUserFavoritedWorkIds,
+  getUserLikedWorkIds,
   listDiscoverWorks,
   listFeaturedWorks,
   listHomepageWorks,
   listRecentWorksByAuthor,
   listWorksForReview,
+  setFeaturedWork,
+  toggleFavorite,
+  toggleLike,
+  unlistWork,
 } from './server/works';
 export type {
   SiteStats,

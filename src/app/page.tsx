@@ -3,64 +3,25 @@ import { TypeChip, Cover } from '@/components/brand';
 import { getCurrentUser } from '@/features/auth';
 import {
   WorkCard,
-  countLiveWorksByType,
   getSiteStats,
+  getUserLikedWorkIds,
   listFeaturedWorks,
   listHomepageWorks,
 } from '@/features/works';
-import type { WorkSummary, WorkTypeCount } from '@/features/works';
-
-const typeMeta: Record<
-  WorkSummary['type'],
-  { label: string; mood: string; blurb: string }
-> = {
-  game: {
-    label: '游戏',
-    mood: 'var(--t-game)',
-    blurb: '摸鱼五分钟，爽一整天',
-  },
-  tool: {
-    label: '工具',
-    mood: 'var(--t-tool)',
-    blurb: '省一点时间做别的事',
-  },
-  social: {
-    label: '社交',
-    mood: 'var(--t-social)',
-    blurb: '把好玩的东西发到群里',
-  },
-  ai: {
-    label: 'AI',
-    mood: 'var(--t-ai)',
-    blurb: '用模型做点怪的',
-  },
-  other: {
-    label: '其他',
-    mood: 'var(--t-other)',
-    blurb: '装不下的那些小玩具',
-  },
-};
-
-const typeOrder: WorkSummary['type'][] = [
-  'game',
-  'tool',
-  'social',
-  'ai',
-  'other',
-];
+import type { WorkSummary } from '@/features/works';
 
 export default async function HomePage() {
-  const [user, latest, featured, stats, typeCounts] = await Promise.all([
+  const [user, latest, featured, stats] = await Promise.all([
     getCurrentUser(),
     listHomepageWorks(9),
     listFeaturedWorks(4),
     getSiteStats(),
-    countLiveWorksByType(),
   ]);
 
-  const countByType = new Map<WorkSummary['type'], number>(
-    typeCounts.map((t: WorkTypeCount) => [t.type, t.count])
-  );
+  const allWorkIds = [...latest, ...featured].map((w) => w.id);
+  const likedSet = user
+    ? await getUserLikedWorkIds(user.id, allWorkIds)
+    : new Set<string>();
 
   return (
     <div className="ac-page-in">
@@ -79,14 +40,14 @@ export default async function HomePage() {
                 AIRCADE · V1.0 · 2026
               </div>
               <h1
-                className="font-display text-[54px] leading-[1.05] tracking-tight sm:text-[72px]"
+                className="font-display text-[34px] leading-[1.05] tracking-tight sm:text-[54px] lg:text-[72px]"
                 style={{ color: 'var(--ac-fg)' }}
               >
                 群友造的
                 <br />
                 <span style={{ color: 'var(--ac-primary)' }}>街机厅</span>
                 <span
-                  className="ml-3 align-middle text-[24px] sm:text-[32px]"
+                  className="ml-1 align-middle text-[16px] sm:text-[24px] lg:text-[32px]"
                   style={{ color: 'var(--ac-fg-faint)' }}
                 >
                   / aircade
@@ -146,7 +107,7 @@ export default async function HomePage() {
                 ].map(([label, value]) => (
                   <div key={label as string}>
                     <div
-                      className="font-display text-[28px]"
+                      className="font-display text-[22px] sm:text-[28px]"
                       style={{ color: 'var(--ac-fg)' }}
                     >
                       {value}
@@ -177,13 +138,18 @@ export default async function HomePage() {
           />
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {featured.map((work) => (
-              <WorkCard key={work.id} work={work} variant="featured" />
+              <WorkCard
+                key={work.id}
+                work={work}
+                variant="featured"
+                initialLiked={likedSet.has(work.id)}
+              />
             ))}
           </div>
         </section>
       ) : null}
 
-      {/* BY TYPE */}
+      {/* BY TYPE — 暂时隐藏，规模小不需要分类浏览
       <section className="mx-auto max-w-6xl px-6 pt-[60px] sm:px-8">
         <SectionHead kicker="BY TYPE · 按类型逛" title="你今天想玩什么" />
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
@@ -226,6 +192,7 @@ export default async function HomePage() {
           })}
         </div>
       </section>
+      */}
 
       {/* LATEST */}
       <section id="latest" className="mx-auto max-w-6xl px-6 pt-[72px] sm:px-8">
@@ -233,7 +200,11 @@ export default async function HomePage() {
         {latest.length > 0 ? (
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {latest.map((work) => (
-              <WorkCard key={work.id} work={work} />
+              <WorkCard
+                key={work.id}
+                work={work}
+                initialLiked={likedSet.has(work.id)}
+              />
             ))}
           </div>
         ) : (
@@ -277,7 +248,7 @@ export default async function HomePage() {
                 JOIN · 加入我们
               </div>
               <h2
-                className="mt-3 font-display text-[34px] leading-tight sm:text-[38px]"
+                className="mt-3 font-display text-[26px] leading-tight sm:text-[34px] lg:text-[38px]"
                 style={{ color: 'var(--ac-fg)' }}
               >
                 你也在用 AI 做点小东西？
@@ -342,7 +313,7 @@ function SectionHead({
           {kicker}
         </div>
         <h2
-          className="font-display text-[30px] tracking-tight sm:text-[34px]"
+          className="font-display text-[24px] tracking-tight sm:text-[30px] lg:text-[34px]"
           style={{ color: 'var(--ac-fg)' }}
         >
           {title}

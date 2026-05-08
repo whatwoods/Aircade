@@ -1,6 +1,6 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db/client';
-import { users, works } from '@/db/schema';
+import { likes, favorites, users, works } from '@/db/schema';
 import type { CurrentUser } from '@/features/auth';
 import type { CreateWorkInput, ReviewWorkInput, WorkType } from '../schemas';
 import { WorkError } from './errors';
@@ -482,4 +482,117 @@ export async function reviewWork(input: ReviewWorkInput) {
   }
 
   return updatedWork;
+}
+
+// --- Like / Favorite / Admin toggles ---
+
+export async function toggleLike(
+  userId: string,
+  workId: string
+): Promise<{ liked: boolean; likeCount: number }> {
+  return db.transaction(async (tx) => {
+    const work = await tx
+      .select({ id: works.id })
+      .from(works)
+      .where(eq(works.id, workId))
+      .limit(1);
+    if (!work[0]) return { liked: false, likeCount: 0 };
+
+    const existing = await tx
+      .select()
+      .from(likes)
+      .where(and(eq(likes.userId, userId), eq(likes.workId, workId)))
+      .limit(1);
+    if (existing[0]) {
+      await tx
+        .delete(likes)
+        .where(and(eq(likes.userId, userId), eq(likes.workId, workId)));
+      const updated = await tx
+        .update(works)
+        .set({ likeCount: sql`GREATEST(${works.likeCount} - 1, 0)` })
+        .where(eq(works.id, workId))
+        .returning({ count: works.likeCount });
+      return { liked: false, likeCount: updated[0]?.count ?? 0 };
+    } else {
+      await tx.insert(likes).values({ userId, workId });
+      const updated = await tx
+        .update(works)
+        .set({ likeCount: sql`${works.likeCount} + 1` })
+        .where(eq(works.id, workId))
+        .returning({ count: works.likeCount });
+      return { liked: true, likeCount: updated[0]?.count ?? 0 };
+    }
+  });
+}
+
+export async function getUserLikedWorkIds(
+  userId: string,
+  workIds: string[]
+): Promise<Set<string>> {
+  if (workIds.length === 0) return new Set();
+  const rows = await db
+    .select({ workId: likes.workId })
+    .from(likes)
+    .where(and(eq(likes.userId, userId), inArray(likes.workId, workIds)));
+  return new Set(rows.map((r) => r.workId));
+}
+
+export async function toggleFavorite(
+  userId: string,
+  workId: string
+): Promise<{ favorited: boolean }> {
+  return db.transaction(async (tx) => {
+    const work = await tx
+      .select({ id: works.id })
+      .from(works)
+      .where(eq(works.id, workId))
+      .limit(1);
+    if (!work[0]) return { favorited: false };
+
+    const existing = await tx
+      .select()
+      .from(favorites)
+      .where(and(eq(favorites.userId, userId), eq(favorites.workId, workId)))
+      .limit(1);
+    if (existing[0]) {
+      await tx
+        .delete(favorites)
+        .where(and(eq(favorites.userId, userId), eq(favorites.workId, workId)));
+      return { favorited: false };
+    } else {
+      await tx.insert(favorites).values({ userId, workId });
+      return { favorited: true };
+    }
+  });
+}
+
+export async function getUserFavoritedWorkIds(
+  userId: string,
+  workIds: string[]
+): Promise<Set<string>> {
+  if (workIds.length === 0) return new Set();
+  const rows = await db
+    .select({ workId: favorites.workId })
+    .from(favorites)
+    .where(
+      and(eq(favorites.userId, userId), inArray(favorites.workId, workIds))
+    );
+  return new Set(rows.map((r) => r.workId));
+}
+
+export async function setFeaturedWork(
+  workId: string,
+  featured: boolean
+): Promise<void> {
+  await db
+    .update(works)
+    .set({ featuredAt: featured ? new Date() : null })
+    .where(eq(works.id, workId));
+}
+
+export async function unlistWork(workId: string): Promise<void> {
+  await db
+    .update(works)
+    .set({ status: 'unlisted' })
+    .where(and(eq(works.id, workId), eq(works.status, 'live')));
 }

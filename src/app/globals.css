@@ -353,6 +353,16 @@
     margin-top: var(--stack-gap, 12px);
   }
 
+  /* --- Mobile drawer --- */
+  .ac-drawer-backdrop {
+    background: rgba(61, 46, 31, 0.25);
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s var(--ease-out);
+  }
+  .ac-drawer-panel {
+    animation: drawerSlideIn 0.28s var(--ease-out);
+  }
+
   /* --- Skeleton shimmer --- */
   .ac-skeleton {
     position: relative;
@@ -417,6 +427,22 @@
 @keyframes acShimmer {
   to {
     transform: translateX(100%);
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes drawerSlideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
   }
 }
 

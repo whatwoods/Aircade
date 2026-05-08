@@ -5,7 +5,10 @@ import {
   AdminReviewForm,
   countPendingWorks,
   getSiteStats,
+  listHomepageWorks,
   listWorksForReview,
+  setFeaturedAction,
+  unlistWorkAction,
 } from '@/features/works';
 
 export const metadata: Metadata = {
@@ -33,12 +36,14 @@ export default async function AdminWorksPage({
     redirect('/account');
   }
 
-  const [pendingWorks, rejectedWorks, pendingCount, stats] = await Promise.all([
-    listWorksForReview('pending'),
-    listWorksForReview('rejected', 8),
-    countPendingWorks(),
-    getSiteStats(),
-  ]);
+  const [pendingWorks, rejectedWorks, pendingCount, stats, liveWorks] =
+    await Promise.all([
+      listWorksForReview('pending'),
+      listWorksForReview('rejected', 8),
+      countPendingWorks(),
+      getSiteStats(),
+      listHomepageWorks(20),
+    ]);
 
   const notice = readMessage(searchParams?.notice);
   const error = readMessage(searchParams?.error);
@@ -180,6 +185,107 @@ export default async function AdminWorksPage({
             }}
           >
             还没有驳回记录。
+          </div>
+        )}
+      </section>
+
+      {/* Live works management */}
+      <section className="mt-12 space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="ac-micro" style={{ color: 'var(--ac-mint)' }}>
+              LIVE · 已上线作品
+            </div>
+            <h2
+              className="mt-1 font-display text-[22px] leading-tight"
+              style={{ color: 'var(--ac-fg)' }}
+            >
+              Live Works
+            </h2>
+          </div>
+          <span className="ac-pill" style={{ color: 'var(--ac-fg-soft)' }}>
+            {liveWorks.length} 条
+          </span>
+        </div>
+
+        {liveWorks.length > 0 ? (
+          <div className="space-y-3">
+            {liveWorks.map((work) => (
+              <div
+                key={work.id}
+                className="ac-card flex items-center justify-between gap-4 p-4"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="truncate font-medium"
+                      style={{ color: 'var(--ac-fg)' }}
+                    >
+                      {work.title}
+                    </span>
+                    <span
+                      className="ac-pill shrink-0 text-[11px]"
+                      style={{
+                        background: 'var(--ac-surface-soft)',
+                        color: 'var(--ac-fg-soft)',
+                      }}
+                    >
+                      {work.type}
+                    </span>
+                    {work.featuredAt ? (
+                      <span
+                        className="ac-pill shrink-0 text-[11px]"
+                        style={{
+                          background:
+                            'color-mix(in oklch, var(--ac-primary) 14%, var(--ac-surface))',
+                          color: 'var(--ac-primary)',
+                        }}
+                      >
+                        ★ 精选
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  <form action={setFeaturedAction}>
+                    <input type="hidden" name="workId" value={work.id} />
+                    <input
+                      type="hidden"
+                      name="featured"
+                      value={work.featuredAt ? 'false' : 'true'}
+                    />
+                    <button
+                      type="submit"
+                      className="ac-btn ac-btn--ghost text-[13px]"
+                    >
+                      {work.featuredAt ? '取消精选' : '设为精选'}
+                    </button>
+                  </form>
+                  <form action={unlistWorkAction}>
+                    <input type="hidden" name="workId" value={work.id} />
+                    <button
+                      type="submit"
+                      className="ac-btn ac-btn--ghost text-[13px]"
+                      style={{ color: '#b91c1c' }}
+                    >
+                      隐藏
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div
+            className="rounded-[22px] border border-dashed px-6 py-10 text-center text-sm"
+            style={{
+              borderColor: 'var(--ac-border)',
+              background: 'var(--ac-bg-tint)',
+              color: 'var(--ac-fg-soft)',
+            }}
+          >
+            暂无上线作品。
           </div>
         )}
       </section>

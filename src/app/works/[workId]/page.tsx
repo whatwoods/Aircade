@@ -1,12 +1,22 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Avatar, HeartButton, TagChip, TypeChip } from '@/components/brand';
+import { env } from '@/lib/env';
+import {
+  Avatar,
+  FavoriteButton,
+  HeartButton,
+  ShareButton,
+  TagChip,
+  TypeChip,
+} from '@/components/brand';
 import { getCurrentUser } from '@/features/auth';
 import {
   WorkCard,
   WorkGallery,
   getWorkByIdForViewer,
+  getUserFavoritedWorkIds,
+  getUserLikedWorkIds,
   listRecentWorksByAuthor,
 } from '@/features/works';
 
@@ -85,6 +95,13 @@ export default async function WorkDetailPage({
   const moreByAuthor = moreRaw
     .filter((w) => w.id !== work.id && w.status === 'live')
     .slice(0, 3);
+
+  const [likedSet, favoritedSet] = viewer
+    ? await Promise.all([
+        getUserLikedWorkIds(viewer!.id, [work.id]),
+        getUserFavoritedWorkIds(viewer!.id, [work.id]),
+      ])
+    : [new Set<string>(), new Set<string>()];
 
   const notice = readMessage(searchParams?.notice);
   const canSeeReviewState =
@@ -305,42 +322,21 @@ export default async function WorkDetailPage({
               <Stat label="上架" value={formatShort(work.createdAt)} small />
             </div>
             <div className="mt-4 flex items-center gap-2">
-              <HeartButton initial={work.likeCount} size="lg" />
-              <button
-                type="button"
-                className="ac-btn ac-btn-sm ac-btn-ghost flex-1"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                </svg>
-                收藏
-              </button>
-              <button
-                type="button"
-                className="ac-btn ac-btn-sm ac-btn-ghost flex-1"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <circle cx="18" cy="5" r="3" />
-                  <circle cx="6" cy="12" r="3" />
-                  <circle cx="18" cy="19" r="3" />
-                  <path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98" />
-                </svg>
-                分享
-              </button>
+              <HeartButton
+                workId={work.id}
+                initialLiked={likedSet.has(work.id)}
+                initialCount={work.likeCount}
+                size="lg"
+              />
+              <FavoriteButton
+                workId={work.id}
+                initialFavorited={favoritedSet.has(work.id)}
+                size="lg"
+              />
+              <ShareButton
+                title={work.title}
+                url={`${env.NEXT_PUBLIC_SITE_URL}/works/${work.id}`}
+              />
             </div>
             <div
               className="ac-micro mt-4"
