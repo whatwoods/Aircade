@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { env } from '@/lib/env';
 import {
   Avatar,
+  ConfirmDeleteButton,
   FavoriteButton,
   HeartButton,
   ShareButton,
@@ -373,21 +374,7 @@ export default async function WorkDetailPage({
               >
                 编辑作品
               </Link>
-              <form action={deleteWorkAction}>
-                <input type="hidden" name="workId" value={work.id} />
-                <button
-                  type="submit"
-                  className="ac-btn w-full"
-                  style={{ color: '#dc2626' }}
-                  onClick={(e) => {
-                    if (!confirm('确定要删除这个作品吗？此操作不可撤销。')) {
-                      e.preventDefault();
-                    }
-                  }}
-                >
-                  删除作品
-                </button>
-              </form>
+              <ConfirmDeleteButton workId={work.id} action={deleteWorkAction} />
               <Link href="/submit" className="ac-btn w-full">
                 再投一个作品
               </Link>

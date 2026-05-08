@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { likes, favorites, users, works, type Work } from '@/db/schema';
 import type { CurrentUser } from '@/features/auth';
@@ -340,7 +340,10 @@ export async function listDiscoverWorks(options: {
       if (cursorRow[0]) {
         const { createdAt, id } = cursorRow[0];
         conditions.push(
-          sql`(${works.createdAt}, ${works.id}) < (${createdAt}, ${id})`
+          or(
+            lt(works.createdAt, createdAt),
+            and(eq(works.createdAt, createdAt), lt(works.id, id))
+          )!
         );
       }
     } else if (sort === 'hot') {
@@ -356,7 +359,16 @@ export async function listDiscoverWorks(options: {
       if (cursorRow[0]) {
         const { likeCount, createdAt, id } = cursorRow[0];
         conditions.push(
-          sql`(${works.likeCount}, ${works.createdAt}, ${works.id}) < (${likeCount}, ${createdAt}, ${id})`
+          or(
+            lt(works.likeCount, likeCount),
+            and(
+              eq(works.likeCount, likeCount),
+              or(
+                lt(works.createdAt, createdAt),
+                and(eq(works.createdAt, createdAt), lt(works.id, id))
+              )!
+            )
+          )!
         );
       }
     } else {
@@ -372,8 +384,23 @@ export async function listDiscoverWorks(options: {
         .limit(1);
       if (cursorRow[0]) {
         const { featuredAt, createdAt, id } = cursorRow[0];
+        const cursorFeaturedAt = featuredAt;
+        const cursorCreatedAt = createdAt;
+        const cursorId = id;
         conditions.push(
-          sql`(${works.featuredAt}, ${works.createdAt}, ${works.id}) < (${featuredAt}, ${createdAt}, ${id})`
+          or(
+            sql`${works.featuredAt} IS NOT NULL AND ${cursorFeaturedAt} IS NOT NULL AND ${works.featuredAt} < ${cursorFeaturedAt}`,
+            and(
+              sql`(${works.featuredAt} = ${cursorFeaturedAt} OR (${works.featuredAt} IS NULL AND ${cursorFeaturedAt} IS NULL))`,
+              or(
+                lt(works.createdAt, cursorCreatedAt),
+                and(
+                  eq(works.createdAt, cursorCreatedAt),
+                  lt(works.id, cursorId)
+                )
+              )!
+            )
+          )!
         );
       }
     }

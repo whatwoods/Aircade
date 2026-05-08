@@ -9,3 +9,5 @@ export { ShareButton } from './share-button';
 export { TagChip } from './tag-chip';
 export { TypeChip, type WorkType } from './type-chip';
 export { coverThemes, themeForKey, hueForKey } from './cover-themes';
+export { ConfirmDeleteButton } from './confirm-delete-button';
+export { ConfirmForm } from './confirm-form';

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { ConfirmForm } from '@/components/brand';
 import { requireUser } from '@/features/auth';
 import { changePasswordAction, deleteAccountAction } from '@/features/auth';
 
@@ -196,14 +197,10 @@ export default async function SecurityPage({
               删除账号后，你的所有作品、点赞、收藏和会话将被永久清除，且无法恢复。
             </p>
 
-            <form
+            <ConfirmForm
               action={deleteAccountAction}
               className="mt-5"
-              onSubmit={(e) => {
-                if (!confirm('确定删除账号？此操作不可逆')) {
-                  e.preventDefault();
-                }
-              }}
+              message="确定删除账号？此操作不可逆"
             >
               <div className="mb-4">
                 <label
@@ -239,7 +236,7 @@ export default async function SecurityPage({
               >
                 删除账号
               </button>
-            </form>
+            </ConfirmForm>
           </div>
         </div>
       </div>
