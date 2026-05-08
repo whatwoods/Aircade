@@ -3,6 +3,7 @@ export {
   reviewWorkAction,
   setFeaturedAction,
   unlistWorkAction,
+  updateWorkAction,
 } from './actions';
 export { AdminReviewForm } from './components/admin-review-form';
 export { WorkCard } from './components/work-card';
@@ -31,6 +32,7 @@ export {
   toggleFavorite,
   toggleLike,
   unlistWork,
+  updateWork,
 } from './server/works';
 export type {
   SiteStats,

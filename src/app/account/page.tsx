@@ -166,7 +166,18 @@ export default async function AccountPage() {
             {recentWorks.length > 0 ? (
               <div className="grid gap-5 md:grid-cols-2">
                 {recentWorks.map((work) => (
-                  <WorkCard key={work.id} work={work} showStatus />
+                  <div key={work.id} className="space-y-2">
+                    <WorkCard work={work} showStatus />
+                    <div className="flex justify-end">
+                      <Link
+                        href={`/works/${work.id}/edit`}
+                        className="text-[12px] font-medium transition-colors hover:underline"
+                        style={{ color: 'var(--ac-primary)' }}
+                      >
+                        ✎ 编辑作品
+                      </Link>
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : (

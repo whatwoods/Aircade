@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db/client';
-import { likes, favorites, users, works } from '@/db/schema';
+import { likes, favorites, users, works, type Work } from '@/db/schema';
 import type { CurrentUser } from '@/features/auth';
 import type { CreateWorkInput, ReviewWorkInput, WorkType } from '../schemas';
 import { WorkError } from './errors';
@@ -595,4 +595,42 @@ export async function unlistWork(workId: string): Promise<void> {
     .update(works)
     .set({ status: 'unlisted' })
     .where(and(eq(works.id, workId), eq(works.status, 'live')));
+}
+
+export async function updateWork(
+  workId: string,
+  authorId: string,
+  input: CreateWorkInput
+): Promise<Work> {
+  const existing = await db
+    .select()
+    .from(works)
+    .where(eq(works.id, workId))
+    .limit(1);
+
+  if (!existing[0]) throw new WorkError('作品不存在');
+  if (existing[0].authorId !== authorId) throw new WorkError('无权编辑此作品');
+
+  const newStatus =
+    existing[0].status === 'rejected' ? 'pending' : existing[0].status;
+
+  const [updated] = await db
+    .update(works)
+    .set({
+      title: input.title,
+      type: input.type,
+      tagline: input.tagline,
+      description: input.description,
+      coverUrl: input.coverUrl,
+      screenshots: input.screenshots,
+      webUrl: input.webUrl ?? null,
+      qrUrl: input.qrUrl ?? null,
+      status: newStatus,
+      reviewedAt: newStatus === 'pending' ? null : existing[0].reviewedAt,
+      rejectReason: newStatus === 'pending' ? null : existing[0].rejectReason,
+    })
+    .where(eq(works.id, workId))
+    .returning();
+
+  return updated!;
 }

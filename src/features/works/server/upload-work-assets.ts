@@ -250,3 +250,69 @@ export async function parseCreateWorkUploadFormData(
     throw error;
   }
 }
+
+export async function parseUpdateWorkUploadFormData(
+  formData: FormData,
+  existing: { coverUrl: string; screenshots: string[]; qrUrl: string | null }
+): Promise<CreateWorkInput> {
+  const coverFile = asFile(formData.get('coverFile'));
+  const qrFile = asFile(formData.get('qrFile'));
+  const screenshotFiles = formData
+    .getAll('screenshots')
+    .map((entry) => asFile(entry))
+    .filter((file): file is File => file !== null);
+
+  if (screenshotFiles.length > maxScreenshotCount) {
+    throw new WorkError('最多上传 6 张截图');
+  }
+
+  const storedFiles: StoredUpload[] = [];
+
+  try {
+    let coverUrl = existing.coverUrl;
+    if (coverFile) {
+      const coverUpload = await storeImage(coverFile, 'cover');
+      storedFiles.push(coverUpload);
+      coverUrl = coverUpload.publicUrl;
+    }
+
+    let screenshotUrls = existing.screenshots;
+    if (screenshotFiles.length > 0) {
+      const screenshotUploads = await Promise.all(
+        screenshotFiles.map((file) => storeImage(file, 'screenshot'))
+      );
+      storedFiles.push(...screenshotUploads);
+      screenshotUrls = screenshotUploads.map((item) => item.publicUrl);
+    }
+
+    let qrUrl = existing.qrUrl ?? '';
+    if (qrFile) {
+      const qrUpload = await storeImage(qrFile, 'qr');
+      storedFiles.push(qrUpload);
+      qrUrl = qrUpload.publicUrl;
+    }
+
+    return createWorkInputSchema.parse({
+      title: readTextField(formData, 'title'),
+      type: formData.get('type'),
+      tagline: readTextField(formData, 'tagline'),
+      description: readTextField(formData, 'description'),
+      coverUrl,
+      screenshots: screenshotUrls,
+      webUrl: readTextField(formData, 'webUrl'),
+      qrUrl,
+    });
+  } catch (error) {
+    await Promise.all(
+      storedFiles.map(async (file) => {
+        try {
+          await unlink(file.diskPath);
+        } catch {
+          // Ignore cleanup failures and report the original error.
+        }
+      })
+    );
+
+    throw error;
+  }
+}

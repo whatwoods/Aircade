@@ -350,9 +350,17 @@ export default async function WorkDetailPage({
           </div>
 
           {viewer?.id === work.author.id ? (
-            <Link href="/submit" className="ac-btn w-full">
-              再投一个作品
-            </Link>
+            <>
+              <Link
+                href={`/works/${work.id}/edit`}
+                className="ac-btn ac-btn-primary w-full"
+              >
+                编辑作品
+              </Link>
+              <Link href="/submit" className="ac-btn w-full">
+                再投一个作品
+              </Link>
+            </>
           ) : null}
           {viewer?.role === 'admin' ? (
             <Link href="/admin/works" className="ac-btn w-full">

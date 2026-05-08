@@ -3,9 +3,27 @@
 import { useEffect, useState } from 'react';
 import { ImagePlus, QrCode, Upload, X } from 'lucide-react';
 import { Cover, TypeChip } from '@/components/brand';
-import { createWorkAction } from '../actions';
+import { createWorkAction, updateWorkAction } from '../actions';
 import { workTypeValues } from '../schemas';
 import type { WorkType } from '../schemas';
+
+type InitialData = {
+  id: string;
+  title: string;
+  type: string;
+  tagline: string;
+  description: string;
+  coverUrl: string;
+  screenshots: string[];
+  webUrl?: string | null;
+  qrUrl?: string | null;
+};
+
+export type WorkSubmitFormProps = {
+  mode?: 'create' | 'edit';
+  initialData?: InitialData;
+  submitLabel?: string;
+};
 
 const typeLabelMap: Record<WorkType, string> = {
   game: '游戏',
@@ -32,22 +50,47 @@ const inputStyle: React.CSSProperties = {
   color: 'var(--ac-fg)',
 };
 
-export function WorkSubmitForm() {
-  const [type, setType] = useState<WorkType>('game');
-  const [title, setTitle] = useState('');
-  const [tagline, setTagline] = useState('');
-  const [description, setDescription] = useState('');
+export function WorkSubmitForm({
+  mode = 'create',
+  initialData,
+  submitLabel,
+}: WorkSubmitFormProps = {}) {
+  const isEdit = mode === 'edit' && !!initialData;
+
+  const [type, setType] = useState<WorkType>(
+    isEdit ? (initialData.type as WorkType) : 'game'
+  );
+  const [title, setTitle] = useState(isEdit ? initialData.title : '');
+  const [tagline, setTagline] = useState(isEdit ? initialData.tagline : '');
+  const [description, setDescription] = useState(
+    isEdit ? initialData.description : ''
+  );
+  const [webUrl, setWebUrl] = useState(
+    isEdit ? (initialData.webUrl ?? '') : ''
+  );
+
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState('');
   const [coverInputKey, setCoverInputKey] = useState(0);
+
+  // Existing cover URL for edit mode (shown when no new file selected)
+  const existingCoverUrl = isEdit ? initialData.coverUrl : '';
+
   const [screenshotFiles, setScreenshotFiles] = useState<File[]>([]);
   const [screenshotPreviewUrls, setScreenshotPreviewUrls] = useState<string[]>(
     []
   );
   const [screenshotInputKey, setScreenshotInputKey] = useState(0);
+
+  // Existing screenshots for edit mode
+  const existingScreenshots = isEdit ? initialData.screenshots : [];
+
   const [qrFile, setQrFile] = useState<File | null>(null);
   const [qrPreviewUrl, setQrPreviewUrl] = useState('');
   const [qrInputKey, setQrInputKey] = useState(0);
+
+  // Existing QR URL for edit mode
+  const existingQrUrl = isEdit ? (initialData.qrUrl ?? '') : '';
 
   useEffect(() => {
     if (!coverFile) {
@@ -91,9 +134,44 @@ export function WorkSubmitForm() {
     };
   }, [screenshotFiles]);
 
+  // Effective preview values: prefer new file previews, fall back to existing URLs
+  const effectiveCoverPreview = coverPreviewUrl || existingCoverUrl;
+  const effectiveScreenshotPreviews =
+    screenshotPreviewUrls.length > 0
+      ? screenshotPreviewUrls
+      : existingScreenshots;
+  const effectiveQrPreview = qrPreviewUrl || existingQrUrl;
+
+  const defaultSubmitLabel = isEdit ? '更新作品' : '提交审核 →';
+  const finalSubmitLabel = submitLabel ?? defaultSubmitLabel;
+
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[1fr_340px]">
-      <form action={createWorkAction} className="ac-card p-6 sm:p-7">
+      <form
+        action={isEdit ? updateWorkAction : createWorkAction}
+        className="ac-card p-6 sm:p-7"
+      >
+        {isEdit ? (
+          <input type="hidden" name="workId" value={initialData.id} />
+        ) : null}
+
+        {/* Existing asset URLs for edit mode (used by server action as fallback) */}
+        {isEdit ? (
+          <>
+            <input
+              type="hidden"
+              name="existingCoverUrl"
+              value={existingCoverUrl}
+            />
+            <input
+              type="hidden"
+              name="existingScreenshots"
+              value={existingScreenshots.join('|||')}
+            />
+            <input type="hidden" name="existingQrUrl" value={existingQrUrl} />
+          </>
+        ) : null}
+
         <input type="hidden" name="type" value={type} />
 
         <Section title="基本信息" note="这一段会显示在卡片和详情页。">
@@ -179,34 +257,52 @@ export function WorkSubmitForm() {
         <Divider />
 
         <Section title="图片" note="封面在卡片，截图在详情页，支持直接上传。">
-          <Field label="封面上传" htmlFor="coverFile" required>
+          <Field
+            label={isEdit ? '封面图片' : '封面上传'}
+            htmlFor="coverFile"
+            required={!isEdit}
+          >
             <UploadSurface
               inputKey={coverInputKey}
               id="coverFile"
               name="coverFile"
               accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-              required
-              selected={Boolean(coverFile)}
+              required={!isEdit}
+              selected={Boolean(coverFile) || (isEdit && !!existingCoverUrl)}
               icon={<ImagePlus size={18} strokeWidth={2.1} />}
-              title={coverFile ? coverFile.name : '投一张封面图'}
+              title={
+                coverFile
+                  ? coverFile.name
+                  : isEdit && existingCoverUrl
+                    ? '当前封面（点击可替换）'
+                    : '投一张封面图'
+              }
               subtitle={
                 coverFile
                   ? `${formatFileSize(coverFile.size)} · 会展示在卡片正面`
-                  : '支持 PNG / JPG / WEBP / GIF / AVIF'
+                  : isEdit && existingCoverUrl
+                    ? '选择新图片可替换当前封面'
+                    : '支持 PNG / JPG / WEBP / GIF / AVIF'
               }
               text={
                 coverFile
                   ? '拖进来可直接替换封面'
-                  : '点一下选择，或者像投币一样把封面拖进来'
+                  : isEdit && existingCoverUrl
+                    ? '不更换则保留原封面'
+                    : '点一下选择，或者像投币一样把封面拖进来'
               }
               accent="var(--ac-primary)"
-              previewUrl={coverPreviewUrl || undefined}
+              previewUrl={effectiveCoverPreview || undefined}
               previewAlt="封面预览"
               onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
-              onClear={() => {
-                setCoverFile(null);
-                setCoverInputKey((value) => value + 1);
-              }}
+              onClear={
+                isEdit && existingCoverUrl && !coverFile
+                  ? undefined
+                  : () => {
+                      setCoverFile(null);
+                      setCoverInputKey((value) => value + 1);
+                    }
+              }
             />
           </Field>
 
@@ -215,7 +311,9 @@ export function WorkSubmitForm() {
             note={
               screenshotFiles.length > 0
                 ? `已选择 ${screenshotFiles.length} 张，最多 6 张`
-                : '可多选，最多 6 张，可留空'
+                : isEdit && existingScreenshots.length > 0
+                  ? `已有 ${existingScreenshots.length} 张截图，可替换`
+                  : '可多选，最多 6 张，可留空'
             }
             htmlFor="screenshots"
           >
@@ -225,25 +323,38 @@ export function WorkSubmitForm() {
               name="screenshots"
               accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
               multiple
-              selected={screenshotFiles.length > 0}
+              selected={
+                screenshotFiles.length > 0 ||
+                (isEdit && existingScreenshots.length > 0)
+              }
               icon={<Upload size={18} strokeWidth={2.1} />}
               title={
                 screenshotFiles.length > 0
                   ? `已装入 ${screenshotFiles.length} 张截图`
-                  : '补几张过程图'
+                  : isEdit && existingScreenshots.length > 0
+                    ? `当前 ${existingScreenshots.length} 张截图（点击可替换）`
+                    : '补几张过程图'
               }
               subtitle={
                 screenshotFiles.length > 0
                   ? '详情页会按上传顺序展示'
-                  : '建议放玩法、界面、结果页，不要全是一张图'
+                  : isEdit && existingScreenshots.length > 0
+                    ? '选择新图片可替换所有截图'
+                    : '建议放玩法、界面、结果页，不要全是一张图'
               }
               text={
                 screenshotFiles.length > 0
                   ? '拖进来可直接替换这一组截图'
-                  : '支持直接拖进来，做一组像贴在街机机身上的快照'
+                  : isEdit && existingScreenshots.length > 0
+                    ? '不更换则保留原截图'
+                    : '支持直接拖进来，做一组像贴在街机机身上的快照'
               }
               accent="var(--ac-mint)"
-              previewUrls={screenshotPreviewUrls}
+              previewUrls={
+                effectiveScreenshotPreviews.length > 0
+                  ? effectiveScreenshotPreviews
+                  : undefined
+              }
               fileNames={screenshotFiles.map((file) => file.name)}
               onChange={(e) =>
                 setScreenshotFiles(Array.from(e.target.files ?? []))
@@ -264,6 +375,8 @@ export function WorkSubmitForm() {
               id="webUrl"
               name="webUrl"
               type="url"
+              value={webUrl}
+              onChange={(e) => setWebUrl(e.target.value)}
               className={inputClass}
               style={inputStyle}
               placeholder="https://"
@@ -275,21 +388,31 @@ export function WorkSubmitForm() {
               id="qrFile"
               name="qrFile"
               accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-              selected={Boolean(qrFile)}
+              selected={Boolean(qrFile) || (isEdit && !!existingQrUrl)}
               icon={<QrCode size={18} strokeWidth={2.1} />}
-              title={qrFile ? qrFile.name : '没有 H5 就传二维码'}
+              title={
+                qrFile
+                  ? qrFile.name
+                  : isEdit && existingQrUrl
+                    ? '当前二维码（点击可替换）'
+                    : '没有 H5 就传二维码'
+              }
               subtitle={
                 qrFile
                   ? `${formatFileSize(qrFile.size)} · 详情页会展示扫码入口`
-                  : '适合小程序、公众号或群里口令入口'
+                  : isEdit && existingQrUrl
+                    ? '选择新图片可替换当前二维码'
+                    : '适合小程序、公众号或群里口令入口'
               }
               text={
                 qrFile
                   ? '拖进来可直接替换二维码'
-                  : '如果没填 Web 链接，至少上传一张二维码'
+                  : isEdit && existingQrUrl
+                    ? '不更换则保留原二维码'
+                    : '如果没填 Web 链接，至少上传一张二维码'
               }
               accent="var(--ac-cream)"
-              previewUrl={qrPreviewUrl || undefined}
+              previewUrl={effectiveQrPreview || undefined}
               previewAlt="二维码预览"
               onChange={(e) => setQrFile(e.target.files?.[0] ?? null)}
               onClear={() => {
@@ -311,7 +434,7 @@ export function WorkSubmitForm() {
             我确认作品为原创或已获授权。
           </label>
           <button type="submit" className="ac-btn ac-btn-primary">
-            提交审核 →
+            {finalSubmitLabel}
           </button>
         </div>
       </form>
@@ -327,7 +450,7 @@ export function WorkSubmitForm() {
         >
           <Cover
             seed={`preview-${type}`}
-            coverUrl={coverPreviewUrl || undefined}
+            coverUrl={effectiveCoverPreview || undefined}
             ratio="4 / 3"
           />
           <div className="p-4">

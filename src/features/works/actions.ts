@@ -5,12 +5,17 @@ import { redirect } from 'next/navigation';
 import { requireUser } from '@/features/auth';
 import { parseReviewWorkFormData } from './schemas';
 import { getWorkErrorMessage } from './server/errors';
-import { parseCreateWorkUploadFormData } from './server/upload-work-assets';
+import {
+  parseCreateWorkUploadFormData,
+  parseUpdateWorkUploadFormData,
+} from './server/upload-work-assets';
 import {
   createWork,
   reviewWork,
   setFeaturedWork,
   unlistWork,
+  getWorkByIdForViewer,
+  updateWork,
 } from './server/works';
 
 function buildRedirectUrl(
@@ -135,4 +140,46 @@ export async function unlistWorkAction(formData: FormData) {
   revalidatePath('/');
   revalidatePath('/discover');
   redirect('/admin/works?notice=' + encodeURIComponent('已设为隐藏'));
+}
+
+export async function updateWorkAction(formData: FormData) {
+  const user = await requireUser('/submit');
+  const workId = formData.get('workId');
+  if (typeof workId !== 'string' || !workId) {
+    throw new Error('Missing workId');
+  }
+
+  // Fetch existing work for image fallbacks
+  const existing = await getWorkByIdForViewer(workId, user);
+  if (!existing || existing.author.id !== user.id) {
+    throw new Error('无权编辑此作品');
+  }
+
+  let errorMessage: string | null = null;
+
+  try {
+    const parsed = await parseUpdateWorkUploadFormData(formData, {
+      coverUrl: existing.coverUrl,
+      screenshots: existing.screenshots,
+      qrUrl: existing.qrUrl,
+    });
+
+    await updateWork(workId, user.id, parsed);
+  } catch (error) {
+    errorMessage = getWorkErrorMessage(error);
+  }
+
+  if (!errorMessage) {
+    revalidatePath('/');
+    revalidatePath('/account');
+    revalidatePath(`/works/${workId}`);
+    revalidatePath('/admin/works');
+    redirect(`/works/${workId}?notice=作品已更新`);
+  }
+
+  redirect(
+    buildRedirectUrl(`/works/${workId}/edit`, {
+      error: errorMessage ?? '更新失败，请稍后再试',
+    })
+  );
 }
