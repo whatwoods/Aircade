@@ -13,11 +13,7 @@ export function WorkGallery({ work }: { work: WorkDetail }) {
   return (
     <div>
       <div className="overflow-hidden rounded-[22px]">
-        <Cover
-          seed={`${seed}-${active}`}
-          coverUrl={mainImage}
-          ratio="16 / 10"
-        />
+        <Cover seed={`${seed}-${active}`} coverUrl={mainImage} fit="contain" />
       </div>
 
       {shots.length > 1 ? (

@@ -9,6 +9,8 @@ type CoverProps = {
   label?: string;
   /** CSS aspect-ratio string, default "4 / 3". */
   ratio?: string;
+  /** How to fit the image: 'cover' crops to fill, 'contain' shows full image. */
+  fit?: 'cover' | 'contain';
   /** Hide emoji glyph — useful for thumbnails. */
   hideEmoji?: boolean;
   className?: string;
@@ -19,6 +21,7 @@ export function Cover({
   coverUrl,
   label,
   ratio = '4 / 3',
+  fit = 'cover',
   hideEmoji,
   className,
 }: CoverProps) {
@@ -29,17 +32,29 @@ export function Cover({
     ['--c-from' as string]: theme.from,
     ['--c-via' as string]: theme.via,
     ['--c-to' as string]: theme.to,
-    aspectRatio: ratio,
+    aspectRatio: fit === 'contain' && coverUrl ? 'auto' : ratio,
   };
 
   return (
-    <div className={`ac-cover ${className ?? ''}`} style={bgStyle}>
+    <div
+      className={`ac-cover ${fit === 'contain' && coverUrl ? 'relative' : ''} ${className ?? ''}`}
+      style={bgStyle}
+    >
       <div className="ac-cover-grad" />
       {coverUrl ? (
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${coverUrl})` }}
-        />
+        fit === 'contain' ? (
+          <img
+            src={coverUrl}
+            alt=""
+            className="relative z-[1] mx-auto max-h-[80vh] w-auto object-contain"
+            style={{ display: 'block' }}
+          />
+        ) : (
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${coverUrl})` }}
+          />
+        )
       ) : (
         <>
           <div className="ac-cover-stripes" />
