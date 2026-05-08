@@ -58,7 +58,9 @@ export function WorkSubmitForm({
   const isEdit = mode === 'edit' && !!initialData;
 
   const [type, setType] = useState<WorkType>(
-    isEdit ? (initialData.type as WorkType) : 'game'
+    isEdit && workTypeValues.includes(initialData.type as WorkType)
+      ? (initialData.type as WorkType)
+      : 'game'
   );
   const [title, setTitle] = useState(isEdit ? initialData.title : '');
   const [tagline, setTagline] = useState(isEdit ? initialData.tagline : '');
@@ -153,23 +155,6 @@ export function WorkSubmitForm({
       >
         {isEdit ? (
           <input type="hidden" name="workId" value={initialData.id} />
-        ) : null}
-
-        {/* Existing asset URLs for edit mode (used by server action as fallback) */}
-        {isEdit ? (
-          <>
-            <input
-              type="hidden"
-              name="existingCoverUrl"
-              value={existingCoverUrl}
-            />
-            <input
-              type="hidden"
-              name="existingScreenshots"
-              value={existingScreenshots.join('|||')}
-            />
-            <input type="hidden" name="existingQrUrl" value={existingQrUrl} />
-          </>
         ) : null}
 
         <input type="hidden" name="type" value={type} />

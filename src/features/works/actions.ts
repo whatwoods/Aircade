@@ -146,13 +146,15 @@ export async function updateWorkAction(formData: FormData) {
   const user = await requireUser('/submit');
   const workId = formData.get('workId');
   if (typeof workId !== 'string' || !workId) {
-    throw new Error('Missing workId');
+    redirect('/account?error=无效的作品ID');
   }
 
   // Fetch existing work for image fallbacks
-  const existing = await getWorkByIdForViewer(workId, user);
+  const existing = await getWorkByIdForViewer(workId, user, {
+    incrementView: false,
+  });
   if (!existing || existing.author.id !== user.id) {
-    throw new Error('无权编辑此作品');
+    redirect('/account?error=无权编辑此作品');
   }
 
   let errorMessage: string | null = null;

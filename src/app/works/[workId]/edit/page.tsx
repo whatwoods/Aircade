@@ -10,8 +10,11 @@ export default async function EditWorkPage({ params }: Props) {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
 
-  const work = await getWorkByIdForViewer(params.workId, user);
-  if (!work || work.author.id !== user.id) redirect('/account');
+  const work = await getWorkByIdForViewer(params.workId, user, {
+    incrementView: false,
+  });
+  if (!work || work.author.id !== user.id)
+    redirect('/account?error=无权编辑此作品');
 
   return (
     <div className="ac-page-in mx-auto max-w-6xl px-6 py-10 sm:px-8">

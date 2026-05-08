@@ -601,9 +601,15 @@ export async function updateWork(
   workId: string,
   authorId: string,
   input: CreateWorkInput
-): Promise<Work> {
+): Promise<void> {
   const existing = await db
-    .select()
+    .select({
+      id: works.id,
+      authorId: works.authorId,
+      status: works.status,
+      reviewedAt: works.reviewedAt,
+      rejectReason: works.rejectReason,
+    })
     .from(works)
     .where(eq(works.id, workId))
     .limit(1);
@@ -629,8 +635,8 @@ export async function updateWork(
       reviewedAt: newStatus === 'pending' ? null : existing[0].reviewedAt,
       rejectReason: newStatus === 'pending' ? null : existing[0].rejectReason,
     })
-    .where(eq(works.id, workId))
+    .where(and(eq(works.id, workId), eq(works.authorId, authorId)))
     .returning();
 
-  return updated!;
+  if (!updated) throw new WorkError('作品状态已变化，请刷新后重试');
 }
