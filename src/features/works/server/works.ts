@@ -5,6 +5,9 @@ import type { CurrentUser } from '@/features/auth';
 import type { CreateWorkInput, ReviewWorkInput, WorkType } from '../schemas';
 import { WorkError } from './errors';
 import { redis } from '@/lib/redis';
+import { unlink } from 'node:fs/promises';
+import path from 'node:path';
+import { env } from '@/lib/env';
 
 type WorkStatus = 'pending' | 'live' | 'rejected' | 'unlisted';
 
@@ -317,27 +320,62 @@ export async function listDiscoverWorks(options: {
   type?: WorkType;
   sort?: 'hot' | 'new' | 'featured';
   limit?: number;
-  offset?: number;
   cursor?: string;
 }): Promise<{ works: WorkSummary[]; nextCursor: string | null }> {
-  const { type, sort = 'new', limit = 24, offset = 0, cursor } = options;
+  const { type, sort = 'new', limit = 24, cursor } = options;
 
   const conditions = [eq(works.status, 'live')];
   if (type) {
     conditions.push(eq(works.type, type));
   }
 
-  // Cursor-based pagination: fetch cursor's createdAt and filter
-  let cursorCreatedAt: Date | null = null;
+  // Cursor-based pagination: fetch cursor row's sort-relevant fields
   if (cursor) {
-    const cursorRow = await db
-      .select({ createdAt: works.createdAt })
-      .from(works)
-      .where(eq(works.id, cursor))
-      .limit(1);
-    if (cursorRow[0]) {
-      cursorCreatedAt = cursorRow[0].createdAt;
-      conditions.push(sql`${works.createdAt} < ${cursorCreatedAt}`);
+    if (sort === 'new') {
+      const cursorRow = await db
+        .select({ createdAt: works.createdAt, id: works.id })
+        .from(works)
+        .where(eq(works.id, cursor))
+        .limit(1);
+      if (cursorRow[0]) {
+        const { createdAt, id } = cursorRow[0];
+        conditions.push(
+          sql`(${works.createdAt}, ${works.id}) < (${createdAt}, ${id})`
+        );
+      }
+    } else if (sort === 'hot') {
+      const cursorRow = await db
+        .select({
+          likeCount: works.likeCount,
+          createdAt: works.createdAt,
+          id: works.id,
+        })
+        .from(works)
+        .where(eq(works.id, cursor))
+        .limit(1);
+      if (cursorRow[0]) {
+        const { likeCount, createdAt, id } = cursorRow[0];
+        conditions.push(
+          sql`(${works.likeCount}, ${works.createdAt}, ${works.id}) < (${likeCount}, ${createdAt}, ${id})`
+        );
+      }
+    } else {
+      // featured
+      const cursorRow = await db
+        .select({
+          featuredAt: works.featuredAt,
+          createdAt: works.createdAt,
+          id: works.id,
+        })
+        .from(works)
+        .where(eq(works.id, cursor))
+        .limit(1);
+      if (cursorRow[0]) {
+        const { featuredAt, createdAt, id } = cursorRow[0];
+        conditions.push(
+          sql`(${works.featuredAt}, ${works.createdAt}, ${works.id}) < (${featuredAt}, ${createdAt}, ${id})`
+        );
+      }
     }
   }
 
@@ -376,16 +414,13 @@ export async function listDiscoverWorks(options: {
       ? await base
           .orderBy(desc(works.likeCount), desc(works.createdAt))
           .limit(fetchLimit)
-          .offset(offset)
       : sort === 'featured'
         ? await base
             .orderBy(desc(works.featuredAt), desc(works.createdAt))
             .limit(fetchLimit)
-            .offset(offset)
         : await base
-            .orderBy(desc(works.createdAt))
-            .limit(fetchLimit)
-            .offset(offset);
+            .orderBy(desc(works.createdAt), desc(works.id))
+            .limit(fetchLimit);
 
   const hasMore = rows.length > limit;
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
@@ -731,7 +766,13 @@ export async function deleteWork(
   authorId: string
 ): Promise<void> {
   const existing = await db
-    .select({ id: works.id, authorId: works.authorId })
+    .select({
+      id: works.id,
+      authorId: works.authorId,
+      coverUrl: works.coverUrl,
+      screenshots: works.screenshots,
+      qrUrl: works.qrUrl,
+    })
     .from(works)
     .where(eq(works.id, workId))
     .limit(1);
@@ -740,4 +781,25 @@ export async function deleteWork(
   await db
     .delete(works)
     .where(and(eq(works.id, workId), eq(works.authorId, authorId)));
+
+  // Clean up uploaded files from disk
+  const fileUrls: string[] = [existing[0].coverUrl];
+  if (Array.isArray(existing[0].screenshots)) {
+    fileUrls.push(
+      ...existing[0].screenshots.filter(
+        (s): s is string => typeof s === 'string'
+      )
+    );
+  }
+  if (existing[0].qrUrl) {
+    fileUrls.push(existing[0].qrUrl);
+  }
+  for (const url of fileUrls) {
+    try {
+      const diskPath = url.replace(env.UPLOAD_PUBLIC_BASE, env.UPLOAD_DIR);
+      await unlink(diskPath);
+    } catch {
+      // Ignore missing files so deletion flow is not broken
+    }
+  }
 }
