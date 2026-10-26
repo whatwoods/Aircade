@@ -8,6 +8,7 @@ export interface SimOptions {
   maxWave?: number;
   /** "average player" bot: 0.2–0.3 s reactions, ±20 u catch error, random cards (evolutions always taken) */
   human?: boolean;
+  naive?: boolean;
   /** kept for API compatibility; the simulation always runs as fast as it can */
   speed?: number;
 }
@@ -61,6 +62,7 @@ export function simulate(opts: SimOptions): Promise<SimReport> {
       g.start({ seed, tutorial: false });
       g.autoplay.enabled = true;
       g.autoplay.human = !!opts.human;
+      g.autoplay.naive = !!opts.naive;
       steps = 0;
       lastWave = g.wave;
       waveT = 0;

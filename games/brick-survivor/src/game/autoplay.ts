@@ -12,6 +12,8 @@ export class Autoplay {
   enabled = false;
   /** "average player" mode for balancing: reacts every 0.2–0.3 s, catches with ±20 u error, random cards */
   human = false;
+  /** with human: the reviewer's touch bot — no aiming, no dodging, no gem chasing, always tracks the next ball */
+  naive = false;
   private reactT = 0;
   private hseed = 12345;
   private hr(): number {
@@ -65,6 +67,14 @@ export class Autoplay {
     for (const b of g.balls.pool) {
       if (!b.alive || b.vy <= 0) continue;
       if (!g.balls.predict(b, pred)) continue;
+      if (this.naive) {
+        const v = 1 / (pred.t + 0.01);
+        if (v > best) {
+          best = v;
+          bestX = pred.x;
+        }
+        continue;
+      }
       if (pred.t > 0.9) continue;
       const reach = Math.abs(pred.x - p.x) / 1400;
       if (reach > pred.t + 0.05) continue;
@@ -74,7 +84,9 @@ export class Autoplay {
         bestX = pred.x;
       }
     }
-    if (best > 0) {
+    if (this.naive) {
+      target = best > 0 ? bestX : 195;
+    } else if (best > 0) {
       // aim the paddle so the ball goes toward the threat column
       const threat = this.threatX(g);
       const off = Math.max(-0.45, Math.min(0.45, (threat - bestX) / 260)) * half;
@@ -108,6 +120,7 @@ export class Autoplay {
     }
     const lw = config.bosses.omega.laserW * 0.5 + half * 0.6 + 14;
     for (const l of g.bulletsSys.lasers) if (l.alive) this.addZone(l.x - lw, l.x + lw, Math.max(0, l.warnDur - l.warnT));
+    if (this.naive) this.nz = 0;
     if (this.nz > 0 && (this.unsafe(target) || this.blocked(p.x, target))) {
       // nearest safe edge that can be reached without sweeping through something about to land
       const lo = F.wallL + half;

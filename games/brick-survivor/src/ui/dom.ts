@@ -37,8 +37,11 @@ export function setUiSound(fn: () => void): void {
 export function onTap(e: HTMLElement, fn: (ev: Event) => void, guard?: () => boolean): void {
   let downId = -1;
   let fired = false;
+  let downOk = true;
   e.addEventListener('pointerdown', (ev) => {
     downId = ev.pointerId;
+    // a press that starts inside an input lock never becomes a tap, even if released after the lock
+    downOk = !guard || guard();
     fired = false;
     e.classList.add('down');
   });
@@ -50,7 +53,7 @@ export function onTap(e: HTMLElement, fn: (ev: Event) => void, guard?: () => boo
     const ok = downId === ev.pointerId;
     clear();
     if (!ok) return;
-    if (guard && !guard()) return;
+    if (!downOk || (guard && !guard())) return;
     fired = true;
     uiSound?.();
     fn(ev);
