@@ -18,9 +18,7 @@ export class HpBar {
   private mainT = 1;
   private mainDur = 0.08;
   ghost = 1;
-  private ghostFrom = 1;
   private ghostHold = 0;
-  private ghostT = 1;
   /** 回复的绿色前沿 */
   edge = 1;
   shieldV = 0;
@@ -38,8 +36,8 @@ export class HpBar {
 
   reset(max: number, hp: number, shield = 0): void {
     this.max = Math.max(1, max);
-    this.hp = this.main = this.mainFrom = this.ghost = this.ghostFrom = this.edge = hp;
-    this.mainT = this.ghostT = this.shieldT = 1;
+    this.hp = this.main = this.mainFrom = this.ghost = this.edge = hp;
+    this.mainT = this.shieldT = 1;
     this.ghostHold = 0;
     this.shieldV = this.shield = this.shieldFrom = shield;
     this.shake = this.full = this.shieldPop = this.shieldBreak = 0;
@@ -50,13 +48,15 @@ export class HpBar {
   setHp(v: number): void {
     if (v === this.hp) return;
     if (v < this.hp) {
-      // 主条 80ms 下降；残影停 300ms 后 450ms 跟上
-      if (this.ghostT >= 1 && this.ghostHold <= 0) this.ghost = Math.max(this.ghost, this.main);
+      // 主条 80ms 下降；残影停 300ms 后追上。残影已在显示时不再重置等待，
+      // 否则 4× 连击下残影永远停在顶端，整条血看起来是满的
+      if (this.ghost <= this.main + 0.01) {
+        this.ghost = this.main;
+        this.ghostHold = 0.3;
+      }
       this.mainFrom = this.main;
       this.mainDur = 0.08;
       this.mainT = 0;
-      this.ghostHold = 0.3;
-      this.ghostT = 1;
       this.edge = Math.min(this.edge, v);
     } else {
       // 回复：绿色前沿先到，主条 350ms 补满
@@ -84,16 +84,11 @@ export class HpBar {
       const e = this.mainDur > 0.1 ? ease.outCubic(this.mainT) : this.mainT;
       this.main = this.mainFrom + (this.hp - this.mainFrom) * e;
     }
-    if (this.ghostHold > 0) {
-      this.ghostHold -= dt;
-      if (this.ghostHold <= 0) {
-        this.ghostFrom = this.ghost;
-        this.ghostT = 0;
-      }
-    } else if (this.ghostT < 1) {
-      this.ghostT = Math.min(1, this.ghostT + dt / 0.45);
-      this.ghost = this.ghostFrom + (this.hp - this.ghostFrom) * ease.inOutQuad(this.ghostT);
-    } else if (this.ghost < this.hp) this.ghost = this.hp;
+    if (this.ghostHold > 0) this.ghostHold -= dt;
+    else if (this.ghost > this.hp) {
+      // 指数 + 线性追赶：约 450ms 追上大部分差距
+      this.ghost = Math.max(this.hp, this.ghost - dt * Math.max(this.max * 0.15, (this.ghost - this.hp) * 5));
+    } else this.ghost = this.hp;
     if (this.shieldT < 1) {
       this.shieldT = Math.min(1, this.shieldT + dt / 0.2);
       this.shield = this.shieldFrom + (this.shieldV - this.shieldFrom) * ease.outCubic(this.shieldT);

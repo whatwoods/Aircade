@@ -290,6 +290,18 @@ export class Jar {
     // 危险暗角（罐底红色）
     this.vignette = mk(R - L, B - dangerY + 40, Math.min(ratio, 1), (ctx) => {
       const h = B - dangerY + 40;
+      const w = R - L;
+      const rb = J.inner.rBottom;
+      // 底部两角跟内腔一样是圆角，红光不能溢出玻璃
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(w, 0);
+      ctx.lineTo(w, h - rb);
+      ctx.arcTo(w, h, w - rb, h, rb);
+      ctx.lineTo(rb, h);
+      ctx.arcTo(0, h, 0, h - rb, rb);
+      ctx.closePath();
+      ctx.clip();
       const g = ctx.createLinearGradient(0, h, 0, 0);
       g.addColorStop(0, 'rgba(255,59,92,0.5)');
       g.addColorStop(0.5, 'rgba(255,59,92,0.18)');
@@ -306,6 +318,14 @@ export class Jar {
       g3.addColorStop(1, 'rgba(255,59,92,0)');
       ctx.fillStyle = g3;
       ctx.fillRect(R - L - 40, 0, 40, h);
+      // 顶部 60px 淡入，两侧红边不留硬边
+      ctx.globalCompositeOperation = 'destination-in';
+      const fade = ctx.createLinearGradient(0, 0, 0, 60);
+      fade.addColorStop(0, 'rgba(0,0,0,0)');
+      fade.addColorStop(1, 'rgba(0,0,0,1)');
+      ctx.fillStyle = fade;
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'source-over';
     });
 
     // 焦散贴图 256²

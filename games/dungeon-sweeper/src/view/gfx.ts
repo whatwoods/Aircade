@@ -1,4 +1,13 @@
 /** 离屏画布与绘图小工具 */
+export interface Mat {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  f: number;
+}
+
 export interface Sprite {
   c: HTMLCanvasElement;
   /** 设备像素尺寸 */

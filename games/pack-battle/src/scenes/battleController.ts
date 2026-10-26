@@ -93,6 +93,8 @@ export class BattleController {
   /** 玩家背包受击晃动（像素） */
   jolt = new Spring(34, 0.22, 0);
   private vignette = 0;
+  /** 获得护盾：背包边框蓝色涟漪（0..1 进度，<0 不显示），[玩家, 敌人] */
+  private ripple = [-1, -1];
   private flashA = 0;
   private flashColor = '#ffd27a';
   private stamps: Stamp[] = [];
@@ -166,6 +168,7 @@ export class BattleController {
     this.downT = -1;
     this.ribbonK = 0;
     this.vignette = 0;
+    this.ripple[0] = this.ripple[1] = -1;
     this.flashA = 0;
     this.beat = 0;
     clearProjs();
@@ -187,6 +190,7 @@ export class BattleController {
     this.downT = -1;
     this.ribbonK = 0;
     this.vignette = 0;
+    this.ripple[0] = this.ripple[1] = -1;
     this.flashA = 0;
     this.enraged = false;
     this.consumed.clear();
@@ -242,6 +246,7 @@ export class BattleController {
     if (this.sP.poisonPop > 0) this.sP.poisonPop = Math.max(0, this.sP.poisonPop - dt);
     if (this.sE.poisonPop > 0) this.sE.poisonPop = Math.max(0, this.sE.poisonPop - dt);
     if (this.vignette > 0) this.vignette = Math.max(0, this.vignette - dt / 0.35);
+    for (let i = 0; i < 2; i++) if (this.ripple[i] >= 0) this.ripple[i] = this.ripple[i] + dt / 0.5 > 1 ? -1 : this.ripple[i] + dt / 0.5;
     if (this.flashA > 0) this.flashA = Math.max(0, this.flashA - dt / 0.4);
     for (let i = this.stamps.length - 1; i >= 0; i--) {
       this.stamps[i].t += dt;
@@ -332,6 +337,7 @@ export class BattleController {
       if (!v) return;
       v.pop = 0.22;
       v.flash = 0.09;
+      v.flashMax = fast ? 0.45 : 0.75;
       if (side === 0) gs.links.flashLinks(e.links);
       else this.eLinks.flashLinks(e.links);
       const def = ITEMS[v.id];
@@ -397,7 +403,10 @@ export class BattleController {
         if (tgt === 1) {
           this.standee.hit(big);
           const dx = (Math.random() - 0.5) * 30;
-          if (amt > 0) popup(String(amt), TMP.x + dx, TMP.y - 20, big ? '#fff3c4' : '#ffffff', big ? 32 : fast ? 20 : 24, { life: fast ? 0.6 : 0.9, vy: -60 });
+          if (amt > 0) {
+            const p = lane('h1', TMP.x + dx, TMP.y - 20);
+            popup(String(amt), p.x, p.y, big ? '#fff3c4' : '#ffffff', big ? 32 : fast ? 20 : 24, { life: fast ? 0.6 : 0.9, vy: -60 });
+          }
           emit('ink', TMP.x, TMP.y, big ? 8 : fast ? 2 : 4, { speed: 120, life: 0.5, size: 2.4 });
           if (big) {
             sfx('bigHit');
@@ -406,7 +415,10 @@ export class BattleController {
             emit('spark', TMP.x, TMP.y, 1, { color: '#fff3c4', speed: 0, size: 18, life: 0.25 });
           } else sfx('hit');
         } else {
-          if (amt > 0) popup('−' + amt, TMP.x + (Math.random() - 0.3) * 60, TMP.y - 16, '#ff9a7a', big ? 30 : fast ? 18 : 22, { ui: true, life: fast ? 0.6 : 0.9, vy: -40 });
+          if (amt > 0) {
+            const p = lane('h0', TMP.x + (Math.random() - 0.3) * 40, TMP.y - 16);
+            popup('−' + amt, p.x, p.y, '#ff9a7a', big ? 30 : fast ? 18 : 22, { ui: true, life: fast ? 0.6 : 0.9, vy: -40 });
+          }
           this.jolt.v += big ? 220 : 120;
           this.vignette = big ? 1 : 0.6;
           emit('ink', TMP.x, TMP.y, 3, { color: C.hp, speed: 90, life: 0.4 });
@@ -416,7 +428,8 @@ export class BattleController {
         }
         if ((e.absorbed ?? 0) > 0) {
           this.barCenter(tgt, TMP2);
-          popup('−' + e.absorbed, TMP2.x - 100, TMP2.y - 14, C.shieldLight, fast ? 15 : 17, { ui: true, life: 0.7, vy: -30 });
+          const p = lane(tgt === 0 ? 'a0' : 'a1', TMP2.x - 100, TMP2.y - 14);
+          popup('−' + e.absorbed, p.x, p.y, C.shieldLight, fast ? 15 : 17, { ui: true, life: 0.7, vy: -30 });
           if (e.shield[tgt] === 0) {
             sfx('shieldBreak');
             tier('T2');
@@ -428,9 +441,14 @@ export class BattleController {
       case 'shield': {
         const amt = e.amount ?? 0;
         this.barCenter(e.side, TMP);
-        popup('+' + amt, TMP.x - 110, TMP.y - 16, C.shieldLight, fast ? 15 : 19, { ui: true, life: 0.8, vy: -36 });
+        // 4× 时小额护盾不飘字（血条护盾徽章已显示），避免满屏数字
+        if (!fast || amt >= res.maxHp[e.side] * 0.08) {
+          const p = lane(e.side === 0 ? 's0' : 's1', TMP.x - 110, TMP.y - 16);
+          popup('+' + amt, p.x, p.y, C.shieldLight, fast ? 15 : 19, { ui: true, life: 0.8, vy: -36 });
+        }
         if (!fast) emit('shard', TMP.x - 120, TMP.y, 4, { color: C.shieldLight, speed: 70, life: 0.4, ui: true });
         sfx('shield');
+        if (!fast || this.ripple[e.side] < 0) this.ripple[e.side] = 0;
         if (e.uid !== undefined) {
           const v = this.viewOf(e.side, e.uid);
           if (v && v.pop <= 0 && ITEMS[v.id].tag !== 'weapon') v.pop = 0.22;
@@ -439,7 +457,11 @@ export class BattleController {
       }
       case 'heal': {
         this.barCenter(e.side, TMP);
-        popup('+' + (e.amount ?? 0), TMP.x + 40, TMP.y - 16, C.healLight, fast ? 16 : 22, { ui: true, life: 0.9, vy: -40 });
+        // 4× 时小额回复不飘字（血条绿色前沿已显示）
+        if (!fast || (e.amount ?? 0) >= res.maxHp[e.side] * 0.08) {
+          const p = lane(e.side === 0 ? 'l0' : 'l1', TMP.x + 40, TMP.y - 16);
+          popup('+' + (e.amount ?? 0), p.x, p.y, C.healLight, fast ? 16 : 22, { ui: true, life: 0.9, vy: -40 });
+        }
         if (!fast) emit('leaf', TMP.x, TMP.y, 4, { color: C.heal, speed: 60, life: 0.7, ui: true });
         sfx('heal');
         break;
@@ -464,7 +486,8 @@ export class BattleController {
       }
       case 'poisonTick': {
         this.barCenter(e.side, TMP);
-        popup('−' + (e.amount ?? 0), TMP.x + 70, TMP.y - 14, '#c99bef', fast ? 16 : 20, { ui: true, life: 0.8, vy: -30 });
+        const p = lane(e.side === 0 ? 'p0' : 'p1', TMP.x + 70, TMP.y - 14);
+        popup('−' + (e.amount ?? 0), p.x, p.y, '#c99bef', fast ? 16 : 20, { ui: true, life: 0.8, vy: -30 });
         emit('bubble', TMP.x + 70, TMP.y, 3, { color: C.poisonLight, speed: 40, life: 0.8, ui: true });
         sfx('gulp');
         break;
@@ -484,7 +507,7 @@ export class BattleController {
       }
       case 'lowHp': {
         this.barCenter(e.side, TMP);
-        popup('+' + (e.amount ?? 0), TMP.x, TMP.y - 26, C.healLight, 34, { ui: true, life: 1.2, vy: -50 });
+        popup('+' + (e.amount ?? 0), TMP.x - 70, TMP.y - 34, C.healLight, 34, { ui: true, life: 1.2, vy: -50 });
         emit('bubble', TMP.x, TMP.y, 12, { color: C.healLight, speed: 140, life: 0.7, ui: true });
         sfx('potion');
         tier('T3');
@@ -517,7 +540,7 @@ export class BattleController {
         const tr = this.e.traits[e.amount ?? 0];
         const dragon = tr && tr.kind === 'dragonRage';
         this.flashColor = '#d0402a';
-        this.flashA = 0.7;
+        this.flashA = 0.5;
         this.enraged = true;
         this.sE.enraged = true;
         this.hpE.notchBroken = true;
@@ -536,7 +559,8 @@ export class BattleController {
       }
       case 'fatigue': {
         this.barCenter(e.side, TMP);
-        popup('−' + (e.amount ?? 0), TMP.x - 40 + e.side * 10, TMP.y - 14, '#e0b080', fast ? 15 : 18, { ui: true, life: 0.7, vy: -30 });
+        const p = lane(e.side === 0 ? 'f0' : 'f1', TMP.x - 40 + e.side * 10, TMP.y - 14);
+        popup('−' + (e.amount ?? 0), p.x, p.y, '#e0b080', fast ? 15 : 18, { ui: true, life: 0.7, vy: -30 });
         break;
       }
       case 'storm': {
@@ -635,6 +659,7 @@ export class BattleController {
     this.standee.draw(ctx, B.standee, time);
     ctx.restore();
     drawEnemyBag(ctx, eg, this.e.frame, this.e.cols, this.e.rows);
+    if (this.ripple[1] >= 0) drawRipple(ctx, eg, this.ripple[1]);
     for (const v of this.eViews.values()) v.draw(ctx, eg, time, true);
     this.eLinks.draw(ctx, eg, time, 0.32);
     for (const r of this.rings) if (r.side === 1) this.ring(ctx, r, eg);
@@ -650,11 +675,12 @@ export class BattleController {
     drawBand(ctx, gs.B.band, gs.B.hourglass, remain, t >= BATTLE.softLimit, time, gs.tr.enemy);
   }
 
-  /** 玩家背包上层：冷却环、眩晕星 */
+  /** 玩家背包上层：护盾涟漪、冷却环、眩晕星 */
   drawPlayerOverlay(ctx: CanvasRenderingContext2D, g: BagRect, time: number): void {
     if (this.gs.tr.enemy <= 0.01 || !this.pb) return;
     ctx.save();
     ctx.globalAlpha *= Math.min(1, this.gs.tr.enemy * 1.5);
+    if (this.ripple[0] >= 0) drawRipple(ctx, g, this.ripple[0]);
     for (const r of this.rings) if (r.side === 0) this.ring(ctx, r, g);
     if (this.stars[0] > 0.01) this.drawStars(ctx, g.x + g.w / 2, g.y + 6, this.stars[0], time);
     ctx.restore();
@@ -763,4 +789,37 @@ export class BattleController {
   get rect(): Rect {
     return this.eg;
   }
+}
+
+/** 背包边框的钢蓝色涟漪：两道圆角框由内向外扩散并淡出 */
+function drawRipple(ctx: CanvasRenderingContext2D, g: Rect, t: number): void {
+  ctx.save();
+  ctx.strokeStyle = C.shieldLight;
+  for (let i = 0; i < 2; i++) {
+    const k = t - i * 0.22;
+    if (k <= 0 || k >= 1) continue;
+    const e = 1 - (1 - k) * (1 - k);
+    const pad = 2 + e * 12;
+    ctx.globalAlpha = (1 - k) * 0.75;
+    ctx.lineWidth = 3.5 - e * 2;
+    ctx.beginPath();
+    ctx.roundRect(g.x - pad, g.y - pad, g.w + pad * 2, g.h + pad * 2, 10 + pad * 0.5);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// 同一位置连续飘字错开（4× 时不叠成一团）
+const LANE = { x: 0, y: 0 };
+const laneT: Record<string, number> = {};
+const laneI: Record<string, number> = {};
+const LANE_DX = [0, -22, 22, -11, 11];
+function lane(key: string, x: number, y: number): { x: number; y: number } {
+  const now = performance.now();
+  const i = now - (laneT[key] ?? -1e9) < 380 ? ((laneI[key] ?? 0) + 1) % LANE_DX.length : 0;
+  laneT[key] = now;
+  laneI[key] = i;
+  LANE.x = x + LANE_DX[i];
+  LANE.y = y - i * 14;
+  return LANE;
 }

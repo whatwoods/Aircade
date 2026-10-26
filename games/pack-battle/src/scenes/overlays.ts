@@ -194,7 +194,7 @@ export class SettingsPanel extends Panel {
       new Toggle('set.shake', R(62, y0 + 230, 266, 40), '画面震动', settings.shake),
     ];
     this.speeds = BATTLE.speeds.map((s, i) => {
-      const b = new Button('set.speed' + s, R(150 + i * 60, y0 + 290, 52, 38), s + '×', 'tag', 30 + i);
+      const b = new Button('set.speed' + s, R(160 + i * 58, y0 + 290, 52, 38), s + '×', 'tag', 30 + i);
       b.fontSize = 18;
       return b;
     });
@@ -253,7 +253,8 @@ export class SettingsPanel extends Panel {
     drawPanel(ctx, r, 22);
     titleText(ctx, '设置', 195, r.y + 48, 30);
     for (const t of this.toggles) t.draw(ctx);
-    text(ctx, '默认战斗速度', 62, r.y + 309, { size: 17, weight: 700, align: 'left' });
+    text(ctx, '战斗速度', 62, r.y + 309, { size: 17, weight: 700, align: 'left' });
+    text(ctx, '默认', 62, r.y + 330, { size: 11, weight: 700, color: C.pencil, align: 'left' });
     for (let i = 0; i < this.speeds.length; i++) {
       const b = this.speeds[i];
       b.tint = settings.speed === BATTLE.speeds[i] ? '#f3d88a' : '';

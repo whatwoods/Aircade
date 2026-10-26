@@ -14,7 +14,7 @@ import {
   applyResult, beginArrange, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, type Outcome, type SellRecord,
 } from '../game/run.ts';
 import { computeSynergy, type SynergyResult } from '../game/synergy.ts';
-import { hintSeen, markHint, markTutorialDone, HINT_TEXT, Tutorial, type HintId } from '../game/tutorial.ts';
+import { hintSeen, markHint, markTutorialDone, resetTutorialFlag, HINT_TEXT, Tutorial, type HintId } from '../game/tutorial.ts';
 import type { ItemInst, Rot, RunState } from '../game/types.ts';
 import { drawParticles, emit } from '../render/fx/particles.ts';
 import { drawPopups, popup } from '../render/fx/popups.ts';
@@ -24,7 +24,7 @@ import { arrangeLayout, battleLayout, inRect, type ArrangeLayout, type BagRect, 
 import { LW, rectCss, setGameTransform, stage } from '../render/stage.ts';
 import { drawSprite, text } from '../render/text.ts';
 import { Button, drawToast, showToast, drawBubble, drawStamp, type UiEl } from '../render/ui/widgets.ts';
-import { drawBossLamp, drawFarShade } from '../render/views/background.ts';
+import { setBackdrop } from '../render/views/background.ts';
 import { drawMapFlag } from '../render/views/desktopDecor.ts';
 import { drawPlayerBag } from '../render/views/bagView.ts';
 import { drawDetailBar, drawEnemyCard, drawGold, drawHearts, drawRoundTag, type DetailInfo, type HeartBreak } from '../render/views/hudView.ts';
@@ -77,6 +77,9 @@ export class GameScene implements Scene {
   private tt = 0;
   private standeePopped = false;
   private bossIntro = -1;
+  /** 正在打 / 刚打完的轮次（结算时 run.round 已前进，HUD 仍显示这一轮） */
+  private battleRound = 1;
+  private hintQ: HintId[] = [];
   heartBreaks: HeartBreak[] = [];
   enemyFlip = 0;
   detail: { info: DetailInfo; until: number; t: number } | null = null;
@@ -159,6 +162,7 @@ export class GameScene implements Scene {
 
   exit(): void {
     this.ac.reset();
+    setBackdrop(0, 0, 0);
   }
 
   autoPause(): void {
@@ -316,9 +320,19 @@ export class GameScene implements Scene {
   }
 
   showHint(id: HintId): void {
-    if (hintSeen(id)) return;
+    if (hintSeen(id) || this.hintQ.includes(id)) return;
+    // 引导气泡或另一条提示正在显示：排队，避免互相覆盖
+    if (this.tutBubble() || this.hint) {
+      this.hintQ.push(id);
+      return;
+    }
     markHint(id);
     this.hint = { s: HINT_TEXT[id], t: 3.4 };
+  }
+
+  private tutBubble(): boolean {
+    const s = this.tut.step;
+    return (s >= 1 && s <= 4) || (s === 6 && this.phase === 'arrange');
   }
 
   // ---------- 账单 ----------
@@ -358,9 +372,9 @@ export class GameScene implements Scene {
     this.receipt = null;
     this.gold.set(this.run.gold);
     this.phase = 'arrange';
-    if (this.run.gold >= 10) this.showHint('interest');
     if (this.run.tutorial && this.run.round === 2 && this.run.attempt === 1 && this.tut.step !== 6) this.tut.go(6);
     if (enemyFor(this.run.round).boss) this.showHint('boss');
+    if (this.run.gold >= 10) this.showHint('interest');
   }
 
   // ---------- 开战 ----------
@@ -389,6 +403,7 @@ export class GameScene implements Scene {
       this.tut.go(5);
     } else if (this.tut.step === 6) this.tut.stop();
     this.recompute(false);
+    this.battleRound = this.run.round;
     const res = startBattle(this.run);
     this.bc.begin(res);
     this.phase = 'toBattle';
@@ -529,7 +544,18 @@ export class GameScene implements Scene {
     this.ov.open(
       new PausePanel(stage.H, {
         resume: () => this.resume(),
-        settings: () => this.ov.open(new SettingsPanel(stage.H, null)),
+        settings: () =>
+          this.ov.open(
+            new SettingsPanel(stage.H, () =>
+              this.ov.open(
+                new ConfirmPanel(stage.H, '重看教程会从第 1 轮重新开始，确定吗？', '重新开始', () => {
+                  this.ov.closeAll();
+                  resetTutorialFlag();
+                  gotoScene(() => factories.game({ tutorial: true }));
+                }),
+              ),
+            ),
+          ),
         restart: () => {
           this.ov.closeAll();
           gotoScene(() => factories.game({ tutorial: false }));
@@ -551,6 +577,10 @@ export class GameScene implements Scene {
 
   update(dt: number, raw: number): void {
     this.layout();
+    // 战斗远端暗化 + 首领红灯（合成进背景缓存）
+    const ek = this.tr.enemy > 0.01 ? this.tr.enemy : 0;
+    const br = this.phase === 'arrange' || this.phase === 'receipt' ? this.run.round : this.battleRound;
+    setBackdrop(ek, this.B.band.y + this.B.band.h * 0.5, ek > 0 && enemyFor(br).boss ? ek * (this.bc.enraged ? 1 : 0.6) : 0);
     this.ov.update(raw);
     if (this.paused) {
       if (!this.ov.has(PausePanel)) this.paused = false;
@@ -582,6 +612,9 @@ export class GameScene implements Scene {
     if (this.hint) {
       this.hint.t -= dt;
       if (this.hint.t <= 0) this.hint = null;
+    } else if (this.hintQ.length && !this.tutBubble()) {
+      const id = this.hintQ.shift()!;
+      this.showHint(id);
     }
     if (this.undo) {
       this.undo.slide = Math.min(1, this.undo.slide + dt / 0.25);
@@ -641,10 +674,6 @@ export class GameScene implements Scene {
     const real = clock.real;
     const time = this.time;
     const battleish = this.tr.enemy > 0.01;
-    if (battleish) {
-      drawFarShade(ctx, this.tr.enemy, this.B.band.y + this.B.band.h * 0.5);
-      if (enemyFor(this.run.round).boss) drawBossLamp(ctx, this.tr.enemy * (this.bc.enraged ? 1 : 0.6));
-    }
     if (stage.desktop) {
       setGameTransform(ctx);
       ctx.setTransform(stage.dpr, 0, 0, stage.dpr, 0, 0);
@@ -762,7 +791,7 @@ export class GameScene implements Scene {
     const L = this.L;
     this.pauseB.draw(ctx, time, real);
     drawHearts(ctx, L.hearts, this.run.hearts, this.heartBreaks, time, this.bc.lowHp());
-    drawRoundTag(ctx, L.roundTag, this.run.round, this.run.attempt, this.score.int, this.score.flash);
+    drawRoundTag(ctx, L.roundTag, this.phase === 'result' ? this.battleRound : this.run.round, this.run.attempt, this.score.int, this.score.flash);
     drawGold(ctx, L.gold, this.gold, this.tr.enemy > 0.5 ? 0.75 : 1);
     if (this.tr.enemy < 0.99) {
       ctx.save();
@@ -890,7 +919,7 @@ export class GameScene implements Scene {
     if (!h) return;
     const k = Math.min(1, (3.4 - h.t) / 0.25);
     const a = h.t < 0.3 ? h.t / 0.3 : 1;
-    const y = this.phase === 'arrange' || this.phase === 'receipt' ? this.L.bubbleY - 36 : this.B.band.y + this.B.band.h + 16;
+    const y = this.phase === 'arrange' || this.phase === 'receipt' ? this.L.bubbleY - 36 : this.B.band.y + this.B.band.h + 32;
     ctx.save();
     ctx.globalAlpha *= a;
     drawBubble(ctx, '💡 ' + h.s, 195, y, 330, null, k);

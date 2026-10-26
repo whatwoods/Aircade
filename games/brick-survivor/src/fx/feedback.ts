@@ -90,6 +90,8 @@ export class Feedback implements FxSink {
   private thrustAcc = 0;
   private comboAcc = 0;
   private lastPerfectStop = -10;
+  private lastPerfectWord = -10;
+  private lastMaxWord = -10;
   private realTime = 0;
   private touch = false;
   lowHp = false;
@@ -284,7 +286,11 @@ export class Feedback implements FxSink {
         this.sparks(x, cy, perfect ? 8 : 4, perfect ? 0xffffff : pal.neutral, 120, 260, 0.25, -Math.PI / 2, 2.2, 3.5, true);
         if (perfect) {
           this.parts.spawn(FR_STAR, x, cy, 0, 0, 0.3, 8, 22, 0xffffff, pal.gold, 1, 1, P_HIGH | P_FADE_SQ, 0, 0, 0, 3);
-          this.floats.word(x, cy - 34, '完美', 0xfff3b0, 15, 0.7);
+          // several catches in a burst share one word, so they never pile into an unreadable smear
+          if (this.realTime - this.lastPerfectWord >= 0.35) {
+            this.lastPerfectWord = this.realTime;
+            this.floats.word(x, cy - 34, '完美', 0xfff3b0, 15, 0.7);
+          }
           sfx.perfect();
           this.cam.addTrauma(juice.perfectCatch.trauma, 2);
           if (this.realTime - this.lastPerfectStop >= config.catch.perfectHitstopGap) {
@@ -296,7 +302,10 @@ export class Feedback implements FxSink {
           sfx.catchBall(a);
           this.j('catch');
         }
-        if (a >= 3 && b === KIND_MAIN) this.floats.word(x + 30, cy - 22, 'MAX', 0xffffff, 9, 0.45);
+        if (a >= 3 && b === KIND_MAIN && this.realTime - this.lastMaxWord >= 0.3) {
+          this.lastMaxWord = this.realTime;
+          this.floats.word(x + 30, cy - 22, 'MAX', 0xffffff, 9, 0.45);
+        }
         break;
       }
       case 'miss': {
@@ -584,7 +593,10 @@ export class Feedback implements FxSink {
         break;
       }
       case 'comboMilestone': {
-        this.ring(195, 330, 20, 220, 0.55, 0xffffff, 0.8);
+        // neon ring in the milestone colour (matches the DOM banner): white alone reads as grey smoke
+        const mc = a >= 1000 ? 0xffffff : a >= 200 ? pal.blast : a >= 100 ? pal.fire : 0xb6ff2e;
+        this.ring(195, 330, 20, 220, 0.45, mc, 0.9);
+        this.ring(195, 330, 10, 150, 0.3, 0xffffff, 0.7);
         for (let i = 0; i < this.n(30); i++) {
           const an = r.next() * TAU;
           const v = r.range(120, 340);

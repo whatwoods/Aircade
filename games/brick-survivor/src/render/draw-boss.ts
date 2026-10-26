@@ -179,7 +179,12 @@ function drawOmega(b: Batcher, s: Sprites, o: Omega, t: number, a: number): void
   b.spriteR(s.glowTight, x, y, 22 + 6 * pulse, 0, col(0xffffff, 0.5 + 0.2 * ph * 0.3, 1));
   b.spriteR(s.ring, x, y, 18 + 3 * pulse, t, col(0xffffff, 0.7, 0.5));
   b.spriteR(s.disc, x, y, 6 + ph, 0, col(0xffffff, 1, 0.2));
-  if (core.flashT > 0) b.spriteR(s.disc, x, y, core.r, 0, col(0xffffff, (core.flashT / 0.05) * 0.4, 0.6));
+  if (core.flashT > 0) {
+    // hit flash lights the rim and only tints the fill: under sustained fire a full white fill reads as a grey disc
+    const k = core.flashT / 0.05;
+    b.spriteR(s.ring, x, y, core.r * 1.02, 0, col(0xffffff, 0.85 * k, 1));
+    b.spriteR(s.disc, x, y, core.r * 0.92, 0, col(0xffffff, 0.1 * k, 1));
+  }
   flames(b, s, core, x, y, t);
   for (let i = 0; i < o.cells.length; i++) {
     const c = o.cells[i]!;

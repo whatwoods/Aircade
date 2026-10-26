@@ -20,6 +20,8 @@ import type { TextStyle } from '../render/popups';
 
 const FX = CONFIG.fx;
 const TAU = Math.PI * 2;
+/** 妙击 / 救场小字（16–18px）在盖子下方的最高位置：内腔顶 + 上浮 36 + 半字高 */
+const POP_MIN_Y = CONFIG.layout.jar.inner.T + 36 + 13;
 const COMBO_STYLE: TextStyle[] = ['white', 'white', 'orange', 'coral', 'rose', 'violet'];
 
 interface Delayed {
@@ -486,7 +488,9 @@ export class Feedback {
     const size = tier <= 1 ? 18 : tier === 2 ? 24 : 30;
     const style: TextStyle = e.combo >= 2 ? COMBO_STYLE[Math.min(5, e.combo)]! : 'white';
     const sub = e.combo >= 2 ? '连击×' + e.combo : '';
-    let py = y - nr - 6;
+    // 叠在上面的小字（妙击 / 救场）也要留在盖子下方
+    const stack = e.trick && e.clutch ? 50 : e.trick || e.clutch ? 26 : 0;
+    let py = Math.max(y - nr - 6, POP_MIN_Y + stack);
     if (e.trick) {
       r.popups.add('反弹妙击 ×1.5', x, py - 26, 16, 'mint', '', 1.0);
     }

@@ -126,6 +126,9 @@ export class Hud {
     this.shownLv = -1;
     this.xpV = 0;
     this.xpTarget = -1;
+    this.xpFill.style.transform = this.xpGain.style.transform = 'scaleX(0)';
+    this.nearOn = false;
+    this.xpBox.classList.remove('near', 'flash');
     this.bossOn = false;
     this.bossBox.classList.remove('on');
     this.buildSig = -1;
@@ -155,7 +158,8 @@ export class Hud {
         c.style.width = w + 'px';
         this.cells.push(c);
       }
-      this.hpNum.style.left = 14 + max * (w + 3) + 5 + 'px';
+      // the number sits on the label row, right-aligned to the end of the cells (clear of the centred wave)
+      this.hpNum.style.width = max * (w + 3) - 3 + 'px';
       this.shownHp = -1;
     }
     if (hp !== this.shownHp) {
@@ -202,7 +206,7 @@ export class Hud {
     const boss = g.boss !== null || g.phase === 'bossIntro' || g.phase === 'bossDeath';
     if (boss !== this.shownBoss) {
       this.shownBoss = boss;
-      this.waveBox.classList.toggle('boss', boss);
+      this.waveBox.classList.toggle('is-boss', boss);
       this.waveLbl.set(boss ? 'BOSS' : 'WAVE');
     }
     const w = g.wave;

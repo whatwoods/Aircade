@@ -65,6 +65,8 @@ export function candyText(ctx: CanvasRenderingContext2D, text: string, x: number
 const CAP = 24;
 /** 罐内腔顶（盖子下沿） */
 const POP_TOP = CONFIG.layout.jar.inner.T;
+const POP_L = CONFIG.layout.jar.inner.L;
+const POP_R = CONFIG.layout.jar.inner.R;
 
 export class Popups {
   text: string[] = new Array<string>(CAP).fill('');
@@ -102,7 +104,11 @@ export class Popups {
     this.head = (this.head + 1) % CAP;
     this.text[i] = text;
     this.sub[i] = sub;
-    this.x[i] = Math.max(40, Math.min(350, x));
+    // 按估算字宽夹在罐内，长字（「惊险救场 +50」）贴墙时不被玻璃挡住
+    let w = 0;
+    for (let k = 0; k < text.length; k++) w += text.charCodeAt(k) > 255 ? size : size * 0.6;
+    const hw = Math.min(150, w / 2 + size * 0.14 + 4);
+    this.x[i] = Math.max(POP_L + hw, Math.min(POP_R - hw, x));
     // 水果往上浮、合成多发生在罐顶：起点压到盖子下方，保证整段上浮（36px）都在罐内、不钻到盖子和图鉴后面
     this.y[i] = Math.max(y, POP_TOP + 36 + size * 0.7);
     this.t[i] = 0;

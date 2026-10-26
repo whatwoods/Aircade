@@ -97,13 +97,53 @@ function build(): HTMLCanvasElement {
   return c;
 }
 
+// 战斗远端暗化 + 首领红灯：合成进一张缓存图（量化到 1/16），每帧只画一次全屏，
+// 避免背景 + 渐变 + 红灯三遍全屏填充
+let shadeK = 0;
+let shadeY = 0;
+let lampK = 0;
+let comp: HTMLCanvasElement | null = null;
+let compK = -1;
+let compY = -1;
+let compL = -1;
+let compVer = -1;
+
+/** 由场景在 update 里设置（0 = 关闭） */
+export function setBackdrop(k: number, bandY: number, lamp: number): void {
+  shadeK = k;
+  shadeY = bandY;
+  lampK = lamp;
+}
+
 export function drawBackground(ctx: CanvasRenderingContext2D, time: number): void {
   if (!bg || bgVer !== stage.version) {
     bg = build();
     bgVer = stage.version;
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(bg, 0, 0);
+  const kq = Math.round(shadeK * 16) / 16;
+  const lq = Math.round(lampK * 16) / 16;
+  if (kq <= 0 && lq <= 0) ctx.drawImage(bg, 0, 0);
+  else {
+    if (!comp || comp.width !== bg.width || comp.height !== bg.height) {
+      comp = makeCanvas(bg.width, bg.height)[0];
+      compVer = -1;
+    }
+    if (kq !== compK || lq !== compL || shadeY !== compY || compVer !== bgVer) {
+      const cc = comp.getContext('2d')!;
+      cc.setTransform(1, 0, 0, 1, 0, 0);
+      cc.globalAlpha = 1;
+      cc.globalCompositeOperation = 'source-over';
+      cc.drawImage(bg, 0, 0);
+      drawFarShade(cc, kq, shadeY);
+      drawBossLamp(cc, lq);
+      compK = kq;
+      compL = lq;
+      compY = shadeY;
+      compVer = bgVer;
+    }
+    ctx.drawImage(comp, 0, 0);
+  }
   if (stage.desktop && decorLayout().right) {
     ctx.setTransform(stage.dpr, 0, 0, stage.dpr, 0, 0);
     drawCandleFlame(ctx, time);
@@ -118,7 +158,8 @@ export function drawFarShade(ctx: CanvasRenderingContext2D, k: number, bandY: nu
   const y = cssY(bandY);
   const g = ctx.createLinearGradient(0, 0, 0, y);
   g.addColorStop(0, `rgba(12,6,2,${0.42 * k})`);
-  g.addColorStop(1, `rgba(12,6,2,${0.12 * k})`);
+  g.addColorStop(0.75, `rgba(12,6,2,${0.14 * k})`);
+  g.addColorStop(1, 'rgba(12,6,2,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, stage.vw, y);
   ctx.restore();

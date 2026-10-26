@@ -97,6 +97,7 @@ export class App implements FxHost {
   private lvT = 0;
   private lvScale = 1;
   private lvBusy = false;
+  private lvAutoT = 0;
   private hadTutorial = false;
   private endT = 0;
   private bestAtStart: BestRecord | null = null;
@@ -117,6 +118,8 @@ export class App implements FxHost {
   readonly frameMs = new Float32Array(120);
   private frameIdx = 0;
   private fpsCount = 0;
+  private lastDraw = -1;
+  private flowing = false;
   private fpsT = 0;
   fps = 60;
   private readonly tierSamples = new Float32Array(1024);
@@ -544,6 +547,14 @@ export class App implements FxHost {
       }
       case 'open':
         this.lvScale = 0;
+        // the autoplay bot picks too (debug / balance), after a short beat so the panel is readable
+        if (g.autoplay.enabled && !this.paused && !this.lvBusy && this.levelup.isOpen) {
+          this.lvAutoT += realDt;
+          if (this.lvAutoT >= 0.7) {
+            this.lvAutoT = 0;
+            this.levelup.pick(g.autoplay.pickCard(g, this.levelup.cards), true);
+          }
+        } else this.lvAutoT = 0;
         break;
       case 'easeOut': {
         if (this.paused) break;
@@ -653,11 +664,19 @@ export class App implements FxHost {
     if (realDt > config.physics.maxFrameDt) realDt = config.physics.maxFrameDt;
     const t0 = performance.now();
     this.update(realDt);
-    this.render();
+    // the software presenter may still be busy with the previous frame: simulate now, draw next tick
+    const draw = this.ctx.frameReady(now);
+    if (draw) this.render(now);
     const ms = performance.now() - t0;
     this.frameMs[this.frameIdx] = ms;
     this.frameIdx = (this.frameIdx + 1) % this.frameMs.length;
-    this.fpsCount++;
+    if (draw) {
+      // fps + auto quality follow presented frames (equal to rAF ticks on real GPUs)
+      const pd = this.lastDraw < 0 ? realDt : Math.min(config.physics.maxFrameDt, (now - this.lastDraw) / 1000);
+      this.lastDraw = now;
+      this.fpsCount++;
+      this.sampleTier(pd, this.flowing);
+    }
     this.fpsT += realDt;
     if (this.fpsT >= 0.5) {
       this.fps = Math.round(this.fpsCount / this.fpsT);
@@ -770,7 +789,7 @@ export class App implements FxHost {
       }
     }
     this.sides.update(g, this.mode === 'run', this.vp.sideWidth(), realDt);
-    this.sampleTier(realDt, running && ts > 0 && this.lvState === 'none');
+    this.flowing = running && ts > 0 && this.lvState === 'none';
     // scene id for tests
     this.scene = this.computeScene();
     setScene(this.scene);
@@ -803,7 +822,7 @@ export class App implements FxHost {
   }
 
   // ================================================================ render
-  private render(): void {
+  private render(now: number): void {
     const ctx = this.ctx;
     if (ctx.lost || !this.spr || !this.atlas) return;
     this.atlas.sync(ctx);
@@ -893,6 +912,6 @@ export class App implements FxHost {
       P.shockS = 0;
     }
     P.end(flip);
-    ctx.present();
+    ctx.present(now);
   }
 }

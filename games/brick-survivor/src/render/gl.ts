@@ -29,6 +29,7 @@ export class SoftwarePresenter {
   private u8: Uint8Array | null = null;
   private w = 0;
   private h = 0;
+  private fenceT = 0;
   constructor(
     private gl: WebGL2RenderingContext,
     private ctx2d: CanvasRenderingContext2D,
@@ -56,28 +57,39 @@ export class SoftwarePresenter {
     }
   }
 
-  /** call after the frame has been rendered (flipped) into the default framebuffer */
-  present(): void {
+  /**
+   * Backpressure for the software path: a software rasteriser cannot keep up with 60 Hz at full resolution and,
+   * with no visible GL canvas, nothing throttles requestAnimationFrame — the GPU queue would grow without bound.
+   * Returns true when the previous readback has landed (and was blitted) so a new frame may be rendered.
+   */
+  poll(now: number): boolean {
     const gl = this.gl;
-    if (!this.pbo || !this.img || !this.u8) return;
-    if (this.fence) {
-      const st = gl.getSyncParameter(this.fence, gl.SYNC_STATUS);
-      if (st === gl.SIGNALED) {
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
-        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.u8);
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-        this.dropFence();
-        this.ctx2d.putImageData(this.img, 0, 0);
-      }
+    if (!this.fence || !this.img || !this.u8) return true;
+    if (gl.getSyncParameter(this.fence, gl.SYNC_STATUS) !== gl.SIGNALED) {
+      if (now - this.fenceT < 2000) return false;
+      // watchdog: a fence that never signals must not freeze the screen forever
+      this.dropFence();
+      return true;
     }
-    if (!this.fence) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
-      gl.readPixels(0, 0, this.w, this.h, gl.RGBA, gl.UNSIGNED_BYTE, 0);
-      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-      this.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-      gl.flush();
-    }
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.u8);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    this.dropFence();
+    this.ctx2d.putImageData(this.img, 0, 0);
+    return true;
+  }
+
+  /** call after the frame has been rendered (flipped) into the default framebuffer */
+  present(now: number): void {
+    const gl = this.gl;
+    if (!this.pbo || !this.img || !this.u8 || this.fence) return;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
+    gl.readPixels(0, 0, this.w, this.h, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    this.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    this.fenceT = now;
+    gl.flush();
   }
 
   invalidate(): void {
@@ -177,9 +189,15 @@ export class GLContext {
     this.presenter?.resize(w, h);
   }
 
-  present(): void {
+  /** false while the software presenter is still waiting for the previous frame (skip rendering this tick) */
+  frameReady(now: number): boolean {
+    if (this.lost) return false;
+    return this.presenter ? this.presenter.poll(now) : true;
+  }
+
+  present(now: number): void {
     if (this.lost) return;
-    this.presenter?.present();
+    this.presenter?.present(now);
   }
 
   compile(vs: string, fs: string): WebGLProgram {

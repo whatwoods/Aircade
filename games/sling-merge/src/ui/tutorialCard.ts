@@ -53,12 +53,15 @@ export class TutorialCard {
     const i = this.tipT[0]! <= this.tipT[1]! ? 0 : 1;
     const el = this.tipEls[i]!;
     el.textContent = text;
-    const cx = Math.max(118, Math.min(272, x));
+    // 按气泡实际宽度夹在罐内（L24..R366，各留 6px）
+    const hw = Math.min(180, (el.offsetWidth || 220) / 2);
+    const cx = Math.max(30 + hw, Math.min(360 - hw, x));
     const cy = Math.max(150, Math.min(700, y));
     el.style.left = `${cx}px`;
     el.style.top = `${cy}px`;
-    // 尾巴指向锚点
-    el.style.setProperty('--tail', `${Math.max(-80, Math.min(80, x - cx))}px`);
+    // 尾巴指向锚点（不超出气泡圆角）
+    const lim = Math.max(0, hw - 18);
+    el.style.setProperty('--tail', `${Math.max(-lim, Math.min(lim, x - cx))}px`);
     el.classList.remove('show');
     void el.offsetWidth;
     el.classList.add('show');

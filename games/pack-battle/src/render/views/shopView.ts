@@ -191,8 +191,7 @@ export class ShopView {
       ctx.lineDashOffset = -time * 30;
       ctx.stroke();
       ctx.setLineDash([]);
-      // 金额价签挂在拖拽件上方（arrangeController.drawSellTag）；这里只在柜台中央写一行提示
-      text(ctx, '松手出售', 174, L.shopTitleY + 9, { size: 15, weight: 900, color: '#ffd2c4', stroke: C.ink, strokeW: 3.5 });
+      // 金额价签挂在拖拽件上方（arrangeController.drawSellTag），不会被手指和装备挡住
       ctx.restore();
     }
     ctx.restore();

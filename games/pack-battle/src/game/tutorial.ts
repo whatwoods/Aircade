@@ -8,7 +8,7 @@ export const HINT_TEXT: Record<HintId, string> = {
   stash: '桌边的装备不参战',
   boss: '首领半血会变强',
   poison: '中毒无视护盾',
-  loss: '失去 1 颗心。调整背包，再战同一个对手',
+  loss: '失去 1 颗心：调整背包，再战同一对手',
   interest: '存钱有利息：每 10 金下轮 +1',
 };
 

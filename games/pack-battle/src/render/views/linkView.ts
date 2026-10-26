@@ -5,6 +5,7 @@ import { noise1 } from '../noise.ts';
 import type { BagRect } from '../layout.ts';
 import { glowOf } from '../fx/particles.ts';
 import { C } from '../kit.ts';
+import { stage } from '../stage.ts';
 import { HAND, text } from '../text.ts';
 
 export const LINK_COLOR: Record<LinkKind, string> = {
@@ -96,7 +97,8 @@ export function drawLinkCurve(
   const ay = g.gy + (l.a[1] + 0.5) * cell;
   const bx = g.gx + (l.b[0] + 0.5) * cell;
   const by = g.gy + (l.b[1] + 0.5) * cell;
-  curve(ax, ay, bx, by, time, l.id * 7 + 1, true);
+  // 自适应画质降档后关闭线条沸腾
+  curve(ax, ay, bx, by, time, l.id * 7 + 1, stage.dprCap >= 2);
   const color = LINK_COLOR[l.kind];
   const k = cell / 54;
   const L = Math.hypot(bx - ax, by - ay) * 1.12;

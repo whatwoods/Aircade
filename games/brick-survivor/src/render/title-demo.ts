@@ -54,18 +54,18 @@ export class TitleDemo {
 
   private placeBrick(i: number, initial: boolean): void {
     const r = this.rng;
-    // keep clear of the logo core (y 160–360 centre column) so letters stay readable
-    for (let tries = 0; tries < 20; tries++) {
+    // keep clear of the whole logo band (y 140–370) and the best badge so letters stay readable
+    for (let tries = 0; tries < 40; tries++) {
       const x = r.range(X0 + 28, X1 - 28);
       const y = r.range(Y0 + 20, Y1 - 30);
-      let ok = !(y > 150 && y < 370 && x > 70 && x < 320);
+      let ok = !(y > 134 && y < 376) && !(y > 384 && y < 452 && x > 110 && x < 280);
       for (let j = 0; ok && j < NB; j++) {
         if (j === i || (initial && j > i)) continue;
         const dx = this.bx[j]! - x;
         const dy = this.by[j]! - y;
-        if (dx * dx + dy * dy < 70 * 70) ok = false;
+        if (dx * dx + dy * dy < 64 * 64) ok = false;
       }
-      if (ok || tries === 19) {
+      if (ok || tries === 39) {
         this.bx[i] = x;
         this.by[i] = y;
         break;

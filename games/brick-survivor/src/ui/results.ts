@@ -46,6 +46,7 @@ export class ResultsPanel {
     this.clearTimers();
     const r = this.root;
     r.classList.toggle('win', d.victory);
+    r.classList.remove('rec');
     const rows: [string, string][] = [
       ['到达波数', d.endless ? `无尽 · 第 ${d.wave} 波` : `${d.wave} / 20`],
       ['用时', fmtTime(d.time)],
@@ -106,6 +107,7 @@ export class ResultsPanel {
       this.timers.push(
         window.setTimeout(() => {
           (this.inner.querySelector('.stamp') as HTMLElement).classList.add('go');
+          this.root.classList.add('rec');
           this.h.record();
         }, 1500),
       );

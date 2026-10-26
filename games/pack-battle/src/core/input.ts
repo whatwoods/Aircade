@@ -128,7 +128,17 @@ export function initInput(canvas: HTMLCanvasElement): void {
   canvas.addEventListener('pointerup', (e) => end(e, false));
   canvas.addEventListener('pointercancel', (e) => end(e, true));
   canvas.addEventListener('lostpointercapture', (e) => {
-    if (e.pointerId === input.id) end(e, true);
+    if (e.pointerId !== input.id) return;
+    // 拖拽中右键会弹 contextmenu 并让浏览器释放捕获：左键仍按着就重新捕获，别取消拖拽
+    if (e.pointerType === 'mouse' && (e.buttons & 1) !== 0) {
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        /* 画布全屏，没有捕获也能收到移动事件 */
+      }
+      return;
+    }
+    end(e, true);
   });
   canvas.addEventListener('pointerleave', (e) => {
     if (e.pointerType === 'mouse' && input.id === -1) {

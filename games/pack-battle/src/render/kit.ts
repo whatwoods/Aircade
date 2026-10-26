@@ -364,7 +364,23 @@ export function coin(icon: CoinIcon | null, r: number, seed = 1): Sprite {
 
 // ---------- 金币图标 ----------
 
+/** 金币：按半径缓存成精灵（数字键，不产生每帧垃圾） */
+const goldSprites = new Map<number, Sprite>();
+let goldVer = -1;
 export function drawGoldCoin(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  if (goldVer !== stage.version) {
+    goldSprites.clear();
+    goldVer = stage.version;
+  }
+  let sp = goldSprites.get(r);
+  if (!sp) {
+    sp = sprite(r * 2, r * 2.12, pxRatio(), 2, (c) => paintGoldCoin(c, r, r, r));
+    goldSprites.set(r, sp);
+  }
+  drawSprite(ctx, sp, cx - r, cy - r);
+}
+
+function paintGoldCoin(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
   ctx.fillStyle = C.goldDark;
   ctx.beginPath();
   ctx.ellipse(cx, cy + r * 0.12, r, r * 0.96, 0, 0, Math.PI * 2);
@@ -390,7 +406,7 @@ export function drawGoldCoin(ctx: CanvasRenderingContext2D, cx: number, cy: numb
 }
 
 export function goldCoin(r: number): Sprite {
-  return cached('gold|' + r, r * 2, r * 2, 2, (ctx) => drawGoldCoin(ctx, r, r, r));
+  return cached('gold|' + r, r * 2, r * 2.12, 2, (ctx) => paintGoldCoin(ctx, r, r, r));
 }
 
 // ---------- 心 ----------

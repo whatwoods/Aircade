@@ -31,6 +31,8 @@ export class ItemView {
   /** 原位 20% 虚影（拖拽中） */
   ghost = false;
   flash = 0;
+  /** 闪光峰值（4× 时调低，避免满屏白块） */
+  flashMax = 0.75;
   /** 战斗出手弹起：剩余时间 */
   pop = 0;
   gray = 0;
@@ -125,7 +127,7 @@ export class ItemView {
       ctx.globalAlpha /= Math.min(1, this.gray);
     }
     if (this.flash > 0) {
-      ctx.globalAlpha *= Math.min(1, this.flash / 0.09) * 0.85;
+      ctx.globalAlpha *= Math.min(1, this.flash / 0.09) * this.flashMax;
       ctx.globalCompositeOperation = 'lighter';
       drawItemAt(ctx, this.id, 1, this.ang.x, 0, 0, cell, 'white');
       ctx.globalCompositeOperation = 'source-over';

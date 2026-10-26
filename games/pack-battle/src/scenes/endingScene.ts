@@ -30,12 +30,17 @@ export class EndingScene implements Scene {
   private t = 0;
   private total = new Rolling(0, 0.25);
   private best: BestRecord | null = null;
+  private prevBest: BestRecord | null = null;
   private isRecord = false;
+  /** 证书顶部与高度（随内容行数自适应，证书 + 按钮整体垂直居中） */
+  private py = 90;
+  private ph = 620;
   private recordT = -1;
   private again: Button;
   private title: Button;
   private pressed: Button | null = null;
-  private oy = 0;
+  private lastH = 0;
+  private stampY = 500;
   private rain = 0;
 
   constructor(d: EndingData) {
@@ -53,6 +58,7 @@ export class EndingScene implements Scene {
 
   enter(): void {
     const prev = loadBest();
+    this.prevBest = prev;
     this.isRecord = submitBest({ score: this.d.score, round: this.d.round, cleared: this.d.cleared, date: Date.now() });
     this.best = this.isRecord ? { score: this.d.score, round: this.d.round, cleared: this.d.cleared, date: Date.now() } : prev;
     setMusic(null);
@@ -70,8 +76,14 @@ export class EndingScene implements Scene {
 
   private layout(): void {
     const H = stage.H;
-    this.oy = Math.max(0, (H - 844) / 2);
-    const by = Math.min(H - 116, 728 + this.oy);
+    this.lastH = H;
+    // 内容高度：标题区 134 + 明细行 + 总分/最高/统计/种子
+    const n = Math.max(1, this.lines.length);
+    const want = 134 + n * 21 + 34 + 52 + 40 + 66 + 56;
+    this.ph = Math.max(440, Math.min(620, want, H - 210));
+    const total = this.ph + 22 + 64;
+    this.py = Math.max(40, Math.round((H - total) / 2));
+    const by = Math.min(H - 80, this.py + this.ph + 22);
     this.again.r = { x: 40, y: by, w: 210, h: 64 };
     this.title.r = { x: 262, y: by, w: 88, h: 64 };
   }
@@ -127,7 +139,7 @@ export class EndingScene implements Scene {
   }
 
   update(dt: number, _raw: number): void {
-    if (this.oy !== Math.max(0, (stage.H - 844) / 2)) this.layout();
+    if (this.lastH !== stage.H) this.layout();
     this.t += dt;
     const per = 0.14;
     const want = Math.min(this.lines.length, Math.floor(Math.max(0, this.t - 0.6) / per));
@@ -144,7 +156,7 @@ export class EndingScene implements Scene {
       if (this.isRecord && this.d.score > 0) {
         sfx('record');
         tier('T3', false);
-        emit('confetti', 300, 500 + this.oy, 40, { color: C.goldLight, speed: 260, life: 1.2, ui: true });
+        emit('confetti', 268, this.stampY, 40, { color: C.goldLight, speed: 260, life: 1.2, ui: true });
       }
     }
     if (this.recordT >= 0) this.recordT += dt;
@@ -158,14 +170,13 @@ export class EndingScene implements Scene {
 
   draw(ctx: CanvasRenderingContext2D): void {
     const d = this.d;
-    const oy = this.oy;
     const t = this.t;
     const real = clock.real;
     const k = ease.outBack(Math.min(1, t / 0.45));
     // 证书展开
     const px = 20;
-    const py = 90 + oy;
-    const ph = Math.min(620, stage.H - 210 - oy + 90);
+    const py = this.py;
+    const ph = this.ph;
     ctx.save();
     ctx.translate(195, py);
     ctx.scale(1, Math.max(0.05, k));
@@ -186,7 +197,7 @@ export class EndingScene implements Scene {
     if (!d.cleared && d.killerName) text(ctx, `击败你的是 ${d.killerName}`, 195, py + 104, { size: 13, weight: 700, color: C.inkSoft });
     // 分数明细
     const ly0 = py + 134;
-    const lh = Math.min(21, (ph - 380) / Math.max(1, this.lines.length));
+    const lh = Math.min(21, (ph - 382) / Math.max(1, this.lines.length));
     for (let i = 0; i < this.shown; i++) {
       const l = this.lines[i];
       const y = ly0 + i * lh;
@@ -212,8 +223,10 @@ export class EndingScene implements Scene {
     text(ctx, num(this.total.int), 326, ty + 4, { size: 48, family: HAND, color: C.ink, align: 'right' });
     // 历史最高
     const by = ty + 52;
-    const b = this.best;
-    text(ctx, `历史最高 ${b ? num(b.score) : num(d.score)}`, 64, by, { size: 14, weight: 700, color: C.inkSoft, align: 'left' });
+    // 破纪录时：盖章那一刻才把"历史最高"换成新分数
+    const b = this.recordT >= 0 ? this.best : this.prevBest;
+    text(ctx, `历史最高 ${b ? num(b.score) : '—'}`, 64, by, { size: 14, weight: 700, color: C.inkSoft, align: 'left' });
+    this.stampY = by - 4;
     if (this.recordT >= 0 && this.isRecord && d.score > 0) {
       const st = Math.min(1, this.recordT / 0.12);
       drawStamp(ctx, '新纪录！', 268, by - 4, 22, '#c2402c', -0.18, 1, 2 - st);
