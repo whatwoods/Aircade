@@ -28,6 +28,8 @@ const C_M = 'M'.charCodeAt(0);
 
 export const HALO = [0xbfb3ff, 0xff7a1a, 0x2ee6ff, 0xff2fd0, 0xff7a1a];
 export const CORE = [0xffffff, 0xffe0b0, 0xe8fdff, 0xffd6f6, 0xfff6e0];
+/** element-coloured ball body (outer ~65 % of the radius); the white-hot CORE is only the centre */
+const BODY = [0xf4f1ff, 0xff8d2e, 0x36e4ff, 0xff4fd6, 0xffa64a];
 export const BRICK_STROKE = [pal.basic, pal.armored, pal.volatile, pal.prismBrick, pal.turret, pal.warden, pal.elite];
 const COMBO_COLORS = [0xede9ff, 0x2ee6ff, 0xb6ff2e, 0xff7a1a, 0xff2fd0, 0xffffff];
 const COMBO_SIZES = [30, 34, 38, 42, 46, 50];
@@ -454,7 +456,13 @@ export class WorldView {
         }
       }
       // ice shell
-      if (br.frozenT > 0) b.sprite(elite ? s.iceE : s.ice, cx, cy, sc, sc, 0, col(0xffffff, 0.92, 0.1));
+      if (br.frozenT > 0) {
+        // cyan-white ice crust over the whole brick so frozen bricks separate clearly from violet ones
+        const bw = (f.right(br) - f.left(br) - 4) * sc;
+        const bh = (f.bottom(br) - top - 4) * sc;
+        b.rect(s.white, cx - bw / 2, cy - bh / 2, bw, bh, col(0x7feaff, 0.3, 0.35));
+        b.sprite(elite ? s.iceE : s.ice, cx, cy, sc, sc, 0, col(0xe6fcff, 0.95, 0.15));
+      }
       // flames (1–5 tongues)
       if (br.burnStacks > 0) {
         const n = Math.min(5, br.burnStacks);
@@ -473,7 +481,7 @@ export class WorldView {
       // HP number
       const hp = Math.ceil(br.hp);
       const offset = br.type === 'turret' || br.type === 'prism' || br.type === 'warden' ? 6 : 0;
-      const numC = br.frozenT > 0 ? col(0x9ff4ff, fade, 0) : col(0xede9ff, 0.92 * fade, 0);
+      const numC = br.frozenT > 0 ? col(0x5cf0ff, fade, 0) : col(0xede9ff, 0.92 * fade, 0);
       const size = elite ? 16 : 11;
       if (hp >= 1e6) drawNumber(b, t.numS, hp / 1e6, cx + offset, cy + 0.5, size * 0.9, 0.5, numC, 0, NUM_DEC1, 0, C_M, sc);
       else if (hp >= 1000) drawNumber(b, t.numS, hp >= 1e5 ? Math.round(hp / 1000) : hp / 1000, cx + offset, cy + 0.5, size * 0.9, 0.5, numC, 0, hp >= 1e5 ? 0 : NUM_DEC1, 0, C_K, sc);
@@ -650,10 +658,16 @@ export class WorldView {
       // pierce: elongated body + bright leading edge
       const pierce = kind === KIND_MAIN && ball.pierceLeft > 0;
       const r = ball.r * scale * (ball.charges >= 2 ? 1.08 : 1);
+      const body = echo ? core : BODY[ei]!;
+      const tinted = !echo && ei > 0;
       if (pierce) {
-        b.sprite(s.disc, x, y, (r / 16) * 1.35, r / 16, ang, col(core, echo ? 0.75 : 1, 0.15));
+        b.sprite(s.disc, x, y, (r / 16) * 1.35, r / 16, ang, col(body, echo ? 0.75 : 1, 0.15));
+        if (tinted) b.sprite(s.disc, x, y, (r / 16) * 1.35 * 0.48, (r / 16) * 0.48, ang, col(core, 1, 0.2));
         b.sprite(s.spark, x + Math.cos(ang) * r * 0.9, y + Math.sin(ang) * r * 0.9, 0.35, 2.2, ang + Math.PI / 2, col(0xffffff, 0.9, 0.5));
-      } else b.spriteR(s.disc, x, y, r, 0, col(core, echo ? 0.75 : 1, 0.15));
+      } else {
+        b.spriteR(s.disc, x, y, r, 0, col(body, echo ? 0.75 : 1, 0.15));
+        if (tinted) b.spriteR(s.disc, x, y, r * 0.48, 0, col(core, 1, 0.2));
+      }
       if (ei === 2) b.spriteR(s.star4, x, y, 10 * scale, time * 2 + ball.id, col(0xe8fdff, 0.55, 1));
       // homing reticle on target
       if (ball.target !== -1 && g.stats.homing && kind === KIND_MAIN && g.targetAlive(ball.target)) {
