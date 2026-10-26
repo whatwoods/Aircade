@@ -32,14 +32,15 @@ export class Spawner {
 
   /**
    * @param shots 本局已发射数（加压曲线）
-   * @param rescue 危险时最低那颗果的等级（0 = 无），按 rescueChance 直接出这一级
+   * @param rescue 危险时最该救的那颗果的等级（0 = 无）；预警按 rescueChance、已越线按 rescueChanceOver 直接出这一级
+   * @param over 是否已有水果越线（第 2 档）
    */
-  roll(highest: number, shots = 0, rescue = 0): number {
+  roll(highest: number, shots = 0, rescue = 0, over = false): number {
     let lvl: number;
     const S = CONFIG.spawn;
     if (this.queue.length > 0) {
       lvl = this.queue.shift()!;
-    } else if (rescue > 0 && rescue <= this.maxAllowed(highest) && rngGame.next() < S.rescueChance) {
+    } else if (rescue > 0 && rescue <= this.maxAllowed(highest) && rngGame.next() < (over ? S.rescueChanceOver : S.rescueChance)) {
       lvl = rescue;
     } else {
       this.ramp = Math.min(1, Math.max(0, (shots - S.rampStart) / S.rampShots));

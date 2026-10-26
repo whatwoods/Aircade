@@ -29,6 +29,8 @@ export class Monolith extends Boss {
   shotWarn = 0;
   sway = 0;
   eyeX = 0;
+  /** true while the next conveyor step will slam the danger line (telegraph) */
+  slamArmed = false;
 
   constructor(g: Game, hpMult: number) {
     super(g);
@@ -105,6 +107,13 @@ export class Monolith extends Boss {
       }
     }
 
+    // slam telegraph: armed when the next step lands on the line
+    const armed = this.slamSteps() <= 1;
+    if (armed && !this.slamArmed) {
+      g.sink.emit('breachWarn', this.x, F.dangerY, -1, 0);
+      this.core.warnT = 0.6;
+    }
+    this.slamArmed = armed;
     // slam
     if (this.riseT >= 1 && this.y + M.coreR >= F.dangerY) {
       g.damagePlayer(M.slamDmg, 'slam', this.x, F.dangerY);
@@ -166,6 +175,13 @@ export class Monolith extends Boss {
         this.shotA = this.shotB = -1;
       }
     }
+  }
+
+  /** conveyor steps left before the slam (0 = now, 99 = still rising back) */
+  slamSteps(): number {
+    if (this.state !== 'fight' || this.riseT < 1) return 99;
+    const gap = F.dangerY - (this.homeY + (this.g.formation.scroll - this.baseScroll) * G.cellH + M.coreR);
+    return gap <= 0 ? 0 : Math.ceil(gap / G.cellH - 1e-3);
   }
 
   private pickSummonCells(): void {

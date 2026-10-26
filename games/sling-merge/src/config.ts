@@ -236,6 +236,8 @@ export const CONFIG = {
     rampBoost: [0, 0, 0.3, 0.8, 1.0],
     /** 救场：有水果进入预警区时，下一个以此概率直接出最低那颗果的等级（须在已解锁范围内） */
     rescueChance: 0.5,
+    /** 已有水果越线（倒计时中）时的救场概率：奖励会瞄准越线果的玩家 */
+    rescueChanceOver: 0.5,
     maxSameInRow: 3,
     opening: [1, 1, 2],
   },

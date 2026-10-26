@@ -57,6 +57,8 @@ export function drawBoss(b: Batcher, s: Sprites, boss: Boss, t: number, a: numbe
   }
 }
 
+const TAU_ = Math.PI * 2;
+
 function drawMonolith(b: Batcher, s: Sprites, m: Monolith, t: number, a: number): void {
   const core = m.core;
   lerpPos(core, a, P);
@@ -69,11 +71,17 @@ function drawMonolith(b: Batcher, s: Sprites, m: Monolith, t: number, a: number)
   const fl = core.flashT > 0 ? core.flashT / 0.05 : 0;
   b.sprite(s.monolith, x, y, 1, 1, Math.sin(t * 0.8) * 0.02, col(0xffffff, 1, 0));
   if (fl > 0) b.sprite(s.monolith, x, y, 1, 1, 0, col(0xffffff, fl * 0.6, 0.6));
+  // slam armed: the slab pulses red
+  const armed = m.slamArmed ? 0.5 + 0.5 * Math.sin(t * TAU_ * 4) : 0;
+  if (armed > 0) {
+    b.sprite(s.monolith, x, y, 1, 1, 0, col(pal.danger, armed * 0.45, 0.7));
+    b.spriteR(s.glow, x, y + 30, 70, 0, col(pal.danger, armed * 0.35, 1));
+  }
   // eye tracks the core
   const ex = x + m.eyeX * 6;
   const ey = y - 6;
   const p2 = m.phase >= 2 ? 1 : 0;
-  b.spriteR(s.glow, ex, ey, 22 + p2 * 6, 0, col(pal.danger, 0.55 + 0.2 * Math.sin(t * 5), 1));
+  b.spriteR(s.glow, ex, ey, 22 + p2 * 6 + armed * 12, 0, col(pal.danger, 0.55 + 0.2 * Math.sin(t * 5) + armed * 0.4, 1));
   b.sprite(s.eye, ex, ey, 0.85, 0.75 + 0.1 * Math.sin(t * 3), 0, col(mixHex(pal.danger, 0xffffff, 0.25), 1, 0.2));
   flames(b, s, core, x, y, t);
   // plates

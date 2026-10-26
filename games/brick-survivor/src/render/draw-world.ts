@@ -9,6 +9,7 @@ import { KIND_DART, KIND_ECHO, KIND_MAIN, KIND_SHARD } from '../game/balls';
 import { GEM_HEAL } from '../game/gems';
 import { TG_CELL, TG_COLUMN, TG_LINE } from '../game/bullets';
 import type { Brick } from '../game/formation';
+import type { Monolith } from '../game/bosses/monolith';
 import { elementIndex, brickTypeIndex } from '../types';
 import type { Batcher } from './batcher';
 import { col, mixHex } from './batcher';
@@ -237,6 +238,42 @@ export class WorldView {
         b.line(s.strip, x0, F.dangerY, x0 + G.cellW, F.dangerY, 14, col(pal.danger, 0.5 * blink, 1));
         for (let k = 0; k < 2; k++) {
           b.sprite(s.hatch, x0 + 13 + k * 26, F.dangerY + 9, 26 / 32, 14 / 32, 0, col(pal.danger, 0.18 * blink, 0.4));
+        }
+      }
+    }
+    // Monolith slam telegraph (§5.2 #40): the strip of line under the slab turns into a red hatch when the
+    // next step will slam, with a drop beam from the slab; 2–3 steps out it shows dim brackets + step pips
+    const boss = g.boss;
+    if (boss && boss.kind === 'monolith' && boss.state === 'fight') {
+      const m = boss as Monolith;
+      const steps = m.slamSteps();
+      if (steps <= 3) {
+        const hw = config.bosses.monolith.coreR + 18;
+        const x0 = Math.max(F.wallL, m.x - hw);
+        const x1 = Math.min(F.wallR, m.x + hw);
+        if (steps <= 1) {
+          const blink = 0.55 + 0.45 * Math.sin(this.time * TAU * 4);
+          b.line(s.strip, x0, F.dangerY, x1, F.dangerY, 22, col(pal.danger, 0.6 * blink, 1));
+          b.rect(s.white, x0, F.dangerY - 1.5, x1 - x0, 3, col(0xff8095, blink, 0.2));
+          for (let x = x0; x < x1 - 4; x += 26) {
+            const w = Math.min(26, x1 - x);
+            b.sprite(s.hatch, x + w / 2, F.dangerY + 10, w / 32, 18 / 32, 0, col(pal.danger, 0.35 * blink, 0.4));
+          }
+          // drop beam from the slab to the line
+          const top = m.y + config.bosses.monolith.coreR;
+          if (top < F.dangerY) b.line(s.strip, m.x, top, m.x, F.dangerY, hw * 1.6, col(pal.danger, 0.1 * blink, 1));
+          // brackets
+          b.rect(s.white, x0, F.dangerY - 10, 2, 20, col(0xff8095, 0.9, 0.2));
+          b.rect(s.white, x1 - 2, F.dangerY - 10, 2, 20, col(0xff8095, 0.9, 0.2));
+        } else {
+          const a = steps === 2 ? 0.55 : 0.32;
+          b.rect(s.white, x0, F.dangerY - 6, 2, 12, col(pal.danger, a, 0.2));
+          b.rect(s.white, x1 - 2, F.dangerY - 6, 2, 12, col(pal.danger, a, 0.2));
+          b.rect(s.white, x0, F.dangerY - 1, x1 - x0, 2, col(pal.danger, a * 0.8, 0.2));
+        }
+        // remaining-step pips above the line
+        for (let i = 0; i < steps; i++) {
+          b.spriteR(s.disc, m.x + (i - (steps - 1) / 2) * 12, F.dangerY - 16, 3, 0, col(steps <= 1 ? 0xff8095 : pal.danger, 0.9, 0.3));
         }
       }
     }

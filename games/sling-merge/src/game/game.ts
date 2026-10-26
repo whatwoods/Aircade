@@ -295,7 +295,7 @@ export class Game {
         s.hopLevel = this.run.next;
         s.hopT = 0;
         const forced = this.tutorial.forcedNext();
-        this.run.next = forced ?? this.spawner.roll(this.run.highestLevel, this.run.shots, this.rescueLevel());
+        this.run.next = forced ?? this.spawner.roll(this.run.highestLevel, this.run.shots, this.rescueLevel(), this.dangerMax > 0);
         bus.emit({ t: 'nextChanged', level: this.run.next });
         bus.emit({ t: 'hop', level: s.hopLevel });
       }
