@@ -316,7 +316,7 @@ export const ENEMIES: EnemyDef[] = [
     hint: '半血会狂暴，攒足护盾！',
   },
   {
-    round: 6, name: '吱吱帮', title: '鼠群', hp: 160, cols: 5, rows: 4, frame: 'crate', portrait: 'rats',
+    round: 6, name: '吱吱帮', title: '鼠群', hp: 180, cols: 5, rows: 4, frame: 'crate', portrait: 'rats',
     layout: ['.a...', 'bMc.e', '.d.f.', 'H.J..'],
     legend: { a: 'ratfang', b: 'ratfang', c: 'ratfang', d: 'ratfang', e: 'ratfang', f: 'ratfang', M: 'whetstone', N: 'whetstone', H: 'herb', J: 'herb' }, traits: [],
     hint: '一大堆小伤害：铁盔能大幅减免。',
