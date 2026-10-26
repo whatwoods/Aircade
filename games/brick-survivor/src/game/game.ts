@@ -233,6 +233,7 @@ export class Game {
   /** begins a normal wave: rows queued; banner fires when its first row enters */
   beginWave(w: number): void {
     this.wave = w;
+    if (w > 1 && this.combo > 0) this.cutCombo(config.combo.waveKeep);
     if (w > 20) this.endless = true;
     this.waves.pickPattern(w);
     this.formation.mode = 'waves';
@@ -313,8 +314,19 @@ export class Game {
       const target = P.target[this.wave] ?? P.endlessTarget;
       const err = target - Math.max(0, lr);
       // slow to tighten, quick to relax; ignore the first few steps after a boss while the field refills
-      if (err < 0 || this.formation.stepsTaken - this.pressureFrom >= P.settleSteps)
-        this.pressure = Math.max(P.min, Math.min(P.max, this.pressure * Math.exp((err > 0 ? P.gainUp : P.gainDown) * err)));
+      if (err < 0 || this.formation.stepsTaken - this.pressureFrom >= P.settleSteps) {
+        const want = Math.max(P.min, Math.min(P.max, this.pressure * Math.exp((err > 0 ? P.gainUp : P.gainDown) * err)));
+        const r = Math.max(1 / (1 + P.rateDown), Math.min(1 + P.rateUp, want / this.pressure));
+        if (r < 1) {
+          const k = Math.pow(r, P.easeExisting);
+          for (const b of this.formation.bricks) {
+            if (!b.alive) continue;
+            b.hp = Math.max(1, b.hp * k);
+            b.maxHp = Math.max(1, b.maxHp * k);
+          }
+        }
+        this.pressure *= r;
+      }
     }
   }
 
@@ -528,7 +540,7 @@ export class Game {
   addCombo(n: number): void {
     if (this.tut && this.tut.step < 1) return;
     const before = this.combo;
-    this.combo += n;
+    this.combo = Math.min(config.combo.cap, this.combo + n);
     this.comboT = this.comboWindow();
     if (this.combo > this.maxCombo) this.maxCombo = this.combo;
     const tiers = config.combo.tiers;
@@ -569,8 +581,13 @@ export class Game {
   onMiss(): void {
     this.tut?.onMiss();
     // a dropped main ball costs half the combo (and the tier with it)
+    this.cutCombo(config.combo.missKeep);
+  }
+
+  /** keep a fraction of the combo; below the first tier it breaks */
+  cutCombo(keep: number): void {
     if (this.combo <= 0) return;
-    const kept = Math.floor(this.combo * config.combo.missKeep);
+    const kept = Math.floor(this.combo * keep);
     if (kept < config.combo.tiers[0]!) {
       this.breakCombo(false);
       return;

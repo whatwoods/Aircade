@@ -98,7 +98,7 @@ export class Waves {
     const rng = g.rng;
     const w = g.wave;
     const dens = this.density(w);
-    const base = this.baseHp(w) * g.pressure;
+    const base = this.baseHp(w) * g.pressure * (1 + config.pressure.evoK * g.evolutions.size);
     const jitter = 1 + rng.range(-W.hpJitter, W.hpJitter);
     const mask = this.patternMask(rowIdx);
     const structured = this.pattern !== 'random' && rng.next() < 0.8;

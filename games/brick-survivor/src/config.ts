@@ -60,10 +60,14 @@ export const config = {
   xp: { base: 5, perLevel: 3 },
   levelup: { inputLockMs: 350, easeIn: 0.25, easeOut: 0.4, cardStagger: 0.07 },
   // pressure director (docs §3.16): new-row HP is scaled so the formation settles near a per-wave target depth
-  // (display row, 0 = top, 21 = danger line). Bounded, so strong builds still out-pace it and weak builds get
-  // only partial relief.
+  // (display row, 0 = top, 21 = danger line). Range 0.7–8 so it works mid-range instead of saturating.
   pressure: {
-    on: true, gainUp: 0.025, gainDown: 0.07, settleSteps: 4, min: 0.8, max: 3.2,
+    on: true, gainUp: 0.02, gainDown: 0.06, settleSteps: 4, min: 0.7, max: 8,
+    // per-step rate limit (×1.06 up / ÷1.08 down) so it never jumps; when it relaxes, bricks already on the
+    // field are eased too (remaining HP × ratio^easeExisting) so an earlier over-shoot doesn't linger as a wall
+    rateUp: 0.06, rateDown: 0.08, easeExisting: 1,
+    // formed builds: each evolution adds this much to new-row HP (multiplicative with the director)
+    evoK: 0.3,
     target: [0, 5, 6, 7, 8, 8, 9, 10, 11, 12, 12, 9, 11, 13, 13, 15, 12, 14, 15, 16, 16] as readonly number[],
     endlessTarget: 16,
   },
@@ -144,9 +148,10 @@ export const config = {
   rerolls: { start: 1, perBoss: 1 },
   combo: {
     // the window shrinks from 1.8 s (≤100) to 0.9 s (≥1000); a missed main ball halves the combo
-    window: 1.8, windowMin: 0.9, shrinkFrom: 100, shrinkTo: 1000, missKeep: 0.5,
+    // hard cap 999; every new wave halves it (waveKeep) so the number keeps moving even when nothing is missed
+    window: 1.8, windowMin: 0.9, shrinkFrom: 100, shrinkTo: 1000, missKeep: 0.5, cap: 999, waveKeep: 0.5,
     tiers: [10, 25, 50, 100, 250, 600], mults: [1.2, 1.5, 2.0, 2.5, 3.0, 4.0],
-    milestones: [50, 100, 250, 500, 1000, 2000, 5000],
+    milestones: [50, 100, 250, 500, 999],
   },
   score: {
     brick: 10, wavePct: 0.15, perfect: 20, intercept: 5, bossBase: 2000, noDamageMult: 1.5,

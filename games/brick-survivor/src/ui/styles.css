@@ -310,7 +310,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 #hud.bossfight .boss .bar { height: 5px; }
 #hud.bossfight .boss::before { display: none; }
 #hud .xp { transition: top 0.3s var(--ease-out), height 0.3s var(--ease-out); }
-#hud.bossfight .xp { top: 65px; height: 2px; }
+#hud.bossfight .xp { top: 65px; height: 4px; box-shadow: 0 0 0 1px rgba(255, 216, 74, 0.35); }
 #hud .boss::before { content: ''; position: absolute; left: -24px; right: -24px; top: -3px; bottom: -4px; background: linear-gradient(90deg, transparent, rgba(5, 3, 11, 0.78) 14%, rgba(5, 3, 11, 0.78) 86%, transparent); }
 #hud .boss .bn { position: relative; display: flex; justify-content: center; align-items: baseline; gap: 8px; height: 15px; white-space: nowrap; }
 #hud .boss .bn b { font-weight: 700; font-size: 11px; letter-spacing: 0.2em; color: #ffd3dc; }
@@ -494,7 +494,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 .tgl.on { background: rgba(46, 230, 255, 0.35); box-shadow: inset 0 0 0 1px var(--cyan); }
 .tgl.on::after { transform: translateX(22px); background: #fff; box-shadow: 0 0 8px var(--cyan); }
 .seg { display: flex; gap: 2px; }
-.seg button { height: 36px; min-width: 44px; padding: 0 8px; font-size: 12px; font-weight: 700; color: var(--dim); background: rgba(59, 44, 115, 0.6); }
+.seg button { height: 44px; min-width: 44px; padding: 0 8px; font-size: 12px; font-weight: 700; color: var(--dim); background: rgba(59, 44, 115, 0.6); }
 .seg button.on { background: var(--cyan); color: #07031a; }
 #settings .rowi.tap { cursor: pointer; }
 #settings .rowi.tap.down .tgl { filter: brightness(1.3); }
