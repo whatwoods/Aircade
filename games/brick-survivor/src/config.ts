@@ -68,7 +68,10 @@ export const config = {
     rateUp: 0.06, rateDown: 0.08, easeExisting: 1,
     // formed builds: each evolution adds this much to new-row HP (multiplicative with the director)
     evoK: 0.3,
-    target: [0, 5, 6, 7, 8, 8, 9, 10, 11, 12, 12, 9, 11, 13, 13, 15, 12, 14, 15, 16, 16] as readonly number[],
+    // per-wave ceiling: min(max, capBase + capPerWave·(w − capFrom)), raised to capEvoBase + capPerEvo·evolutions
+    // for strong builds, so the ramp into the wave-10 boss isn't a grind before any evolution
+    capBase: 3, capPerWave: 0.6, capFrom: 5, capEvoBase: 3.5, capPerEvo: 1.5,
+    target: [0, 5, 6, 7, 8, 8, 9, 10, 11, 9, 12, 9, 11, 13, 11, 15, 12, 14, 15, 14, 16] as readonly number[],
     endlessTarget: 16,
   },
   advance: {
@@ -170,8 +173,8 @@ export const config = {
       shotSpeed: 200, stepBeats: 6,
     },
     pulsar: {
-      hp: 4200, r: 36, xs: [90, 195, 300], y: 200, travel: 1.6, dwell: 1.2, fanWarn: 0.6, fanCount: 5, fanSpread: 60,
-      fanSpeed: 190, diveEvery: 14, diveWarn: 1.0, diveTime: 0.5, diveY: 470, ringCount: 10, ringSpeed: 160,
+      hp: 3000, r: 36, xs: [90, 195, 300], y: 200, travel: 1.6, dwell: 1.2, fanWarn: 0.6, fanCount: 4, fanSpread: 60,
+      fanSpeed: 170, diveEvery: 14, diveWarn: 1.0, diveTime: 0.5, diveY: 470, ringCount: 8, ringSpeed: 160,
       hover: 1.5, hoverVuln: 0.25, returnTime: 0.8, splitAt: 0.5, childR: 26, childFan: 3, childSpeed: 1.3,
       enrage: 0.3, splitHitstopMs: 120,
     },

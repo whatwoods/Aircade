@@ -315,7 +315,8 @@ export class Game {
       const err = target - Math.max(0, lr);
       // slow to tighten, quick to relax; ignore the first few steps after a boss while the field refills
       if (err < 0 || this.formation.stepsTaken - this.pressureFrom >= P.settleSteps) {
-        const want = Math.max(P.min, Math.min(P.max, this.pressure * Math.exp((err > 0 ? P.gainUp : P.gainDown) * err)));
+        const cap = Math.min(P.max, Math.max(P.capBase + P.capPerWave * (this.wave - P.capFrom), P.capEvoBase + P.capPerEvo * this.evolutions.size));
+        const want = Math.max(P.min, Math.min(cap, this.pressure * Math.exp((err > 0 ? P.gainUp : P.gainDown) * err)));
         const r = Math.max(1 / (1 + P.rateDown), Math.min(1 + P.rateUp, want / this.pressure));
         if (r < 1) {
           const k = Math.pow(r, P.easeExisting);
