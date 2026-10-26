@@ -260,7 +260,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   ratfang: {
     id: 'ratfang', name: '鼠牙', tag: 'weapon', rarity: 0, price: 0, shape: ['#'], enemyOnly: true,
     trigger: 'cooldown', cd: 1.0,
-    lv: [{ dmg: 2 }, { dmg: 4 }, { dmg: 7 }],
+    lv: [{ dmg: 3 }, { dmg: 4 }, { dmg: 7 }],
     adj: { kind: 'none' },
     text: { effect: '每 {cd} 秒造成 {dmg} 伤害', adj: '怪物部件' },
   },
@@ -316,7 +316,7 @@ export const ENEMIES: EnemyDef[] = [
     hint: '半血会狂暴，攒足护盾！',
   },
   {
-    round: 6, name: '吱吱帮', title: '鼠群', hp: 180, cols: 5, rows: 4, frame: 'crate', portrait: 'rats',
+    round: 6, name: '吱吱帮', title: '鼠群', hp: 150, cols: 5, rows: 4, frame: 'crate', portrait: 'rats',
     layout: ['.a...', 'bMc.e', '.d.f.', 'H.J..'],
     legend: { a: 'ratfang', b: 'ratfang', c: 'ratfang', d: 'ratfang', e: 'ratfang', f: 'ratfang', M: 'whetstone', N: 'whetstone', H: 'herb', J: 'herb' }, traits: [],
     hint: '一大堆小伤害：铁盔能大幅减免。',
