@@ -59,7 +59,7 @@ export interface Snapshot {
   combo: number;
   maxCombo: number;
   balls: { main: number; inFlight: number; magazine: number; shards: number; echoes: number };
-  bricks: { alive: number; lowestRow: number };
+  bricks: { alive: number; lowestRow: number; pressure: number };
   levels: Record<UpgradeId, number>;
   evolutions: EvolutionId[];
   boss: { kind: BossKind; hp: number; maxHp: number; phase: number } | null;

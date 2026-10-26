@@ -77,12 +77,13 @@ export class Tutorial {
         }
         break;
       case 3:
-        // the rule stays readable: the T3 bubble holds ≥ 1.5 s, then a catch confirms with "充能 +1" for 1.4 s
+        // the rule stays readable: the T3 bubble is up ≥ 1.5 s (t3Dwell includes the 0.74 s bubble swap), then a
+        // catch confirms with "充能 +1" for 1.4 s
         if (this.hint === 't3ok') {
-          if (this.t >= 1.4) this.go(4, 't4');
+          if (this.t >= T.t3OkTime) this.go(4, 't4');
           break;
         }
-        if (this.caught && (this.hint !== 't3' || this.t >= 1.5)) {
+        if (this.caught && (this.hint !== 't3' || this.t >= T.t3Dwell)) {
           this.hint = 't3ok';
           this.t = 0;
           this.g.sink.emit('tutCharge', this.g.player.x, config.field.catchY - 40, 0, 0);

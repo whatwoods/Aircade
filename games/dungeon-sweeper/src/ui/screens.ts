@@ -1,7 +1,7 @@
+import type { Layout } from '../view/layout';
 import type { Records, Settings } from '../core/storage';
 import { breakdownRows, fmtInt, fmtTime } from '../game/score';
 import type { ScoreBreakdown } from '../game/types';
-import type { Rect } from '../view/layout';
 
 export type Action =
   | 'start'
@@ -130,26 +130,36 @@ export class Screens {
   }
 
   /** 布局：#ui 覆盖游戏栏 */
-  place(colX: number, colW: number, vh: number, pause: Rect, scoreMid: number, boardTop: number, boardBottom: number, safeBottom: number): void {
+  place(L: Layout): void {
     const r = this.root.style;
-    r.left = colX + 'px';
-    r.width = colW + 'px';
-    r.height = vh + 'px';
+    r.left = L.colX + 'px';
+    r.width = L.colW + 'px';
+    r.height = L.vh + 'px';
     const p = this.pauseBtn.style;
-    p.left = pause.x + pause.w / 2 - 24 + 'px';
-    p.top = pause.y + pause.h / 2 - 24 + 'px';
+    p.left = L.pause.x + L.pause.w / 2 - 24 + 'px';
+    p.top = L.pause.y + L.pause.h / 2 - 24 + 'px';
     // 跳过按钮放在分数行正中（分数与计时之间），不与暂停键/HUD 重叠
-    this.skip.style.top = scoreMid - 14 + 'px';
-    // 提示条压在棋盘上沿内侧，不挡分数/计时
-    this.toasts.style.top = boardTop + 8 + 'px';
-    // 引导气泡放在棋盘下方（盖住图鉴），不挡引导目标格与轮盘；空间不足时贴底
-    const below = vh - safeBottom - boardBottom;
-    if (below >= 96) {
-      this.bubble.style.bottom = '';
-      this.bubble.style.top = boardBottom + 6 + 'px';
+    this.skip.style.top = L.scoreLine.y + L.scoreLine.h / 2 - 14 + 'px';
+    this.skip.style.left = L.scoreLine.x + L.scoreLine.w / 2 + 'px';
+    const side = L.side;
+    // 提示条：竖屏压在棋盘上沿内侧（不挡分数/计时）；横屏放在右栏图鉴上
+    const t = this.toasts.style;
+    t.top = side.toastTop + 'px';
+    t.left = side.cx - side.w / 2 + 'px';
+    t.right = '';
+    t.width = side.w + 'px';
+    // 引导气泡：竖屏放在棋盘下方（盖住图鉴），不挡引导目标格与轮盘；空间不足时贴底
+    const bs = this.bubble.style;
+    bs.left = side.cx + 'px';
+    bs.width = Math.min(side.w, 360) + 'px';
+    const boardBottom = L.boardOuter.y + L.boardOuter.h;
+    const below = L.vh - L.safeBottom - boardBottom;
+    if (L.landscape || below >= 96) {
+      bs.bottom = '';
+      bs.top = (L.landscape ? side.bubbleTop : boardBottom + 6) + 'px';
     } else {
-      this.bubble.style.top = '';
-      this.bubble.style.bottom = safeBottom + 8 + 'px';
+      bs.top = '';
+      bs.bottom = L.safeBottom + 8 + 'px';
     }
   }
 

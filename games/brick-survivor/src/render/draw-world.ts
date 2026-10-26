@@ -160,6 +160,11 @@ export class WorldView {
     if (g.phase !== 'idle') {
       this.drawCombo();
       this.drawBricks();
+      // staged rows above the ceiling stay out of the HUD band (they slide into view as they cross it)
+      if (!this.hideHud) {
+        this.b.rect(this.spr.white, 0, 0, config.world.width, F.ceilY - 8, col(pal.void, 1, 0));
+        this.b.line(this.spr.strip, 0, F.ceilY - 8, config.world.width, F.ceilY - 8, 16, col(pal.void, 1, 0));
+      }
       this.drawTelegraphs();
       this.drawGems();
       this.parts.draw(this.b, false, this.time);
@@ -250,7 +255,7 @@ export class WorldView {
       const m = boss as Monolith;
       const steps = m.slamSteps();
       if (steps <= 3) {
-        const hw = config.bosses.monolith.coreR + 18;
+        const hw = config.bosses.monolith.coreR + 34;
         const x0 = Math.max(F.wallL, m.x - hw);
         const x1 = Math.min(F.wallR, m.x + hw);
         if (steps <= 1) {
@@ -259,7 +264,7 @@ export class WorldView {
           b.rect(s.white, x0, F.dangerY - 1.5, x1 - x0, 3, col(0xff8095, blink, 0.2));
           for (let x = x0; x < x1 - 4; x += 26) {
             const w = Math.min(26, x1 - x);
-            b.sprite(s.hatch, x + w / 2, F.dangerY + 10, w / 32, 18 / 32, 0, col(pal.danger, 0.35 * blink, 0.4));
+            b.sprite(s.hatch, x + w / 2, F.dangerY + 11, w / 32, 20 / 32, 0, col(pal.danger, 0.6 * blink, 0.4));
           }
           // drop beam from the slab to the line
           const top = m.y + config.bosses.monolith.coreR;
@@ -273,9 +278,11 @@ export class WorldView {
           b.rect(s.white, x1 - 2, F.dangerY - 6, 2, 12, col(pal.danger, a, 0.2));
           b.rect(s.white, x0, F.dangerY - 1, x1 - x0, 2, col(pal.danger, a * 0.8, 0.2));
         }
-        // remaining-step pips above the line
+        // remaining-step pips just outside the zone (the slab itself covers the line under it)
+        const side = m.x < 195 ? 1 : -1;
+        const px0 = side > 0 ? x1 + 10 : x0 - 10;
         for (let i = 0; i < steps; i++) {
-          b.spriteR(s.disc, m.x + (i - (steps - 1) / 2) * 12, F.dangerY - 16, 3, 0, col(steps <= 1 ? 0xff8095 : pal.danger, 0.9, 0.3));
+          b.spriteR(s.disc, px0 + side * i * 11, F.dangerY - 12, 3.5, 0, col(steps <= 1 ? 0xff8095 : pal.danger, 0.95, 0.3));
         }
       }
     }
@@ -658,8 +665,8 @@ export class WorldView {
       // pierce: elongated body + bright leading edge
       const pierce = kind === KIND_MAIN && ball.pierceLeft > 0;
       const r = ball.r * scale * (ball.charges >= 2 ? 1.08 : 1);
-      const body = echo ? core : BODY[ei]!;
-      const tinted = !echo && ei > 0;
+      const body = echo ? mixHex(halo, 0xffffff, 0.3) : BODY[ei]!;
+      const tinted = echo || ei > 0;
       if (pierce) {
         b.sprite(s.disc, x, y, (r / 16) * 1.35, r / 16, ang, col(body, echo ? 0.75 : 1, 0.15));
         if (tinted) b.sprite(s.disc, x, y, (r / 16) * 1.35 * 0.48, (r / 16) * 0.48, ang, col(core, 1, 0.2));

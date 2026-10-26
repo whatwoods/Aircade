@@ -287,9 +287,9 @@ export class Feedback implements FxSink {
         if (perfect) {
           this.parts.spawn(FR_STAR, x, cy, 0, 0, 0.3, 8, 22, 0xffffff, pal.gold, 1, 1, P_HIGH | P_FADE_SQ, 0, 0, 0, 3);
           // several catches in a burst share one word, so they never pile into an unreadable smear
-          if (this.realTime - this.lastPerfectWord >= 0.35) {
+          if (this.realTime - this.lastPerfectWord >= 0.2) {
             this.lastPerfectWord = this.realTime;
-            this.floats.word(x, cy - 34, '完美', 0xfff3b0, 15, 0.7);
+            this.floats.word(x, cy - 34, '完美', 0xfff3b0, 15, 0.7, true);
           }
           sfx.perfect();
           this.cam.addTrauma(juice.perfectCatch.trauma, 2);
@@ -304,7 +304,7 @@ export class Feedback implements FxSink {
         }
         if (a >= 3 && b === KIND_MAIN && this.realTime - this.lastMaxWord >= 0.3) {
           this.lastMaxWord = this.realTime;
-          this.floats.word(x + 30, cy - 22, 'MAX', 0xffffff, 9, 0.45);
+          this.floats.word(x + 30, cy - 22, 'MAX', 0xffffff, 9, 0.45, true);
         }
         break;
       }
@@ -527,7 +527,9 @@ export class Feedback implements FxSink {
       }
       case 'breachWarn': {
         if (a === -1) {
-          this.floats.word(195, F.dangerY - 40, '警告', pal.danger, 18, 0.9);
+          // b = 1: Monolith slam — the word sits beside the slab instead of on it
+          const wx = b === 1 ? (x < 195 ? x + 120 : x - 120) : 195;
+          this.floats.word(wx, F.dangerY - 40, '警告', pal.danger, 18, b === 1 ? 1.2 : 0.9);
           this.vigRed = Math.max(this.vigRed, 0.5);
         }
         sfx.alarm();

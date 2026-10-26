@@ -62,8 +62,11 @@ export class Floaters {
     f.big = big;
   }
 
-  word(x: number, y: number, w: WordId, color: number, size: number, life = 0.7): void {
-    const f = this.alloc();
+  /** unique: restart an already-floating copy of the same word instead of stacking a second one */
+  word(x: number, y: number, w: WordId, color: number, size: number, life = 0.7, unique = false): void {
+    let f: Floater | null = null;
+    if (unique) for (const o of this.pool) if (o.alive && o.word === w) f = o;
+    if (!f) f = this.alloc();
     f.alive = true;
     f.word = w;
     f.x = clampX(x);

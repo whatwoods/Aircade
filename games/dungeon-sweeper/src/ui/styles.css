@@ -53,6 +53,11 @@ body {
 #game.blur {
   filter: blur(6px) brightness(0.45);
 }
+/* 结算：场景缓慢虚化压暗 */
+#game.rblur {
+  filter: blur(3px) brightness(0.55) saturate(0.85);
+  transition: filter 0.9s ease;
+}
 #ui {
   position: fixed;
   top: 0;
@@ -277,6 +282,7 @@ body {
   left: 50%;
   transform: translateX(-50%);
   width: min(92%, 360px);
+  box-sizing: border-box;
   padding: 12px 14px;
   background: linear-gradient(180deg, #241E16, #14110D);
   border: 1px solid rgba(232, 176, 75, 0.65);
@@ -322,6 +328,15 @@ body {
   border-radius: 14px;
 }
 
+/* 视觉 28px，命中区扩到 44px 高 */
+#skip-btn::after {
+  content: '';
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  top: -8px;
+  bottom: -8px;
+}
 #skip-btn:active {
   transform: translateX(-50%) scale(0.96);
 }

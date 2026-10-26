@@ -384,7 +384,7 @@ export class Director {
     const per = Math.floor(amount / n);
     let rem = amount - per * n;
     let pending: XpPlan | null = plan;
-    const x0 = from >= 0 ? this.px(from) : s.L.colW / 2;
+    const x0 = from >= 0 ? this.px(from) : s.L.board.x + s.L.board.w / 2;
     const y0 = from >= 0 ? this.py(from) : s.L.board.y + s.L.board.h / 2;
     this.inflight++;
     this.at(t, () => {
@@ -430,9 +430,9 @@ export class Director {
     const txt = times > 1 ? `LEVEL UP ×${times}` : 'LEVEL UP';
     const spr = s.gl.text.get(txt, 30 * L.s, PAL.gold, 700, FONT_DECO, { glow: 'rgba(255,181,74,0.9)', glowBlur: 12, stroke: 'rgba(40,20,4,0.95)', strokeW: 4, spacing: 0.08 });
     const cy0 = L.board.y + L.board.h * 0.4;
-    s.fx.sprText(spr, L.colW / 2, cy0, 1500, 1, 34, 1);
+    s.fx.sprText(spr, L.board.x + L.board.w / 2, cy0, 1500, 1, 34, 1);
     const sub = s.gl.text.get(`生命上限 +${p.maxHpTo - p.maxHpFrom} · 生命回满`, 14 * L.s, PAL.parchment, 700, FONT_CN, { stroke: 'rgba(10,8,6,0.95)', strokeW: 3 });
-    s.fx.sprText(sub, L.colW / 2, cy0 + 34 * L.s, 1500, 1, 34, 1);
+    s.fx.sprText(sub, L.board.x + L.board.w / 2, cy0 + 34 * L.s, 1500, 1, 34, 1);
     s.hud.levelUp(p.to, now);
     s.board.goldT0 = now;
     s.sfx.levelUp(times);
@@ -470,7 +470,7 @@ export class Director {
     s.hud.message(`肃清！全部怪物已被击败 · +${bonus}`, 'gold', s.clock.real, 3200);
     for (let k = 0; k < 30; k++) s.fx.spawn(P.GoldDust, s.fx.rr(0, L.colW), L.board.y + s.fx.rr(0, L.board.h), s.fx.rr(-20, 20), s.fx.rr(-50, -10), 1500, 7, 2, 0, 0.3, 1);
     const spr = s.gl.text.get(`肃清 +${bonus}`, 26 * L.s, PAL.gold, 900, FONT_CN, { glow: 'rgba(255,181,74,0.8)', glowBlur: 10, stroke: 'rgba(40,20,4,0.95)', strokeW: 4 });
-    s.fx.sprText(spr, L.colW / 2, L.board.y + L.board.h * 0.5, 1600, 1, 30);
+    s.fx.sprText(spr, L.board.x + L.board.w / 2, L.board.y + L.board.h * 0.5, 1600, 1, 30);
   }
 
   // ------------------------------------------------------------ 道具

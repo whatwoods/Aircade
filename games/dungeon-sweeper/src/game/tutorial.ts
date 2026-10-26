@@ -21,9 +21,29 @@ export interface TutStep {
   ms: number;
   /** 本步提示文案（操作错误时） */
   wrong?: string;
+  /** 在暗砖上显示的等级标签（教学「数字 = 等级之和」） */
+  labels?: { cell: number; level: number }[];
+  /** 在数字格上方显示的算式 */
+  sum?: { cell: number; text: string };
 }
 
 export const TUTORIAL_STEPS: TutStep[] = [
+  {
+    id: '0',
+    text: '数字 = 周围 8 格怪物的「等级之和」：这\u2060里 3\u00a0=\u00a01\u00a0+\u00a02',
+    cells: [idx(2, 10), idx(2, 9), idx(1, 10)],
+    arrow: -1,
+    hud: [],
+    action: 'auto',
+    target: -1,
+    mark: 0,
+    ms: 3400,
+    labels: [
+      { cell: idx(2, 9), level: 1 },
+      { cell: idx(1, 10), level: 2 },
+    ],
+    sum: { cell: idx(2, 10), text: '1 + 2 = 3' },
+  },
   {
     id: '1',
     text: '「1」旁只剩这一块暗砖——里面是 1 级怪。点它！',

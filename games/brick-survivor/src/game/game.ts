@@ -740,7 +740,7 @@ export class Game {
         shards: this.balls.shards + this.balls.darts,
         echoes: this.balls.echoes,
       },
-      bricks: { alive: this.formation.aliveCount, lowestRow: this.formation.lowestDisplayRow() },
+      bricks: { alive: this.formation.aliveCount, lowestRow: this.formation.lowestDisplayRow(), pressure: Math.round(this.pressure * 100) / 100 },
       levels,
       evolutions: [...this.evolutions],
       boss: this.boss ? { kind: this.boss.kind, hp: Math.round(this.boss.hp), maxHp: Math.round(this.boss.maxHp), phase: this.boss.phase } : null,

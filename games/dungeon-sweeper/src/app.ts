@@ -10,8 +10,8 @@ import { Loop } from './core/loop';
 import { randomSeed } from './core/rng';
 import { clearAll, load, loadRecords, loadSettings, type Records, save, type Settings } from './core/storage';
 import { Tweens } from './core/tween';
-import { LAIR_DIST, N, cx, cy } from './game/board';
-import { Game } from './game/rules';
+import { type BoardData, LAIR_DIST, N, cx, cy, generateBoard } from './game/board';
+import { Game, pickBoard } from './game/rules';
 import { commitRecords } from './game/score';
 import { type TutStep, Tutorial } from './game/tutorial';
 import { type GameEvent, Kind, MARK_NONE, MARK_SAFE, MARK_UNKNOWN } from './game/types';
@@ -167,7 +167,12 @@ export class App implements Stage, InputHandler {
     if (opts.mute) this.audio.setMuted(true);
     if (opts.fast) this.clock.scale = 3;
     // 游戏实例（标题页背景也需要一个）
-    this.game = new Game(opts.seed ?? randomSeed(), false);
+    {
+      // 标题页的占位局：只用快速生成，不跑求解校验
+      const s0 = opts.seed ?? randomSeed();
+      this.game = new Game(s0, false, generateBoard(s0, false));
+    }
+    this.prefetchBoard();
     this.board.reset(this.game, false, 0);
     this.layout();
     this.bindGlobal();
@@ -202,8 +207,42 @@ export class App implements Stage, InputHandler {
     this.board.version++;
     this.bg.resize(L);
     this.input.updateRect();
-    this.screens.place(L.colX, L.colW, L.vh, L.pause, L.scoreLine.y + L.scoreLine.h / 2, L.boardOuter.y, L.boardOuter.y + L.boardOuter.h, L.safeBottom);
+    this.screens.place(L);
     if (this.radial.open) this.closeRadial();
+    // 暂停中改变尺寸：补画几帧，避免画布全黑
+    if (this.state === 'paused') {
+      this.loop.start();
+      window.setTimeout(() => {
+        if (this.state === 'paused') this.loop.stop();
+      }, 160);
+    }
+  }
+
+  // ------------------------------------------------------------ 后台选盘
+  private worker: Worker | null = null;
+  private prefetched: { seed: number; board: BoardData } | null = null;
+  private prefetching = false;
+
+  private prefetchBoard(): void {
+    if (this.opts.seed !== null || this.prefetched || this.prefetching) return;
+    try {
+      if (!this.worker) {
+        this.worker = new Worker(new URL('./game/boardWorker.ts', import.meta.url), { type: 'module' });
+        this.worker.onmessage = (e: MessageEvent<{ seed: number; board: BoardData }>) => {
+          this.prefetching = false;
+          this.prefetched = e.data;
+        };
+        this.worker.onerror = () => {
+          this.prefetching = false;
+          this.worker = null;
+        };
+      }
+      this.prefetching = true;
+      this.worker.postMessage({ seed: randomSeed() });
+    } catch {
+      this.worker = null;
+      this.prefetching = false;
+    }
   }
 
   /** 字体迟到时重烘字形 */
@@ -396,8 +435,17 @@ export class App implements Stage, InputHandler {
 
   /** 开新局（同一场景内） */
   newGame(tutorial: boolean, deal: boolean): void {
-    const seed = this.opts.seed ?? randomSeed();
-    this.game = new Game(seed, tutorial);
+    const pre = this.prefetched;
+    if (!tutorial && this.opts.seed === null && pre) {
+      // 用 Worker 预取好的盘面（已通过无致命猜测校验）
+      this.prefetched = null;
+      this.game = new Game(pre.seed, false, pre.board);
+    } else {
+      const seed = this.opts.seed ?? randomSeed();
+      // 指定种子：主线程同步校验（同种子同盘面）；随机种子但预取未就绪：短预算兜底
+      this.game = tutorial ? new Game(seed, true) : new Game(seed, false, pickBoard(seed, false, this.opts.seed === null ? CONFIG.solver.fallbackMs : CONFIG.solver.budgetMs));
+    }
+    if (!tutorial) this.prefetchBoard();
     this.game.chordEnabled = this.settings.chord;
     this.director.clear();
     this.fx.clear();
@@ -446,6 +494,7 @@ export class App implements Stage, InputHandler {
   replay(): void {
     if (this.state !== 'result') return;
     this.screens.hideResult();
+    this.canvas.classList.remove('rblur');
     this.state = 'intro';
     this.introT0 = this.clock.real + 600;
     const ms = this.director.flipBack();
@@ -467,6 +516,7 @@ export class App implements Stage, InputHandler {
       this.director.clear();
       this.fx.clear();
       this.canvas.classList.remove('blur');
+      this.canvas.classList.remove('rblur');
       this.audio.musicFilter(18000);
       this.screens.showPauseBtn(false);
       this.screens.showTitle(this.records, false);
@@ -516,6 +566,11 @@ export class App implements Stage, InputHandler {
     const r = commitRecords(this.records, b);
     this.state = 'result';
     this.ov.bigOutT0 = this.clock.real;
+    // HUD 分数滚到结算总分；场景虚化压暗；胜利后棋盘数字淡出
+    this.hud.score = b.total;
+    this.tw.to(this.hud.scoreShown, b.total, 1200, this.clock.world, cubicOut);
+    this.canvas.classList.add('rblur');
+    if (won) this.board.numFadeT0 = this.clock.real;
     this.screens.showPauseBtn(false);
     this.lowHp = false;
     this.ov.lowHp = false;
@@ -535,7 +590,7 @@ export class App implements Stage, InputHandler {
     vibrate([20, 30, 20]);
     for (let r = 0; r < 2; r++)
       this.director.atReal(this.clock.real + r * 350, () => {
-        for (let k = 0; k < 25; k++) this.fx.spawn(P.GoldDust, L.colW / 2 + this.fx.rr(-60, 60), L.vh * 0.35, this.fx.rr(-220, 220), this.fx.rr(-260, -40), 1400, 7, 2, 300, 0.4, 1);
+        for (let k = 0; k < 25; k++) this.fx.spawn(P.GoldDust, L.board.x + L.board.w / 2 + this.fx.rr(-60, 60), L.vh * 0.35, this.fx.rr(-220, 220), this.fx.rr(-260, -40), 1400, 7, 2, 300, 0.4, 1);
       });
   }
 
@@ -680,6 +735,8 @@ export class App implements Stage, InputHandler {
     const L = this.L;
     this.board.tutCells = s.cells;
     this.board.tutArrow = s.arrow;
+    this.board.tutLabels = s.labels ?? [];
+    this.board.tutSum = s.sum ?? null;
     const rects: Rect[] = [];
     for (const h of s.hud) {
       if (h === 'badge') rects.push(L.badge);
@@ -704,6 +761,8 @@ export class App implements Stage, InputHandler {
     this.board.tutCells = [];
     this.board.tutRects = [];
     this.board.tutArrow = -1;
+    this.board.tutLabels = [];
+    this.board.tutSum = null;
     this.tutDimTarget = 0;
     this.tutEyes = false;
     this.screens.hideBubble();
@@ -946,9 +1005,13 @@ export class App implements Stage, InputHandler {
         this.sfx.warn();
         vibrate(15);
         this.hud.message('致命！再点一次硬闯', 'red', real, CONFIG.rules.lethalConfirmMs);
+        this.board.lethalTipCell = c;
+        this.board.lethalTipT0 = real;
+        this.board.lethalTipUntil = this.lethalUntil;
         return;
       }
       this.lethalCell = -1;
+      this.board.lethalTipCell = -1;
       if (this.board.dealT[c] > world - 220) {
         this.board.dealT[c] = world - 220;
         this.board.version++;

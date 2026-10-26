@@ -6,7 +6,7 @@ import type { Game } from '../game/rules';
 import { Kind, MARK_NONE, MARK_SAFE, MARK_UNKNOWN } from '../game/types';
 import type { Fx } from './fx';
 import { type Mat, makeCanvas, roundRect } from './gfx';
-import type { Glyphs } from './glyphs';
+import { FONT_CN, type Glyphs } from './glyphs';
 import type { Layout, Rect } from './layout';
 import { numberTier, PAL } from './palette';
 import type { Silhouettes } from './silhouettes';
@@ -87,6 +87,15 @@ export class BoardView {
   tutRects: Rect[] = [];
   tutDim = 0;
   tutArrow = -1;
+  /** 引导：暗砖上的等级标签与数字格上方的算式 */
+  tutLabels: { cell: number; level: number }[] = [];
+  tutSum: { cell: number; text: string } | null = null;
+  /** 致命标记二次确认：格子旁的小气泡（真实时间） */
+  lethalTipCell = -1;
+  /** 胜利后棋盘数字淡出（真实时间，-1 = 不淡出） */
+  numFadeT0 = -1;
+  lethalTipT0 = 0;
+  lethalTipUntil = 0;
   radialDim = 0;
   radialCell = -1;
   hideBoard = false;
@@ -120,6 +129,8 @@ export class BoardView {
   /** 绑定新局：全部回到暗砖 */
   reset(game: Game, deal: boolean, world: number): void {
     this.game = game;
+    this.numFadeT0 = -1;
+    this.lethalTipCell = -1;
     this.face.fill(0);
     this.flipping.fill(0);
     this.flipStarted.fill(0);
@@ -566,7 +577,7 @@ export class BoardView {
         // 数字
         if (this.numHidden[i]) continue;
         const it = this.item[i] && this.itemState[i] !== 2;
-        const la = 0.65 + 0.35 * Math.min(1, this.light[i]);
+        const la = (0.65 + 0.35 * Math.min(1, this.light[i])) * (this.numFadeT0 >= 0 ? 1 - clamp01((real - this.numFadeT0) / 700) : 1);
         const inT = (world - this.numInT0[i]) / 140;
         if (inT < 0) continue;
         const fade = inT >= 1 ? 1 : inT;
@@ -910,6 +921,49 @@ export class BoardView {
     return calls;
   }
 
+  // ------------------------------------------------------------ draw: 致命确认气泡
+  drawLethalTip(ctx: CanvasRenderingContext2D, base: Mat, L: Layout, real: number): number {
+    const c = this.lethalTipCell;
+    if (c < 0 || real >= this.lethalTipUntil) return 0;
+    const t = real - this.lethalTipT0;
+    const inA = clamp01(t / 120);
+    const outA = clamp01((this.lethalTipUntil - real) / 200);
+    const a = Math.min(inA, outA);
+    const spr = this.gl.text.get('致命！再点一次硬闯', 13, '#FFE0E0', 800, FONT_CN, { stroke: 'rgba(30,4,8,0.9)', strokeW: 2 });
+    const w = spr.w / L.dpr;
+    const h = spr.h / L.dpr;
+    const s = L.cell;
+    const ccx = L.board.x + cx(c) * s + s / 2;
+    const top = L.board.y + cy(c) * s;
+    // 默认在格子上方；顶行则放到下方
+    const below = cy(c) === 0;
+    const bw = w + 16;
+    const bh = h + 8;
+    const bx = Math.max(L.board.x - 4, Math.min(L.board.x + L.board.w + 4 - bw, ccx - bw / 2));
+    const by = below ? top + s + 8 : top - bh - 8;
+    const lift = (1 - cubicOut(inA)) * 6;
+    ctx.setTransform(base.a, base.b, base.c, base.d, base.e, base.f);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(120,14,26,0.96)';
+    roundRect(ctx, bx, by + (below ? -lift : lift), bw, bh, 7);
+    ctx.fill();
+    // 尖角指向格子
+    ctx.beginPath();
+    const tipY = below ? by - lift : by + bh + lift;
+    ctx.moveTo(ccx - 6, tipY);
+    ctx.lineTo(ccx + 6, tipY);
+    ctx.lineTo(ccx, tipY + (below ? -6 : 6));
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,120,120,0.7)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, bx, by + (below ? -lift : lift), bw, bh, 7);
+    ctx.stroke();
+    ctx.drawImage(spr.c, bx + 8, by + 4 + (below ? -lift : lift), w, h);
+    ctx.globalAlpha = 1;
+    return 4;
+  }
+
   // ------------------------------------------------------------ draw: 压暗与引导高亮
   drawDim(ctx: CanvasRenderingContext2D, base: Mat, L: Layout, real: number): number {
     const a = Math.max(this.tutDim * 0.35, this.radialDim * 0.2);
@@ -963,6 +1017,42 @@ export class BoardView {
         ctx.strokeStyle = 'rgba(40,24,6,0.9)';
         ctx.lineWidth = 1.5;
         ctx.stroke();
+      }
+      // 等级标签（暗砖上）与算式（数字格上方）
+      if (this.tutLabels.length || this.tutSum) {
+        const pop = this.tutDim;
+        for (const lb of this.tutLabels) {
+          const spr = this.gl.lvBadge[lb.level];
+          const w = spr.w / L.dpr;
+          const h = spr.h / L.dpr;
+          const x = L.board.x + cx(lb.cell) * s + s / 2;
+          const y = L.board.y + cy(lb.cell) * s + s / 2;
+          ctx.globalAlpha = pop;
+          ctx.fillStyle = 'rgba(10,9,16,0.88)';
+          roundRect(ctx, x - w / 2 - 3, y - h / 2 - 1, w + 6, h + 2, 4);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,210,122,0.75)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.drawImage(spr.c, x - w / 2, y - h / 2, w, h);
+          calls += 3;
+        }
+        if (this.tutSum) {
+          const spr = this.gl.text.get(this.tutSum.text, 14, PAL.gold, 800, "'Cinzel', serif", { stroke: 'rgba(20,12,4,0.95)', strokeW: 3 });
+          const w = spr.w / L.dpr;
+          const h = spr.h / L.dpr;
+          const x = L.board.x + cx(this.tutSum.cell) * s + s / 2;
+          const y = L.board.y + cy(this.tutSum.cell) * s + s + h / 2 + 3;
+          ctx.globalAlpha = pop;
+          ctx.fillStyle = 'rgba(10,9,16,0.9)';
+          roundRect(ctx, x - w / 2 - 6, y - h / 2 - 2, w + 12, h + 4, 6);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,210,122,0.8)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.drawImage(spr.c, x - w / 2, y - h / 2, w, h);
+          calls += 3;
+        }
       }
       ctx.globalAlpha = 1;
       calls += 3;

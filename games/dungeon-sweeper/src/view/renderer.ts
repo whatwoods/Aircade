@@ -9,7 +9,7 @@ import type { BoardView } from './boardView';
 import type { Camera } from './camera';
 import type { DragonView } from './dragonView';
 import { P, type Fx } from './fx';
-import type { Mat, Sprite } from './gfx';
+import { type Mat, type Sprite, radialBlob } from './gfx';
 import { drawText, type Glyphs } from './glyphs';
 import type { Hud } from './hud';
 import type { Layout } from './layout';
@@ -96,6 +96,7 @@ export class Renderer {
   private eyeT0 = -1e9;
   /** 标题 Logo 外发光强度（随烛火闪烁），供 DOM 使用 */
   titleGlow = 0.35;
+  private darkBlob: Sprite | null = null;
   reduced = false;
 
   constructor(d: RenderDeps) {
@@ -147,16 +148,24 @@ export class Renderer {
     ctx.drawImage(tex.wall, 0, 0);
     ctx.setTransform(d, 0, 0, d, 0, 0);
     const tSec = real / 1000;
-    // 体积光柱（左上，约 25°）
-    this.drawShaft(ctx, W, H, tSec, 0.11);
-    // 尘埃
+    // 整体压暗墙面，中段（龙眼所在）再压一层，形成强暗角
+    ctx.fillStyle = 'rgba(4,5,10,0.42)';
+    ctx.fillRect(0, 0, W, H);
+    if (!this.darkBlob) this.darkBlob = radialBlob(128, '#020306', 0.15, 0.9);
+    ctx.globalAlpha = 0.75;
+    ctx.drawImage(this.darkBlob.c, W * 0.5 - W * 0.75, H * 0.52 - H * 0.3, W * 1.5, H * 0.6);
+    ctx.globalAlpha = 1;
+    // 体积光柱（左上，约 25°）：主光柱 + 一道细的副光柱
+    this.drawShaft(ctx, W, H, tSec, 0.22, 0, 1);
+    this.drawShaft(ctx, W, H, tSec + 7, 0.12, W * 0.16, 0.45);
+    // 尘埃：沿光柱漂浮
     this.dustT += rdt;
-    while (this.dustT > 140) {
-      this.dustT -= 140;
+    while (this.dustT > 90) {
+      this.dustT -= 90;
       const u = Math.random();
-      const sx = W * 0.05 + u * W * 0.5;
-      const sy = H * 0.05 + u * H * 0.55 + (Math.random() - 0.5) * 80;
-      fx.spawn(P.Dust, sx, sy, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 6 - 2, 4000, 2.5, 2, 0, 0, 1, 0.7);
+      const sx = W * 0.05 + u * W * 0.5 + (Math.random() - 0.5) * W * 0.12;
+      const sy = H * 0.05 + u * H * 0.55 + (Math.random() - 0.5) * 60;
+      fx.spawn(P.Dust, sx, sy, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 6 - 2, 4500, 3, 2, 0, 0, 1, 0.95);
     }
     // 远处龙眼
     const ey = H * 0.5;
@@ -178,8 +187,8 @@ export class Renderer {
       [W * (350 / 390), 11],
     ] as [number, number][]) {
       ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = 0.22 + 0.06 * flicker(tSec, seed);
-      const gs = 170 * L.s;
+      ctx.globalAlpha = 0.42 + 0.1 * flicker(tSec, seed);
+      const gs = 250 * L.s;
       ctx.drawImage(tex.flameGlow.c, x - gs / 2, ly - gs / 2 - 8 * k, gs, gs);
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
@@ -191,17 +200,20 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.drawImage(tex.vignette, 0, 0, W * d, H * d);
-    this.calls += 8;
+    ctx.globalAlpha = 0.6;
+    ctx.drawImage(tex.vignette, 0, 0, W * d, H * d);
+    ctx.globalAlpha = 1;
+    this.calls += 12;
   }
 
-  private drawShaft(ctx: CanvasRenderingContext2D, W: number, H: number, tSec: number, a: number): void {
+  private drawShaft(ctx: CanvasRenderingContext2D, W: number, H: number, tSec: number, a: number, dx = 0, wMul = 1): void {
     const { tex } = this.d;
     const drift = Math.sin(tSec * 0.13) * 0.06;
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = a * (0.8 + 0.2 * Math.sin(tSec * 0.4));
-    ctx.translate(W * 0.18, -H * 0.05);
+    ctx.translate(W * 0.18 + dx, -H * 0.05);
     ctx.rotate(-0.42 + drift);
-    ctx.drawImage(tex.shaft.c, -W * 0.18, 0, W * 0.36, H * 1.15);
+    ctx.drawImage(tex.shaft.c, -W * 0.18 * wMul, 0, W * 0.36 * wMul, H * 1.15);
     ctx.setTransform(this.screen.a, 0, 0, this.screen.d, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
@@ -306,6 +318,7 @@ export class Renderer {
       this.calls += fx.draw(ctx, 0, B);
       // 7. 引导 / 轮盘压暗
       this.calls += board.drawDim(ctx, B, L, real);
+      this.calls += board.drawLethalTip(ctx, B, L, real);
     }
     // 8. 体积光 + 暗角 + 红暗角
     ctx.setTransform(d, 0, 0, d, 0, 0);
@@ -333,7 +346,7 @@ export class Renderer {
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.6 * (1 - ct);
       const r = 40 + cubicOut(ct) * H * 0.9;
-      ctx.drawImage(tex.ringGold.c, W / 2 - r, L.board.y + L.board.h / 2 - r, r * 2, r * 2);
+      ctx.drawImage(tex.ringGold.c, L.board.x + L.board.w / 2 - r, L.board.y + L.board.h / 2 - r, r * 2, r * 2);
       ctx.globalAlpha = 0.12 * (1 - ct);
       ctx.fillStyle = PAL.gold;
       ctx.fillRect(0, 0, W, H);
@@ -363,8 +376,9 @@ export class Renderer {
       ctx.globalAlpha = t * (ov.bigOutT0 > ov.bigT0 ? 1 - clamp01((real - ov.bigOutT0) / 350) : 1);
       const sc = 1.25 - 0.25 * backOut(t);
       const y = L.board.y + L.board.h * 0.42;
-      drawText(ctx, ov.bigText, W / 2, y, 0.5, d, sc);
-      if (ov.bigSub) drawText(ctx, ov.bigSub, W / 2, y + 40 * L.s, 0.5, d);
+      const bcx = L.board.x + L.board.w / 2;
+      drawText(ctx, ov.bigText, bcx, y, 0.5, d, sc);
+      if (ov.bigSub) drawText(ctx, ov.bigSub, bcx, y + 40 * L.s, 0.5, d);
       ctx.globalAlpha = 1;
       this.calls += 2;
     }

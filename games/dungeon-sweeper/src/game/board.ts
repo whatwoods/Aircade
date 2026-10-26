@@ -225,10 +225,10 @@ function generateOnce(seed: number, tutorial: boolean, attempt: number): BoardDa
   return b;
 }
 
-export function generateBoard(seed: number, tutorial = false): BoardData {
+export function generateBoard(seed: number, tutorial = false, startK = 0): BoardData {
   let last: BoardData | null = null;
   const [lo, hi] = CONFIG.board.initialRevealRange;
-  for (let k = 0; k < CONFIG.board.maxRegen; k++) {
+  for (let k = startK; k < startK + CONFIG.board.maxRegen; k++) {
     const b = generateOnce(seed, tutorial, k);
     last = b;
     if (tutorial) return b;

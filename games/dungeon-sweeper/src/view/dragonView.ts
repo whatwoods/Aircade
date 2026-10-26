@@ -184,7 +184,7 @@ export class DragonView {
     const k = backOut(clamp01(t / 600));
     const unit = this.sil.rise.unit;
     const s0 = r.s / unit;
-    const s1 = (L.colW * 0.9) / unit;
+    const s1 = (Math.min(L.colW, L.boardOuter.w + 18) * 0.9) / unit;
     const s = s0 + (s1 - s0) * k;
     const x = r.x + r.s / 2;
     const y0 = r.y + r.s / 2;

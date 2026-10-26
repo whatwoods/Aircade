@@ -176,7 +176,7 @@ export function installDebug(app: App): void {
     },
     fx(name: string) {
       const L = app.L;
-      const x = L.colW / 2;
+      const x = L.board.x + L.board.w / 2;
       const y = L.board.y + L.board.h / 2;
       switch (name) {
         case 'levelup': {

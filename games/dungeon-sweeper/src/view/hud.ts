@@ -32,7 +32,7 @@ export class Hud {
   readonly aliveFlash = new Float64Array(10).fill(-1e9);
   dragonReady = false;
   showHint = false;
-  hintText = '点击：翻开 · 长按：标记';
+  hintText = '数字 = 周围怪物等级之和 · 点击翻开 · 长按标记';
   lowHp = false;
   private slotPop = new Float64Array(24).fill(-1e9);
   private healT0 = -1e9;

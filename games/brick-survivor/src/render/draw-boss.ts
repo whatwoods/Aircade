@@ -74,8 +74,9 @@ function drawMonolith(b: Batcher, s: Sprites, m: Monolith, t: number, a: number)
   // slam armed: the slab pulses red
   const armed = m.slamArmed ? 0.5 + 0.5 * Math.sin(t * TAU_ * 4) : 0;
   if (armed > 0) {
-    b.sprite(s.monolith, x, y, 1, 1, 0, col(pal.danger, armed * 0.45, 0.7));
-    b.spriteR(s.glow, x, y + 30, 70, 0, col(pal.danger, armed * 0.35, 1));
+    b.sprite(s.monolith, x, y, 1, 1, 0, col(pal.danger, 0.25 + armed * 0.45, 0.7));
+    b.sprite(s.monolith, x, y, 1.08, 1.06, 0, col(pal.danger, 0.2 + armed * 0.4, 1));
+    b.spriteR(s.glow, x, y + 30, 80, 0, col(pal.danger, 0.15 + armed * 0.35, 1));
   }
   // eye tracks the core
   const ex = x + m.eyeX * 6;

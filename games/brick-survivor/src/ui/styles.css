@@ -305,10 +305,12 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 #hud .boss.on { opacity: 1; transform: none; }
 /* boss fights: the name + bar move into the HUD band above the field (clear of the first brick row) and the
    XP bar slims down beneath it */
-#hud.bossfight .boss { top: 43px; }
+#hud.bossfight .boss { top: 42px; }
+#hud.bossfight .boss .bn { height: 13px; line-height: 13px; }
+#hud.bossfight .boss .bar { height: 5px; }
 #hud.bossfight .boss::before { display: none; }
 #hud .xp { transition: top 0.3s var(--ease-out), height 0.3s var(--ease-out); }
-#hud.bossfight .xp { top: 64px; height: 3px; }
+#hud.bossfight .xp { top: 65px; height: 2px; }
 #hud .boss::before { content: ''; position: absolute; left: -24px; right: -24px; top: -3px; bottom: -4px; background: linear-gradient(90deg, transparent, rgba(5, 3, 11, 0.78) 14%, rgba(5, 3, 11, 0.78) 86%, transparent); }
 #hud .boss .bn { position: relative; display: flex; justify-content: center; align-items: baseline; gap: 8px; height: 15px; white-space: nowrap; }
 #hud .boss .bn b { font-weight: 700; font-size: 11px; letter-spacing: 0.2em; color: #ffd3dc; }

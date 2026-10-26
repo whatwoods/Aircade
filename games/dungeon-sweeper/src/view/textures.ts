@@ -870,7 +870,7 @@ export class Textures {
     const s = L.s;
     // 顶部拱门装饰
     const archBottom = L.hudTop - 2;
-    if (archBottom > 18) {
+    if (archBottom > 18 && !L.landscape) {
       const ag = ctx.createLinearGradient(0, 0, 0, archBottom);
       ag.addColorStop(0, 'rgba(5,6,10,0.85)');
       ag.addColorStop(1, 'rgba(5,6,10,0.25)');
@@ -907,7 +907,7 @@ export class Textures {
       ctx.stroke();
     }
     // HUD 底板
-    const hb = { x: L.cl, y: L.hudTop, w: L.boardOuter.w, h: Math.round(62 * s) };
+    const hb = L.hudPlate;
     roundRect(ctx, hb.x, hb.y, hb.w, hb.h, 10 * s);
     ctx.fillStyle = 'rgba(9,10,15,0.62)';
     ctx.fill();

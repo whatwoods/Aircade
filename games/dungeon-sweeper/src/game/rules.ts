@@ -1,5 +1,6 @@
 import { CONFIG, maxHpForLevel, xpToNextLevel } from '../config';
 import { type BoardData, generateBoard, N, NEIGHBORS, START_CELL } from './board';
+import { solveGame } from './solver';
 import {
   type GameEvent,
   Kind,
@@ -41,10 +42,10 @@ export class Game {
   deathCell = -1;
   marksPlaced = 0;
 
-  constructor(seed: number, tutorial = false) {
+  constructor(seed: number, tutorial = false, board?: BoardData) {
     this.seed = seed;
     this.isTutorial = tutorial;
-    this.b = generateBoard(seed, tutorial);
+    this.b = board ?? pickBoard(seed, tutorial);
     const lv = 1;
     this.player = { level: lv, hp: maxHpForLevel(lv), maxHp: maxHpForLevel(lv), xp: 0 };
     for (let i = 0; i < N; i++) {
@@ -418,4 +419,23 @@ export class Game {
     for (let i = 0; i < N; i++) if (this.b.kind[i] === Kind.Lair) return i;
     return 0;
   }
+}
+
+/**
+ * 选盘：在满足开局翻开范围的候选里，取第一个「机器人无需致命猜测即可通关」的盘面。
+ * 候选按 seed + k 确定性递增，同一种子永远得到同一盘面（时间预算只在极慢设备上生效）。
+ */
+export function pickBoard(seed: number, tutorial: boolean, budgetMs: number = CONFIG.solver.budgetMs): BoardData {
+  const first = generateBoard(seed, tutorial);
+  const S = CONFIG.solver;
+  if (tutorial || !S.enabled) return first;
+  const t0 = performance.now();
+  let b = first;
+  for (let n = 0; n < S.maxTries; n++) {
+    const r = solveGame(new Game(seed, false, b));
+    if (r.won && r.deadly === 0) return b;
+    if (performance.now() - t0 > budgetMs) break;
+    b = generateBoard(seed, false, b.regen + 1);
+  }
+  return first;
 }

@@ -185,7 +185,7 @@ export const config = {
     },
   },
   tutorial: {
-    dragNeed: 120, brickHp: 10, brickRowY: 260, gemNeed: 3, gemTimeout: 4, rowBeats: 4, readyTime: 0.8,
+    dragNeed: 120, brickHp: 10, brickRowY: 260, gemNeed: 3, gemTimeout: 4, rowBeats: 4, readyTime: 0.8, t3Dwell: 2.2, t3OkTime: 1.4,
   },
   quality: {
     high: { dpr: 2, bloom: true, particles: 1800, trail: 14, scan: true },

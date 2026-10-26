@@ -68,6 +68,18 @@ export const CONFIG = {
     },
   },
 
+  /** 生成期「无致命猜测」校验（§11）：可见信息机器人下完整局，出现被迫致命猜测则按 seed+k 重抽 */
+  solver: {
+    enabled: true,
+    /** 每次回溯分析的节点上限 */
+    maxNodes: 3000,
+    /** 最多校验的候选盘面数 */
+    maxTries: 16,
+    /** 校验总时间预算（ms）：在 Web Worker 里预取，预算宽松；超时用第一个候选 */
+    budgetMs: 2500,
+    /** 随机种子但 Worker 预取未就绪时的主线程兜底预算（ms） */
+    fallbackMs: 60,
+  },
   dragon: {
     level: 13,
     minHpToChallenge: 14,

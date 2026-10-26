@@ -110,7 +110,7 @@ export class Monolith extends Boss {
     // slam telegraph: armed when the next step lands on the line
     const armed = this.slamSteps() <= 1;
     if (armed && !this.slamArmed) {
-      g.sink.emit('breachWarn', this.x, F.dangerY, -1, 0);
+      g.sink.emit('breachWarn', this.x, F.dangerY, -1, 1);
       this.core.warnT = 0.6;
     }
     this.slamArmed = armed;
