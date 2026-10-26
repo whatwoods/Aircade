@@ -195,6 +195,8 @@ export const CONFIG = {
     superBlastRange: 160,
     fuseTime: 0.09,
     kissGap: 18,
+    /** 引导 T1：新青提射向等待青提的速度 */
+    tutorialAssistSpeed: 260,
   },
 
   danger: {

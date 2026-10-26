@@ -211,6 +211,8 @@ export class Debug {
     const g = app.game;
     const self = this;
     return {
+      /** 调参用：直接改 CONFIG 字段即时生效（仅 ?debug=1） */
+      config: CONFIG,
       state: () => ({
         scene: g.scene,
         paused: app.isPaused(),

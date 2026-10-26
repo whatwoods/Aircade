@@ -40,7 +40,8 @@ const TEXT = {
   merged: '相同的水果碰在一起，\n会合成更大的水果！',
   chain: '新水果还能接着合成，试试连击！',
   combo: '连击！短时间内连续合成，得分翻倍',
-  comboMiss: '连击要在 1.4 秒内接着合成哦',
+  comboRetry: '再试一次：让新水果碰到旁边的青提',
+  comboSkip: '连击就是接连合成，开局后再试试吧',
   line: '水果越过这条线\n超过 3 秒，游戏就结束啦',
   go: '用力拉能撞散水果，还能借墙反弹。\n开始挑战吧！',
 };
@@ -66,6 +67,7 @@ export class Tutorial {
   private misses = 0;
   private launchT = -1;
   private mergedInT1 = false;
+  private chainTries = 0;
   private t1FirstMergeT = -1;
   private holdT = 0;
   private holdNext: Step = Step.None;
@@ -86,6 +88,7 @@ export class Tutorial {
     this.misses = 0;
     this.launchT = -1;
     this.mergedInT1 = false;
+    this.chainTries = 0;
     this.t1FirstMergeT = -1;
     this.holdT = 0;
     this.lineFlashT = 0;
@@ -202,6 +205,13 @@ export class Tutorial {
     return null;
   }
 
+  /** T1 第一次合成出青提时，返回等待中的青提（新果直奔它，冲击波不推它） */
+  chainAssist(level: number): Fruit | null {
+    if (!this.active || this.step !== Step.Chain || level !== 3 || this.mergedInT1) return null;
+    const G = this.grape;
+    return G && G.body.alive && G.state !== 'popping' ? G : null;
+  }
+
   forcedLoad(): number | null {
     return null;
   }
@@ -291,8 +301,15 @@ export class Tutorial {
           this.t1FirstMergeT += dt;
           if (this.t1FirstMergeT > 2.0) {
             this.t1FirstMergeT = -1;
-            this.clearPartner();
-            this.hold(TEXT.comboMiss, 2.0, Step.Line);
+            if (this.chainTries < 1) {
+              // 连锁没接上：重新布置一次，用中性的文案再试
+              this.chainTries++;
+              this.setupChain(true);
+              this.hold(TEXT.comboRetry, 1.8, Step.Chain);
+            } else {
+              this.clearPartner();
+              this.hold(TEXT.comboSkip, 2.0, Step.Line);
+            }
           }
         }
         // 兜底：伙伴不在了（比如被别的合成吃掉）又没有合成，重新布置

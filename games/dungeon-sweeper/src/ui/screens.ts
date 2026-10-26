@@ -130,7 +130,7 @@ export class Screens {
   }
 
   /** 布局：#ui 覆盖游戏栏 */
-  place(colX: number, colW: number, vh: number, pause: Rect, hudTop: number, safeTop: number, boardBottom: number): void {
+  place(colX: number, colW: number, vh: number, pause: Rect, safeTop: number, boardTop: number, boardBottom: number, safeBottom: number): void {
     const r = this.root.style;
     r.left = colX + 'px';
     r.width = colW + 'px';
@@ -139,9 +139,17 @@ export class Screens {
     p.left = pause.x + pause.w / 2 - 24 + 'px';
     p.top = pause.y + pause.h / 2 - 24 + 'px';
     this.skip.style.top = Math.max(6, safeTop + 6) + 'px';
-    this.toasts.style.top = hudTop + 76 + 'px';
-    this.bubble.style.top = '';
-    this.bubble.style.bottom = Math.max(12, vh - boardBottom + 8) + 'px';
+    // 提示条压在棋盘上沿内侧，不挡分数/计时
+    this.toasts.style.top = boardTop + 8 + 'px';
+    // 引导气泡放在棋盘下方（盖住图鉴），不挡引导目标格与轮盘；空间不足时贴底
+    const below = vh - safeBottom - boardBottom;
+    if (below >= 96) {
+      this.bubble.style.bottom = '';
+      this.bubble.style.top = boardBottom + 6 + 'px';
+    } else {
+      this.bubble.style.top = '';
+      this.bubble.style.bottom = safeBottom + 8 + 'px';
+    }
   }
 
   // ---------------------------------------------------------------- 标题

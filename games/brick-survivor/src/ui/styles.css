@@ -505,9 +505,9 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 #results .sc .best { font-size: 12px; color: var(--dim); transition: opacity 0.2s; }
 #results.rec .sc .best { opacity: 0; }
 #results .rows { transition: margin-top 0.3s var(--ease-out); }
-#results.rec .rows { margin-top: 30px; }
+#results.rec .rows { margin-top: 48px; }
 #results .sc .best b { font-family: var(--orb); color: var(--gold); font-weight: 700; }
-#results .stamp { position: absolute; left: 50%; width: 140px; margin-left: -70px; box-sizing: border-box; text-align: center; top: 196px; padding: 6px 12px; border: 3px solid var(--gold); color: var(--gold); font-weight: 900; font-size: 18px; letter-spacing: 0.2em; transform: rotate(-8deg) scale(2); opacity: 0; text-shadow: 0 0 10px rgba(255, 201, 77, 0.8); box-shadow: 0 0 14px rgba(255, 201, 77, 0.5), inset 0 0 10px rgba(255, 201, 77, 0.35); background: rgba(40, 24, 4, 0.7); z-index: 3; }
+#results .stamp { position: absolute; left: 50%; width: 140px; margin-left: -70px; box-sizing: border-box; text-align: center; top: 192px; padding: 6px 12px; border: 3px solid var(--gold); color: var(--gold); font-weight: 900; font-size: 18px; letter-spacing: 0.2em; transform: rotate(-8deg) scale(2); opacity: 0; text-shadow: 0 0 10px rgba(255, 201, 77, 0.8); box-shadow: 0 0 14px rgba(255, 201, 77, 0.5), inset 0 0 10px rgba(255, 201, 77, 0.35); background: rgba(40, 24, 4, 0.7); z-index: 3; }
 #results .stamp.go { animation: stamp 0.45s var(--ease-back) forwards; }
 @keyframes stamp { 0% { transform: rotate(-8deg) scale(2); opacity: 0; } 100% { transform: rotate(-8deg) scale(1); opacity: 1; } }
 #results .rows { margin-top: 14px; }

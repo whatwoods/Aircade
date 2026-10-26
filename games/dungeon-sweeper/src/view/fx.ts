@@ -363,15 +363,17 @@ export class Fx {
     return false;
   }
 
-  clear(): void {
+  /** 清空全部特效；fire=true 时先结算未到达的经验球回调（默认丢弃，避免旧局回调污染新局） */
+  clear(fire = false): void {
     this.pCount = 0;
     this.sCount = 0;
     for (const s of this.sl) s.on = false;
     for (const s of this.rings) s.on = false;
     for (const f of this.ft) f.on = false;
     for (const o of this.orbs) {
-      if (o.on && o.cb) o.cb();
+      if (fire && o.on && o.cb) o.cb();
       o.on = false;
+      o.cb = null;
     }
     for (const b of this.bursts) b.on = false;
   }

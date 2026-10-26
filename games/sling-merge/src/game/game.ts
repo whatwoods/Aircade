@@ -531,7 +531,19 @@ export class Game {
     nf.vis.scaleV = 0;
     nf.vis.flash = 1;
     setExpr(nf.vis, 'born', 0.6);
-    this.blast(mx, my, nr, M.blastDv[L] ?? 100, M.blastRange, World.massFor(nr), nf);
+    // 引导 T1：新青提直奔等待中的青提，且冲击波不推开它，保证新手看到两级连锁
+    const assist = this.tutorial.chainAssist(L);
+    if (assist) {
+      const ab = assist.body;
+      const dx = ab.x - mx;
+      const dy = ab.y - my;
+      const d = Math.max(1e-3, Math.hypot(dx, dy));
+      nf.body.vx = (dx / d) * M.tutorialAssistSpeed;
+      nf.body.vy = (dy / d) * M.tutorialAssistSpeed;
+      nf.age = M.childCooldown; // 一碰到就能合成，不受出生冷却影响
+      this.world.wake(ab);
+    }
+    this.blast(mx, my, nr, M.blastDv[L] ?? 100, M.blastRange, World.massFor(nr), nf, assist);
 
     const firstOfRun = L > this.run.highestLevel;
     if (L > this.run.highestLevel) this.run.highestLevel = L;
@@ -569,7 +581,7 @@ export class Game {
     fa.mergedStamp = fb.mergedStamp = this.stepId;
     this.removeFruit(fa);
     this.removeFruit(fb);
-    this.blast(mx, my, 0, M.superBlastDv, M.superBlastRange, World.massFor(fruitDef(CONFIG.maxLevel).radius), null);
+    this.blast(mx, my, 0, M.superBlastDv, M.superBlastRange, World.massFor(fruitDef(CONFIG.maxLevel).radius), null, null);
     const gained = this.addMergeScore(CONFIG.maxLevel, true, false, clutch, false);
     bus.emit({
       t: 'merge', level: CONFIG.maxLevel, x: mx, y: my, combo: this.run.combo, gained, trick: false, clutch,
@@ -580,9 +592,9 @@ export class Game {
     this.predDirty();
   }
 
-  private blast(x: number, y: number, r: number, dv: number, range: number, mNew: number, except: Fruit | null): void {
+  private blast(x: number, y: number, r: number, dv: number, range: number, mNew: number, except: Fruit | null, except2: Fruit | null): void {
     for (const f of this.fruits) {
-      if (f === except || f.state === 'popping') continue;
+      if (f === except || f === except2 || f.state === 'popping') continue;
       const b = f.body;
       const dx = b.x - x;
       const dy = b.y - y;
