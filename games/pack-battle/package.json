@@ -1,0 +1,21 @@
+{
+  "name": "pack-battle",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "行囊对决 PACK BATTLE — 俄罗斯方块 × 背包整理 × 自动战斗",
+  "scripts": {
+    "dev": "vite --port 5104 --strictPort --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 5104 --strictPort --host",
+    "balance": "node scripts/balance.ts"
+  },
+  "dependencies": {
+    "@fontsource/kalam": "5.3.0",
+    "@fontsource/patrick-hand": "5.3.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "~8.3.4"
+  }
+}

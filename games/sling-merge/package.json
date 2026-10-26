@@ -1,0 +1,19 @@
+{
+  "name": "sling-merge",
+  "private": true,
+  "version": "1.0.0",
+  "description": "弹个大西瓜 · Sling Merge — 合成大西瓜 × 弹弓",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource/fredoka": "^5.3.0"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "vite": "^8.3.5"
+  }
+}
