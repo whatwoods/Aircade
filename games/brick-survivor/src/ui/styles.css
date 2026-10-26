@@ -303,7 +303,8 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 @keyframes xpSheen { from { left: -40px; } to { left: 100%; } }
 #hud .boss { left: 45px; top: 70px; width: 300px; opacity: 0; transform: scaleX(0.02); transition: opacity 0.2s, transform 0.5s var(--ease-out); }
 #hud .boss.on { opacity: 1; transform: none; }
-#hud .boss .bn { display: flex; justify-content: center; align-items: baseline; gap: 8px; height: 15px; white-space: nowrap; }
+#hud .boss::before { content: ''; position: absolute; left: -24px; right: -24px; top: -3px; bottom: -4px; background: linear-gradient(90deg, transparent, rgba(5, 3, 11, 0.78) 14%, rgba(5, 3, 11, 0.78) 86%, transparent); }
+#hud .boss .bn { position: relative; display: flex; justify-content: center; align-items: baseline; gap: 8px; height: 15px; white-space: nowrap; }
 #hud .boss .bn b { font-weight: 700; font-size: 11px; letter-spacing: 0.2em; color: #ffd3dc; }
 #hud .boss .bn i { font-style: normal; font-family: var(--orb); font-size: 9px; letter-spacing: 0.25em; color: var(--danger); }
 #hud .boss .bar { position: relative; margin-top: 2px; height: 6px; border-radius: 1px; background: rgba(60, 10, 26, 0.85); box-shadow: 0 0 0 1px rgba(255, 51, 85, 0.35); overflow: hidden; }
