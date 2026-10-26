@@ -198,7 +198,7 @@ export class App implements Stage, InputHandler {
     this.board.version++;
     this.bg.resize(L);
     this.input.updateRect();
-    this.screens.place(L.colX, L.colW, L.vh, L.pause, L.safeTop, L.boardOuter.y, L.boardOuter.y + L.boardOuter.h, L.safeBottom);
+    this.screens.place(L.colX, L.colW, L.vh, L.pause, L.scoreLine.y + L.scoreLine.h / 2, L.boardOuter.y, L.boardOuter.y + L.boardOuter.h, L.safeBottom);
     if (this.radial.open) this.closeRadial();
   }
 

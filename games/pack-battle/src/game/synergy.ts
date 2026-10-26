@@ -135,9 +135,13 @@ export function computeSynergy(items: readonly Placed[], cols: number, rows: num
     const neigh = [...adj.get(it.uid)!];
     if (rule.kind === 'countTag') {
       const per = st.adj ?? 0;
+      let counted = 0;
       for (const nu of neigh) {
         const nd = ITEMS[byUid.get(nu)!.id];
         if (!matches(nd.tag, rule.tag)) continue;
+        if (rule.otherId && nd.id === def.id) continue;
+        if (rule.max !== undefined && counted >= rule.max) continue;
+        counted++;
         adjAdd.set(it.uid, adjAdd.get(it.uid)! + per);
         const label = statLabel(rule.stat, per);
         contrib.push({ from: nu, to: it.uid, kind: STAT_KIND[rule.stat], label });

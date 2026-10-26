@@ -103,8 +103,8 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     id: 'dagger', name: '匕首', tag: 'weapon', rarity: 0, price: 3, shape: ['#'],
     trigger: 'cooldown', cd: 1.2,
     lv: [{ dmg: 2, adj: 1 }, { dmg: 4, adj: 2 }, { dmg: 8, adj: 3 }],
-    adj: { kind: 'countTag', tag: 'weapon', stat: 'dmg' },
-    text: { effect: '每 {cd} 秒造成 {dmg} 伤害', adj: '每相邻 1 件其他武器：伤害 +{adj}' },
+    adj: { kind: 'countTag', tag: 'weapon', stat: 'dmg', otherId: true },
+    text: { effect: '每 {cd} 秒造成 {dmg} 伤害', adj: '每相邻 1 件其他种类的武器：伤害 +{adj}' },
   },
   sword: {
     id: 'sword', name: '铁剑', tag: 'weapon', rarity: 0, price: 4, shape: ['#', '#', '#'],
@@ -260,7 +260,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   ratfang: {
     id: 'ratfang', name: '鼠牙', tag: 'weapon', rarity: 0, price: 0, shape: ['#'], enemyOnly: true,
     trigger: 'cooldown', cd: 1.0,
-    lv: [{ dmg: 4 }, { dmg: 6 }, { dmg: 10 }],
+    lv: [{ dmg: 2 }, { dmg: 4 }, { dmg: 7 }],
     adj: { kind: 'none' },
     text: { effect: '每 {cd} 秒造成 {dmg} 伤害', adj: '怪物部件' },
   },
@@ -296,7 +296,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     round: 2, name: '叮当', title: '地精盗贼', hp: 44, cols: 4, rows: 3, frame: 'patch', portrait: 'goblin',
-    layout: ['DE.H', '.G..', 'PG..'], legend: { D: 'dagger', E: 'dagger', G: 'glove', H: 'herb', P: 'pouch' }, traits: [],
+    layout: ['DE.H', '.G..', 'PG..'], legend: { D: 'dagger', E: 'dagger:2', G: 'glove', H: 'herb', P: 'pouch' }, traits: [],
     hint: '出手快，但伤害不高。',
   },
   {
@@ -316,8 +316,8 @@ export const ENEMIES: EnemyDef[] = [
     hint: '半血会狂暴，攒足护盾！',
   },
   {
-    round: 6, name: '吱吱帮', title: '鼠群', hp: 150, cols: 5, rows: 4, frame: 'crate', portrait: 'rats',
-    layout: ['.a.e.', 'bMcNf', '.d...', 'H.J..'],
+    round: 6, name: '吱吱帮', title: '鼠群', hp: 160, cols: 5, rows: 4, frame: 'crate', portrait: 'rats',
+    layout: ['.a...', 'bMc.e', '.d.f.', 'H.J..'],
     legend: { a: 'ratfang', b: 'ratfang', c: 'ratfang', d: 'ratfang', e: 'ratfang', f: 'ratfang', M: 'whetstone', N: 'whetstone', H: 'herb', J: 'herb' }, traits: [],
     hint: '一大堆小伤害：铁盔能大幅减免。',
   },

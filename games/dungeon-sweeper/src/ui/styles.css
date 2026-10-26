@@ -310,13 +310,20 @@ body {
 }
 #skip-btn {
   position: absolute;
-  right: 8px;
-  padding: 6px 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 28px;
+  padding: 0 12px;
+  white-space: nowrap;
   font-size: 13px;
   color: var(--ash);
   background: rgba(10, 11, 16, 0.7);
   border: 1px solid rgba(156, 142, 122, 0.4) !important;
   border-radius: 14px;
+}
+
+#skip-btn:active {
+  transform: translateX(-50%) scale(0.96);
 }
 
 /* ---------------- Toast ---------------- */

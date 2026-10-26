@@ -36,7 +36,7 @@ export interface LevelStats {
 export type AdjStat = 'dmg' | 'shield' | 'heal' | 'poison' | 'reduce' | 'reviveFrac' | 'startShield' | 'lowHpHeal';
 
 export type AdjRule =
-  | { kind: 'countTag'; tag: Tag | 'any'; stat: AdjStat }
+  | { kind: 'countTag'; tag: Tag | 'any'; stat: AdjStat; /** 只算不同种类的装备 */ otherId?: boolean; /** 最多计几件 */ max?: number }
   | { kind: 'ifTag'; tag: Tag; effect: 'shieldOnHit' }
   | { kind: 'lone'; tag: Tag; mult: number }
   | { kind: 'emptyCells'; stat: 'dmg' }

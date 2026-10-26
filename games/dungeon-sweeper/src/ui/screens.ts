@@ -130,7 +130,7 @@ export class Screens {
   }
 
   /** 布局：#ui 覆盖游戏栏 */
-  place(colX: number, colW: number, vh: number, pause: Rect, safeTop: number, boardTop: number, boardBottom: number, safeBottom: number): void {
+  place(colX: number, colW: number, vh: number, pause: Rect, scoreMid: number, boardTop: number, boardBottom: number, safeBottom: number): void {
     const r = this.root.style;
     r.left = colX + 'px';
     r.width = colW + 'px';
@@ -138,7 +138,8 @@ export class Screens {
     const p = this.pauseBtn.style;
     p.left = pause.x + pause.w / 2 - 24 + 'px';
     p.top = pause.y + pause.h / 2 - 24 + 'px';
-    this.skip.style.top = Math.max(6, safeTop + 6) + 'px';
+    // 跳过按钮放在分数行正中（分数与计时之间），不与暂停键/HUD 重叠
+    this.skip.style.top = scoreMid - 14 + 'px';
     // 提示条压在棋盘上沿内侧，不挡分数/计时
     this.toasts.style.top = boardTop + 8 + 'px';
     // 引导气泡放在棋盘下方（盖住图鉴），不挡引导目标格与轮盘；空间不足时贴底
@@ -322,7 +323,7 @@ export class Screens {
       <div class="en">${b.won ? 'DRAGON SLAIN' : 'YOU FELL'}</div>
       <div class="rows"></div>
       <div class="total">0</div>
-      <div class="best">历史最高 <b>${fmtInt(Math.max(d.prevBest, d.newBest ? 0 : b.total))}</b></div>
+      <div class="best">${d.newBest ? (d.prevBest > 0 ? `此前最高 <b>${fmtInt(d.prevBest)}</b>` : '首个纪录') : `历史最高 <b>${fmtInt(d.prevBest)}</b>`}</div>
       <div class="stats">等级 ${d.level} · 探索 ${d.explored}% · 猜中标记 ${d.marks} · 用时 ${fmtTime(b.timeSec)}</div>
       <button class="btn btn-main" data-act="replay" id="btn-replay">再来一局</button>
       <button class="btn btn-text" data-act="title" id="btn-rtitle">返回标题</button>`;
