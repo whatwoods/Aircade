@@ -71,7 +71,6 @@ export class Director {
   /** 胜利冲刷中：翻开的怪物格冒烟逃散 */
   private flood = false;
   private inflight = 0;
-  private chainActive = false;
 
   constructor(s: Stage) {
     this.s = s;
@@ -274,7 +273,6 @@ export class Director {
     const n = cells.length;
     this.at(base, () => {
       s.sfx.chainStart(n);
-      this.chainActive = true;
       if (n >= 10) vibrate(10);
       else if (n === 1) vibrate(5);
       if (n > 1) {
