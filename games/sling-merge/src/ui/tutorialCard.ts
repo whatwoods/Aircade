@@ -18,6 +18,7 @@ export class TutorialCard {
   private rev = -1;
   private visible = false;
   private handOn = false;
+  private dimmed = false;
 
   constructor(root: HTMLElement, game: Game) {
     this.game = game;
@@ -109,6 +110,11 @@ export class TutorialCard {
       }
     }
     this.setVisible(show);
+    const dim = show && g.sling.aiming && g.sling.power > 0.02;
+    if (dim !== this.dimmed) {
+      this.dimmed = dim;
+      this.card.classList.toggle('dim', dim);
+    }
     this.setHand(show && c.hand && !g.sling.aiming);
     for (let i = 0; i < this.tipEls.length; i++) {
       if (this.tipT[i]! > 0 && !paused) {

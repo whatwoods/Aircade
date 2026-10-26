@@ -489,7 +489,8 @@ body {
 #tut-card {
   position: absolute;
   left: 45px;
-  top: 634px;
+  /* 卡片在警戒线上方，底边固定在 y = 586，两行时向上长；不挡弹弓上方的预测线起点和「下一个」标签 */
+  bottom: 258px;
   width: 300px;
   min-height: 56px;
   padding: 8px 18px;
@@ -518,6 +519,10 @@ body {
   opacity: 1;
   transform: none;
 }
+/* 瞄准中淡一些，让预测线透出来 */
+#tut-card.show.dim {
+  opacity: 0.55;
+}
 #tut-card.swap {
   animation: cardSwap 0.35s var(--spring);
 }
@@ -545,7 +550,8 @@ body {
 #tut-card .arrow {
   position: absolute;
   left: 60px;
-  top: -24px;
+  bottom: -26px;
+  rotate: 180deg;
   width: 22px;
   height: 22px;
   color: #ff3b5c;

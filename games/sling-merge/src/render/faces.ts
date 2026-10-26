@@ -69,7 +69,8 @@ export function drawFace(ctx: C, level: number, r: number, s: FaceState): void {
     if (e === 'kiss') a = 0.8;
     if (e === 'dead' || e === 'sad') a *= 0.6;
     if (e === 'panic') a = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(s.t * 18));
-    ctx.globalAlpha = Math.min(1, a);
+    const a0 = ctx.globalAlpha; // 继承外层淡出（转场中的吉祥物、破裂中的果）
+    ctx.globalAlpha = a0 * Math.min(1, a);
     ctx.fillStyle = e === 'panic' ? '#FF3B5C' : BLUSH;
     const bw = 0.08 * r * k * (big ? 1.25 : 1);
     const bh = 0.045 * r * k * (big ? 1.25 : 1);
@@ -79,7 +80,7 @@ export function drawFace(ctx: C, level: number, r: number, s: FaceState): void {
     ctx.ellipse(-bx, by, bw, bh, 0, 0, TAU);
     ctx.ellipse(bx, by, bw, bh, 0, 0, TAU);
     ctx.fill();
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = a0;
   }
 
   // ── 眼睛 ──

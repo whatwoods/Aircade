@@ -767,6 +767,7 @@ export class GameScene implements Scene {
     this.bc.drawEffects(ctx, time);
     drawParticles(ctx, false);
     drawPopups(ctx, false);
+    this.drawSpot(ctx, H);
     this.ac.drawTop(ctx, time);
     // ===== HUD 层（40% 震屏）=====
     setGameTransform(ctx, shake.x * 0.4, shake.y * 0.4, shake.rot * 0.4);
@@ -785,6 +786,38 @@ export class GameScene implements Scene {
     setGameTransform(ctx);
     this.ov.draw(ctx, LW, H, time, real);
     drawToast(ctx);
+  }
+
+  /** 引导第 1、2 步：其他区域压暗 55%，只在可拿的商店卡和背包处镂空 */
+  private spotA = 0;
+  private drawSpot(ctx: CanvasRenderingContext2D, H: number): void {
+    const t = this.tut;
+    const on = this.phase === 'arrange' && t.arranging && (t.step === 1 || t.step === 2) && t.praise <= 0;
+    this.spotA += ((on ? 1 : 0) - this.spotA) * Math.min(1, clock.raw * 8);
+    if (this.spotA < 0.01) return;
+    const want = t.step === 1 ? 'sword' : 'whetstone';
+    const L = this.L;
+    const g = L.bag;
+    ctx.save();
+    ctx.fillStyle = `rgba(20,10,4,${(0.55 * this.spotA).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.rect(-400, -400, LW + 800, H + 800);
+    const hole = (x: number, y: number, w: number, h: number, r: number): void => {
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x, y, x, y + h, r);
+      ctx.arcTo(x, y + h, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x + w, y, r);
+      ctx.arcTo(x + w, y, x, y, r);
+      ctx.closePath();
+    };
+    hole(g.gx - 6, g.gy - 6, BAG.cols * g.cell + 12, BAG.rows * g.cell + 12, 10);
+    const i = this.run.shop.findIndex((o) => o && o.id === want);
+    if (i >= 0) {
+      const c = L.cards[i];
+      hole(c.x - 4, c.y - 4, c.w + 8, c.h + 8, 8);
+    }
+    ctx.fill('evenodd');
+    ctx.restore();
   }
 
   private drawHud(ctx: CanvasRenderingContext2D, time: number, real: number): void {

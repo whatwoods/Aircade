@@ -10,7 +10,7 @@ export const HALF_PI = Math.PI / 2;
 /** 桌边暂存里的缩放格大小：min(30, 58/宽, 60/高)（文档原为 22，放大以保证可读） */
 export function stashCell(id: ItemId, rot: Rot): number {
   const s = shapeOf(id, rot);
-  return Math.min(30, 58 / s.w, 60 / s.h);
+  return Math.min(36, 58 / s.w, 60 / s.h);
 }
 
 export class ItemView {

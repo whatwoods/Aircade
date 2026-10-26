@@ -1,7 +1,7 @@
 // 战斗回放表现：冷却环、出手弹起、投射物、血条、跳字、立牌、首领阶段、结算
 import { duckMusic } from '../audio/audio.ts';
 import { sfx } from '../audio/sfx.ts';
-import { BATTLE, FX, ITEMS, TUTORIAL } from '../config.ts';
+import { BATTLE, ECONOMY, FX, ITEMS, TUTORIAL } from '../config.ts';
 import { Spring } from '../core/spring.ts';
 import { Playback } from '../game/battle/playback.ts';
 import { enemyBag, enemyFor } from '../game/enemies.ts';
@@ -11,7 +11,7 @@ import type { BattleEvent, BattleResult, EnemyDef, ItemId, ItemInst, Placed, Sid
 import { emit } from '../render/fx/particles.ts';
 import { popup } from '../render/fx/popups.ts';
 import { shake, tier } from '../render/fx/shake.ts';
-import { C, TAG_COLOR } from '../render/kit.ts';
+import { C, TAG_COLOR, drawGoldCoin } from '../render/kit.ts';
 import { enemyBagRect, type BagRect, type Rect } from '../render/layout.ts';
 import { drawEnemyBadge, drawPlayerBadge } from '../render/portraits.ts';
 import { text } from '../render/text.ts';
@@ -402,9 +402,9 @@ export class BattleController {
         }
         if (tgt === 1) {
           this.standee.hit(big);
-          const dx = (Math.random() - 0.5) * 30;
           if (amt > 0) {
-            const p = lane('h1', TMP.x + dx, TMP.y - 20);
+            // 立牌上的伤害数字：5 条车道左右交错、逐条上移，700ms 内不重叠
+            const p = lane('h1', TMP.x + 8, TMP.y - 6, 24, 700, 1.6);
             popup(String(amt), p.x, p.y, big ? '#fff3c4' : '#ffffff', big ? 32 : fast ? 20 : 24, { life: fast ? 0.6 : 0.9, vy: -60 });
           }
           emit('ink', TMP.x, TMP.y, big ? 8 : fast ? 2 : 4, { speed: 120, life: 0.5, size: 2.4 });
@@ -428,7 +428,7 @@ export class BattleController {
         }
         if ((e.absorbed ?? 0) > 0) {
           this.barCenter(tgt, TMP2);
-          const p = lane(tgt === 0 ? 'a0' : 'a1', TMP2.x - 100, TMP2.y - 14);
+          const p = lane(tgt === 0 ? 'a0' : 'a1', TMP2.x - 100, buffY(tgt, TMP2.y, -14));
           popup('−' + e.absorbed, p.x, p.y, C.shieldLight, fast ? 15 : 17, { ui: true, life: 0.7, vy: -30 });
           if (e.shield[tgt] === 0) {
             sfx('shieldBreak');
@@ -443,7 +443,7 @@ export class BattleController {
         this.barCenter(e.side, TMP);
         // 4× 时小额护盾不飘字（血条护盾徽章已显示），避免满屏数字
         if (!fast || amt >= res.maxHp[e.side] * 0.08) {
-          const p = lane(e.side === 0 ? 's0' : 's1', TMP.x - 110, TMP.y - 16);
+          const p = lane(e.side === 0 ? 's0' : 's1', TMP.x - 110, buffY(e.side, TMP.y, -16));
           popup('+' + amt, p.x, p.y, C.shieldLight, fast ? 15 : 19, { ui: true, life: 0.8, vy: -36 });
         }
         if (!fast) emit('shard', TMP.x - 120, TMP.y, 4, { color: C.shieldLight, speed: 70, life: 0.4, ui: true });
@@ -459,7 +459,7 @@ export class BattleController {
         this.barCenter(e.side, TMP);
         // 4× 时小额回复不飘字（血条绿色前沿已显示）
         if (!fast || (e.amount ?? 0) >= res.maxHp[e.side] * 0.08) {
-          const p = lane(e.side === 0 ? 'l0' : 'l1', TMP.x + 40, TMP.y - 16);
+          const p = lane(e.side === 0 ? 'l0' : 'l1', TMP.x + 40, buffY(e.side, TMP.y, -16));
           popup('+' + (e.amount ?? 0), p.x, p.y, C.healLight, fast ? 16 : 22, { ui: true, life: 0.9, vy: -40 });
         }
         if (!fast) emit('leaf', TMP.x, TMP.y, 4, { color: C.heal, speed: 60, life: 0.7, ui: true });
@@ -486,7 +486,7 @@ export class BattleController {
       }
       case 'poisonTick': {
         this.barCenter(e.side, TMP);
-        const p = lane(e.side === 0 ? 'p0' : 'p1', TMP.x + 70, TMP.y - 14);
+        const p = lane(e.side === 0 ? 'p0' : 'p1', TMP.x + 70, buffY(e.side, TMP.y, -14));
         popup('−' + (e.amount ?? 0), p.x, p.y, '#c99bef', fast ? 16 : 20, { ui: true, life: 0.8, vy: -30 });
         emit('bubble', TMP.x + 70, TMP.y, 3, { color: C.poisonLight, speed: 40, life: 0.8, ui: true });
         sfx('gulp');
@@ -672,7 +672,7 @@ export class BattleController {
     const pb = this.pb;
     const t = pb && this.started ? pb.t : 0;
     const remain = Math.max(0, BATTLE.softLimit - t);
-    drawBand(ctx, gs.B.band, gs.B.hourglass, remain, t >= BATTLE.softLimit, time, gs.tr.enemy);
+    drawBand(ctx, gs.B.band, gs.B.hourglass, this.ribbonK > 0 ? -Math.max(0.001, remain) : remain, t >= BATTLE.softLimit, time, gs.tr.enemy);
   }
 
   /** 玩家背包上层：护盾涟漪、冷却环、眩晕星 */
@@ -739,7 +739,36 @@ export class BattleController {
     }
     if (this.ribbonK > 0 && gs.outcome) {
       drawResultRibbon(ctx, 195, B.band.y + B.band.h / 2, gs.outcome.win, this.ribbonK, time);
+      if (!gs.outcome.ending) this.drawRewardLine(ctx, B.band.y + B.band.h / 2 + 38, gs.outcome.win);
     }
+  }
+
+  /** 缎带下方的金币奖励行："+2 胜利 · +1 利息"（下轮账单会照此入账） */
+  private drawRewardLine(ctx: CanvasRenderingContext2D, y: number, win: boolean): void {
+    const k = Math.min(1, Math.max(0, (this.ribbonK - 0.6) / 0.4));
+    if (k <= 0) return;
+    const run = this.gs.run;
+    const interest = Math.min(ECONOMY.interestCap, Math.floor(run.savedGold / ECONOMY.interestStep));
+    const parts = [win ? `+${ECONOMY.winBonus} 胜利` : `+${ECONOMY.lossBonus} 失败补偿`];
+    if (interest > 0) parts.push(`+${interest} 利息`);
+    if (run.pouchGold > 0) parts.push(`+${run.pouchGold} 钱袋`);
+    const label = parts.join(' · ');
+    let tw = 0;
+    for (const ch of label) tw += ch.charCodeAt(0) > 255 ? 14 : 8;
+    const w = tw + 44;
+    ctx.save();
+    ctx.globalAlpha *= k;
+    ctx.translate(195, y + (1 - k) * -10);
+    ctx.fillStyle = 'rgba(43,29,20,0.88)';
+    ctx.strokeStyle = C.goldDark;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(-w / 2, -12, w, 24, 12);
+    ctx.fill();
+    ctx.stroke();
+    drawGoldCoin(ctx, -w / 2 + 16, 0, 8);
+    text(ctx, label, 10, 1, { size: 14, weight: 900, color: C.goldLight });
+    ctx.restore();
   }
 
   /** HUD 层：敌人徽章 / 名字 / 血条 / 状态；玩家徽记 / 血条 / 状态 */
@@ -814,12 +843,17 @@ const LANE = { x: 0, y: 0 };
 const laneT: Record<string, number> = {};
 const laneI: Record<string, number> = {};
 const LANE_DX = [0, -22, 22, -11, 11];
-function lane(key: string, x: number, y: number): { x: number; y: number } {
+function lane(key: string, x: number, y: number, dy = 14, win = 380, kx = 1): { x: number; y: number } {
   const now = performance.now();
-  const i = now - (laneT[key] ?? -1e9) < 380 ? ((laneI[key] ?? 0) + 1) % LANE_DX.length : 0;
+  const i = now - (laneT[key] ?? -1e9) < win ? ((laneI[key] ?? 0) + 1) % LANE_DX.length : 0;
   laneT[key] = now;
   laneI[key] = i;
-  LANE.x = x + LANE_DX[i];
-  LANE.y = y - i * 14;
+  LANE.x = x + LANE_DX[i] * kx;
+  LANE.y = y - i * dy;
   return LANE;
+}
+
+/** 敌方血条上方是名字：敌方的护盾/回复/中毒等跳字放到血条下方 */
+function buffY(side: Side, barY: number, dy: number): number {
+  return side === 1 ? barY + 30 : barY + dy;
 }

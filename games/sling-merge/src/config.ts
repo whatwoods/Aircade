@@ -27,57 +27,57 @@ export interface FruitDef {
 
 const fruits: FruitDef[] = [
   {
-    level: 1, key: 'blueberry', name: '蓝莓', radius: 14,
+    level: 1, key: 'blueberry', name: '蓝莓', radius: 17,
     colors: { base: '#7C86FF', light: '#BEC3FF', shade: '#5A62E0', outline: '#434AB8', juice: '#8C7BFF', accent: ['#3E3F9E', '#FFFFFF'] },
     face: { mouth: 'cat', eyes: 'dot', extras: ['bigBlush'], breatheMul: 1 },
   },
   {
-    level: 2, key: 'cherry', name: '樱桃', radius: 19,
+    level: 2, key: 'cherry', name: '樱桃', radius: 22,
     colors: { base: '#FF4D6D', light: '#FF9DB0', shade: '#DB2E55', outline: '#B01F45', juice: '#FF3D68', accent: ['#6BBF59', '#84DB6E', '#4E9440'] },
     face: { mouth: 'tongue', eyes: 'oval', extras: ['wink'], breatheMul: 1 },
   },
   {
-    level: 3, key: 'grape', name: '青提', radius: 24,
+    level: 3, key: 'grape', name: '青提', radius: 27,
     colors: { base: '#9BE36E', light: '#D6F8B8', shade: '#6FC24C', outline: '#4E9C35', juice: '#B8F290', accent: ['#A9744A', '#7E5434'] },
     face: { mouth: 'smile', eyes: 'lidded', extras: [], breatheMul: 0.8 },
   },
   {
-    level: 4, key: 'kumquat', name: '金桔', radius: 30,
+    level: 4, key: 'kumquat', name: '金桔', radius: 33,
     colors: { base: '#FFA94D', light: '#FFD7A3', shade: '#F2811F', outline: '#CB6413', juice: '#FFB648', accent: ['#5DCB6A', '#3FA851', '#F08A2C'] },
     face: { mouth: 'grin', eyes: 'oval', extras: [], breatheMul: 2 },
   },
   {
-    level: 5, key: 'lemon', name: '柠檬', radius: 36,
+    level: 5, key: 'lemon', name: '柠檬', radius: 40,
     colors: { base: '#FFE15A', light: '#FFF5B8', shade: '#F4C21A', outline: '#D3A000', juice: '#FFF27D', accent: ['#E8C21A', '#C9DD5A'] },
     face: { mouth: 'smirk', eyes: 'oval', extras: ['browSassy'], breatheMul: 1 },
   },
   {
-    level: 6, key: 'peach', name: '桃子', radius: 43,
+    level: 6, key: 'peach', name: '桃子', radius: 47,
     colors: { base: '#FFB3A0', light: '#FFE4D6', shade: '#F07A8C', outline: '#D2647A', juice: '#FFBFA8', accent: ['#6FD483', '#4DB565', '#FF8FA3'] },
     face: { mouth: 'soft', eyes: 'lash', extras: ['bigBlush'], breatheMul: 1 },
   },
   {
-    level: 7, key: 'dragonfruit', name: '火龙果', radius: 50,
+    level: 7, key: 'dragonfruit', name: '火龙果', radius: 55,
     colors: { base: '#FF5FB4', light: '#FFAEDA', shade: '#E23C93', outline: '#BB2A78', juice: '#FF6EC6', accent: ['#A8E05F', '#7DC23A', '#FF8FCB'] },
     face: { mouth: 'teeth', eyes: 'oval', extras: ['browBold'], breatheMul: 0.9 },
   },
   {
-    level: 8, key: 'plum', name: '李子', radius: 57,
+    level: 8, key: 'plum', name: '李子', radius: 63,
     colors: { base: '#A87BFF', light: '#D8C7FF', shade: '#8455E6', outline: '#6A3FC2', juice: '#B98FFF', accent: ['#FFFFFF', '#7E5434', '#6FD483'] },
     face: { mouth: 'u', eyes: 'dreamy', extras: ['sleepy'], breatheMul: 0.7 },
   },
   {
-    level: 9, key: 'pineapple', name: '菠萝', radius: 63,
+    level: 9, key: 'pineapple', name: '菠萝', radius: 71,
     colors: { base: '#FFC53D', light: '#FFE58F', shade: '#F0A315', outline: '#CC8600', juice: '#FFD84F', accent: ['#36C98C', '#239E6B', '#E8A21A'] },
     face: { mouth: 'laugh', eyes: 'sparkle', extras: [], breatheMul: 1.2 },
   },
   {
-    level: 10, key: 'melon', name: '蜜瓜', radius: 70,
+    level: 10, key: 'melon', name: '蜜瓜', radius: 79,
     colors: { base: '#78DCC2', light: '#C6F6E8', shade: '#45BEA0', outline: '#2D9A80', juice: '#FFB070', accent: ['#FFFFFF', '#3E9E6A', '#2E7D52'] },
     face: { mouth: 'calm', eyes: 'happy', extras: ['bigBlush'], breatheMul: 0.6 },
   },
   {
-    level: 11, key: 'watermelon', name: '彩虹大西瓜', radius: 78,
+    level: 11, key: 'watermelon', name: '彩虹大西瓜', radius: 88,
     colors: { base: '#3DD681', light: '#A8F4C8', shade: '#1FA862', outline: '#13864A', juice: '#FF5C7A', accent: ['#1FA862', '#FFC93C', '#FFF0A8', '#FF6F91', '#F2A100'] },
     face: { mouth: 'king', eyes: 'star', extras: ['bigBlush'], breatheMul: 0.8 },
   },
@@ -90,7 +90,7 @@ export const CONFIG = {
     maxScale: 1.25,
     hud: {
       best: { x: 16, y: 14, w: 108, h: 40 },
-      score: { x: 195, labelY: 20, baseY: 58, size: 38 },
+      score: { x: 195, labelY: 14, baseY: 58, size: 38 },
       pause: { x: 330, y: 14, w: 44, h: 44 },
       chain: { x: 40, y: 68, w: 310, h: 28, iconX0: 55, iconStep: 28, iconY: 82, iconD: 20 },
     },
@@ -113,7 +113,7 @@ export const CONFIG = {
     combo: { x: 68, y: 744, r: 30, labelY: 700 },
     countdown: { x: 195, y: 654, size: 56, labelY: 620 },
     banner: { y: 360, w: 342, h: 70 },
-    tutorialCard: { x: 45, y: 620, w: 300, h: 56 },
+    tutorialCard: { x: 45, bottom: 586, w: 300, h: 56 },
     /** 标题吉祥物（彩虹大西瓜）；标题演示时罐内水果绕开它 */
     mascot: { x: 195, y: 196, r: 64 },
     /** 标题 Logo / 副标题的「隐形托板」（胶囊：x0, y0, x1, y1, 半径）：水果簇拥在 Logo 下方 */
@@ -226,10 +226,16 @@ export const CONFIG = {
   },
 
   spawn: {
-    weights: [30, 28, 22, 13, 7],
+    weights: [26, 26, 24, 15, 9],
     maxStart: 3,
-    unlock4At: 6,
-    unlock5At: 7,
+    unlock4At: 5,
+    unlock5At: 6,
+    /** 加压：第 rampStart 发起，在 rampShots 发内把各级权重乘到 (1 + rampBoost) */
+    rampStart: 40,
+    rampShots: 100,
+    rampBoost: [0, 0, 0.3, 0.8, 1.0],
+    /** 救场：有水果进入预警区时，下一个以此概率直接出最低那颗果的等级（须在已解锁范围内） */
+    rescueChance: 0.5,
     maxSameInRow: 3,
     opening: [1, 1, 2],
   },

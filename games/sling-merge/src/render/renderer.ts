@@ -667,6 +667,11 @@ export class Renderer implements RendererApi, FruitPainter {
           dy = -140 * (1 - kk) * (1 - kk) + Math.sin(kk * Math.PI) * -10 * (1 - kk);
         }
       }
+      if (dy > -900 && f) {
+        // 顶着盖子时王冠往头上压低，始终露在盖子下沿之下（不被盖子挡住）
+        const minDy = (CONFIG.layout.jar.inner.T + 2 - y) / Math.max(0.2, sc) + 0.84 * r + ex.ay;
+        if (dy < minDy) dy = Math.min(minDy, 0.45 * r);
+      }
       if (dy > -900) {
         ctx.translate(0, -0.84 * r + dy);
         ctx.drawImage(ex.c, -ex.ax, -ex.ay, ex.w, ex.h);

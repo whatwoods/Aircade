@@ -6,7 +6,7 @@ import type { EnemyDef, ItemId, Lv, Placed } from '../../game/types.ts';
 import { C, RARITY_COLOR, TAG_COLOR, cached, drawGoldCoin, drawHeart, drawPaper } from '../kit.ts';
 import type { Rect } from '../layout.ts';
 import { drawEnemyBadge } from '../portraits.ts';
-import { HAND, drawSprite, measure, num, text } from '../text.ts';
+import { HAND, LOGO, drawSprite, measure, num, text } from '../text.ts';
 import { rgba } from '../textures.ts';
 import { drawMiniBag } from './bagView.ts';
 
@@ -55,26 +55,20 @@ export function drawHearts(ctx: CanvasRenderingContext2D, r: Rect, hearts: numbe
 // ---------- 轮次签 ----------
 
 export function drawRoundTag(ctx: CanvasRenderingContext2D, r: Rect, round: number, attempt: number, score: number, scoreFlash: number): void {
-  if (attempt > 1) {
-    // "再战"小签挂在下面
-    ctx.strokeStyle = '#a8865a';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(r.x + r.w / 2, r.y + r.h - 2);
-    ctx.lineTo(r.x + r.w / 2, r.y + r.h + 6);
-    ctx.stroke();
-    ctx.save();
-    ctx.translate(r.x + r.w / 2, r.y + r.h + 14);
-    ctx.rotate(0.06);
-    drawSprite(ctx, smallTag(44, 18, C.waxLight), -22, -9);
-    text(ctx, '再战', 0, 0, { size: 11, weight: 900, color: '#fff6e6' });
-    ctx.restore();
-  }
   drawSprite(ctx, roundTagSprite(r.w, r.h), r.x, r.y);
   text(ctx, `第 ${round} 轮`, r.x + r.w / 2 - 9, r.y + 13, { size: 15, weight: 900, color: C.ink });
   text(ctx, '/' + ROUNDS, r.x + r.w / 2 + 26, r.y + 14, { size: 13, family: HAND, color: C.inkSoft });
   const col = scoreFlash > 0 ? C.goldDark : C.inkSoft;
   text(ctx, '分 ' + num(score), r.x + r.w / 2, r.y + 28, { size: 11, weight: 700, color: col });
+  if (attempt > 1) {
+    // "再战"小签斜贴在轮次签右上角（下方是敌情卡，挂在下面会被盖住）
+    ctx.save();
+    ctx.translate(r.x + r.w - 8, r.y + 4);
+    ctx.rotate(0.2);
+    drawSprite(ctx, smallTag(40, 18, C.waxLight), -20, -9);
+    text(ctx, '再战', 0, 0, { size: 11, weight: 900, color: '#fff6e6' });
+    ctx.restore();
+  }
 }
 
 function roundTagSprite(w: number, h: number) {
@@ -109,7 +103,7 @@ export function drawGold(ctx: CanvasRenderingContext2D, r: Rect, gold: Rolling, 
   ctx.translate(r.x + 44, r.y + r.h / 2 + 1);
   ctx.scale(s, s);
   const col = f > 0 ? C.goldLight : f < 0 ? '#ff8a70' : C.paper;
-  text(ctx, String(gold.int), 0, 0, { size: 28, family: HAND, color: col, stroke: C.ink, strokeW: 4.5, align: 'left' });
+  text(ctx, String(gold.int), 0, 0, { size: 26, family: LOGO, color: col, stroke: C.ink, strokeW: 4.5, align: 'left' });
   ctx.restore();
 }
 

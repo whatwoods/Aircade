@@ -253,7 +253,7 @@ export class Toggle {
     }
     const kx = sx + 12 + (sw - 24) * k;
     drawSprite(ctx, knobSprite(), kx - 13, sy + sh / 2 - 13);
-    text(ctx, this.on ? '开' : '关', sx - 14, sy + sh / 2, { size: 13, weight: 700, color: this.on ? C.ok : C.pencil });
+    text(ctx, this.on ? '开' : '关', sx - 14, sy + sh / 2, { size: 14, weight: 900, color: this.on ? '#4f7a2a' : C.inkSoft });
   }
 }
 

@@ -211,8 +211,6 @@ export class Debug {
     const g = app.game;
     const self = this;
     return {
-      /** 调参用：直接改 CONFIG 字段即时生效（仅 ?debug=1） */
-      config: CONFIG,
       state: () => ({
         scene: g.scene,
         paused: app.isPaused(),
@@ -337,10 +335,12 @@ export class Debug {
         g.clearFruits();
         g.noDanger = true;
         const spots: [number, number, number][] = [
-          [11, 104, 212], [10, 284, 214],
-          [9, 90, 378], [8, 208, 382], [7, 314, 392],
-          [6, 72, 530], [5, 172, 532], [4, 262, 534], [3, 334, 536],
-          [2, 140, 648], [1, 250, 652],
+          [11, 113, 216], [10, 286, 222],
+          [9, 98, 386], [8, 296, 378],
+          [7, 200, 470],
+          [6, 72, 530], [5, 318, 520],
+          [4, 150, 580], [3, 245, 580],
+          [2, 130, 660], [1, 230, 660],
         ];
         for (const [lv, x, y] of spots) g.spawnFruit(lv, x, y);
         g.freezePhysics = true;

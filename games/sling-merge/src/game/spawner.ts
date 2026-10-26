@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import { rngGame } from '../core/rng';
 
-/** 出生水果：权重、等级门控、防连号、开局序列（docs §3.7） */
+/** 出生水果：权重、等级门控、按发射数加压、危险时救场偏向、防连号、开局序列（docs §3.7） */
 export class Spawner {
   private history: number[] = [];
   private queue: number[] = [];
@@ -30,13 +30,20 @@ export class Spawner {
     return Math.min(m, S.weights.length);
   }
 
-  roll(highest: number): number {
+  /**
+   * @param shots 本局已发射数（加压曲线）
+   * @param rescue 危险时最低那颗果的等级（0 = 无），按 rescueChance 直接出这一级
+   */
+  roll(highest: number, shots = 0, rescue = 0): number {
     let lvl: number;
+    const S = CONFIG.spawn;
     if (this.queue.length > 0) {
       lvl = this.queue.shift()!;
+    } else if (rescue > 0 && rescue <= this.maxAllowed(highest) && rngGame.next() < S.rescueChance) {
+      lvl = rescue;
     } else {
+      this.ramp = Math.min(1, Math.max(0, (shots - S.rampStart) / S.rampShots));
       lvl = this.weighted(highest);
-      const S = CONFIG.spawn;
       const h = this.history;
       if (h.length >= S.maxSameInRow) {
         let same = true;
@@ -49,15 +56,21 @@ export class Spawner {
     return lvl;
   }
 
+  private ramp = 0;
+
+  private weight(i: number): number {
+    const S = CONFIG.spawn;
+    return S.weights[i]! * (1 + (S.rampBoost[i] ?? 0) * this.ramp);
+  }
+
   private weighted(highest: number, exclude = -1): number {
     const max = this.maxAllowed(highest);
-    const w = CONFIG.spawn.weights;
     let total = 0;
-    for (let i = 0; i < max; i++) if (i + 1 !== exclude) total += w[i]!;
+    for (let i = 0; i < max; i++) if (i + 1 !== exclude) total += this.weight(i);
     let r = rngGame.next() * total;
     for (let i = 0; i < max; i++) {
       if (i + 1 === exclude) continue;
-      r -= w[i]!;
+      r -= this.weight(i);
       if (r <= 0) return i + 1;
     }
     return 1;

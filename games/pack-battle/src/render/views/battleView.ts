@@ -56,7 +56,7 @@ function drawHourglass(ctx: CanvasRenderingContext2D, r: Rect, remain: number, s
   const bot = r.y + r.h - 2;
   const hw = r.w / 2 - 6;
   const mid = (top + bot) / 2;
-  const frac = Math.max(0, Math.min(1, remain / 30));
+  const frac = Math.max(0, Math.min(1, Math.abs(remain) / 30));
   ctx.save();
   // 木框
   ctx.fillStyle = '#6b4424';
@@ -112,6 +112,7 @@ function drawHourglass(ctx: CanvasRenderingContext2D, r: Rect, remain: number, s
     ctx.stroke();
   }
   ctx.restore();
+  if (remain < 0) return; // 结算缎带展开时隐藏计时
   const label = storm ? '风暴' : String(Math.ceil(remain));
   text(ctx, label, cx, bot + 9, { size: storm ? 12 : 15, weight: storm ? 900 : 400, family: storm ? undefined : HAND, color: storm ? '#ffb48a' : C.paper, stroke: C.ink, strokeW: 3, alpha: storm ? 0.8 + 0.2 * Math.sin(time * 8) : 1 });
 }

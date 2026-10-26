@@ -410,6 +410,7 @@ export class DrawerPanel extends Panel {
   closeB: Button;
   sel: Placed | null = null;
   private bag: Placed[];
+  private list: { id: ItemId; lv: Lv; n: number }[];
   private r: Rect;
   private e: EnemyDef;
   constructor(r: Rect, e: EnemyDef, round: number) {
@@ -418,6 +419,20 @@ export class DrawerPanel extends Panel {
     this.e = e;
     this.dim = 0.4;
     this.bag = enemyBag(round);
+    // 装备清单（同名同级合并）
+    const seen = new Map<string, { id: ItemId; lv: Lv; n: number }>();
+    for (const it of this.bag) {
+      const k = it.id + ':' + it.lv;
+      const g = seen.get(k);
+      if (g) g.n++;
+      else seen.set(k, { id: it.id, lv: it.lv, n: 1 });
+    }
+    this.list = [...seen.values()];
+    // 高度按内容自适应（底边不动）
+    const cell = Math.min(40, Math.floor((r.w - 40) / e.cols));
+    const want = 70 + e.rows * cell + 26 + e.traits.length * 22 + 24 + this.list.length * 40 + 64;
+    const h = Math.max(300, Math.min(r.h, want));
+    this.r = r = { x: r.x, y: r.y + r.h - h, w: r.w, h };
     this.closeB = new Button('drawer.close', R(r.x + r.w - 46, r.y + 6, 40, 40), '', 'coin', 61);
     this.closeB.icon = 'close';
     this.buttons = [this.closeB];
@@ -488,7 +503,17 @@ export class DrawerPanel extends Panel {
       text(ctx, '轻点装备查看效果', r.x + 24, y, { size: 12, weight: 700, color: C.inkSoft, align: 'left' });
       y += 24;
     }
-    text(ctx, '“' + e.hint + '”', r.x + r.w / 2, Math.min(y + 8, r.y + r.h - 24), { size: 14, weight: 800, color: C.inkSoft, maxW: r.w - 40 });
+    // 装备清单
+    const bottom = r.y + r.h - 48;
+    for (const g of this.list) {
+      if (y + 30 > bottom) break;
+      const def = ITEMS[g.id];
+      const d = describe(g.id, g.lv);
+      text(ctx, `${def.name} ${'★'.repeat(g.lv)}${g.n > 1 ? ' ×' + g.n : ''}`, r.x + 24, y, { size: 14, weight: 900, color: RARITY_COLOR[def.rarity], align: 'left' });
+      text(ctx, d.effect, r.x + 24, y + 18, { size: 12, weight: 700, color: C.ink, align: 'left', maxW: r.w - 48 });
+      y += 40;
+    }
+    text(ctx, '“' + e.hint + '”', r.x + r.w / 2, r.y + r.h - 26, { size: 14, weight: 800, color: C.inkSoft, maxW: r.w - 40 });
     this.closeB.draw(ctx, time, real);
   }
 }

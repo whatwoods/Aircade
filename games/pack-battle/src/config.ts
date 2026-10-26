@@ -181,8 +181,8 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     id: 'helmet', name: '铁盔', tag: 'armor', rarity: 1, price: 5, shape: ['##'],
     trigger: 'passive',
     lv: [{ reduce: 1, adj: 1 }, { reduce: 2, adj: 1 }, { reduce: 3, adj: 2 }],
-    adj: { kind: 'countTag', tag: 'armor', stat: 'reduce' },
-    text: { effect: '受到的每次攻击伤害 -{reduce}', adj: '每相邻 1 件其他护具：再 -{adj}' },
+    adj: { kind: 'countTag', tag: 'armor', stat: 'reduce', max: 1 },
+    text: { effect: '受到的每次攻击伤害 -{reduce}', adj: '相邻有其他护具：再 -{adj}（只算 1 件）' },
   },
   potion: {
     id: 'potion', name: '治疗药水', tag: 'remedy', rarity: 1, price: 5, shape: ['#', '#'],
@@ -260,7 +260,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   ratfang: {
     id: 'ratfang', name: '鼠牙', tag: 'weapon', rarity: 0, price: 0, shape: ['#'], enemyOnly: true,
     trigger: 'cooldown', cd: 1.0,
-    lv: [{ dmg: 3 }, { dmg: 4 }, { dmg: 7 }],
+    lv: [{ dmg: 2 }, { dmg: 4 }, { dmg: 7 }],
     adj: { kind: 'none' },
     text: { effect: '每 {cd} 秒造成 {dmg} 伤害', adj: '怪物部件' },
   },
@@ -316,10 +316,10 @@ export const ENEMIES: EnemyDef[] = [
     hint: '半血会狂暴，攒足护盾！',
   },
   {
-    round: 6, name: '吱吱帮', title: '鼠群', hp: 150, cols: 5, rows: 4, frame: 'crate', portrait: 'rats',
-    layout: ['.a...', 'bMc.e', '.d.f.', 'H.J..'],
-    legend: { a: 'ratfang', b: 'ratfang', c: 'ratfang', d: 'ratfang', e: 'ratfang', f: 'ratfang', M: 'whetstone', N: 'whetstone', H: 'herb', J: 'herb' }, traits: [],
-    hint: '一大堆小伤害：铁盔能大幅减免。',
+    round: 6, name: '吱吱帮', title: '鼠群', hp: 170, cols: 5, rows: 4, frame: 'crate', portrait: 'rats',
+    layout: ['a.c.e', 'bM.d.', '..f..', 'H.J..'],
+    legend: { a: 'ratfang', b: 'ratfang', c: 'ratfang', d: 'ratfang', e: 'ratfang', f: 'ratfang', M: 'whetstone', H: 'herb', J: 'herb' }, traits: [],
+    hint: '一大堆小伤害：铁盔、护盾能减免，输出够高也能抢先咬死它们。',
   },
   {
     round: 7, name: '苔婆婆', title: '沼泽女巫', hp: 280, cols: 6, rows: 4, frame: 'wicker', portrait: 'witch',
@@ -336,7 +336,7 @@ export const ENEMIES: EnemyDef[] = [
   {
     round: 9, name: '夜枭', title: '暗影游侠', hp: 360, cols: 6, rows: 5, frame: 'shadow', portrait: 'ranger',
     layout: ['..B...', '..B...', 'hhB.D.', '.LB.E.', 'LLL.PP'],
-    legend: { B: 'bow:2', h: 'horn>', D: 'dagger:2', E: 'dagger', L: 'leather:2', P: 'potion:2' }, traits: [],
+    legend: { B: 'bow:2', h: 'horn>', D: 'dagger:2', E: 'dagger:2', L: 'leather:2', P: 'potion:2' }, traits: [],
     hint: '冷箭很痛，开场就要有护盾。',
   },
   {

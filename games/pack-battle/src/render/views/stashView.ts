@@ -12,12 +12,15 @@ export function drawStash(ctx: CanvasRenderingContext2D, slots: Rect[], area: Re
   for (let i = 0; i < slots.length; i++) {
     const s = slots[i];
     const on = i === hi;
-    ctx.strokeStyle = on ? rgba(C.goldLight, 0.95) : rgba(C.chalk, 0.38);
-    ctx.lineWidth = on ? 2.2 : 1.6;
+    ctx.strokeStyle = on ? rgba(C.goldLight, 0.95) : rgba(C.chalk, 0.6);
+    ctx.lineWidth = on ? 2.2 : 1.8;
     ctx.setLineDash([6, 5]);
     if (on) ctx.lineDashOffset = -time * 24;
     ctx.beginPath();
     ctx.roundRect(s.x + 2, s.y + 2, s.w - 4, s.h - 4, 9);
+    // 浅色底，让空槽在木纹上一眼可见
+    ctx.fillStyle = 'rgba(255,240,210,0.09)';
+    ctx.fill();
     ctx.stroke();
     ctx.lineDashOffset = 0;
     if (on) {

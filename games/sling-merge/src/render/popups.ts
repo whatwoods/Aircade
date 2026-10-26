@@ -77,7 +77,13 @@ export class Popups {
   dur = new Float32Array(CAP).fill(1);
   size = new Float32Array(CAP);
   style: TextStyle[] = new Array<TextStyle>(CAP).fill('white');
+  /** 估算半宽（避让用） */
+  hw = new Float32Array(CAP);
+  /** 是否为合成得分跳字（可累加） */
+  isScore = new Uint8Array(CAP);
   private head = 0;
+  private lastScore = -1;
+  private lastSum = 0;
 
   // 大横幅
   bannerText = '';
@@ -94,27 +100,90 @@ export class Popups {
 
   clear(): void {
     this.t.fill(99);
+    this.lastScore = -1;
     this.bannerT = 99;
     this.topT = 99;
     this.recordT = 99;
   }
 
-  add(text: string, x: number, y: number, size: number, style: TextStyle, sub = '', dur = 0.8): void {
-    const i = this.head;
-    this.head = (this.head + 1) % CAP;
-    this.text[i] = text;
-    this.sub[i] = sub;
-    // 按估算字宽夹在罐内，长字（「惊险救场 +50」）贴墙时不被玻璃挡住
+  private static halfW(text: string, size: number): number {
     let w = 0;
     for (let k = 0; k < text.length; k++) w += text.charCodeAt(k) > 255 ? size : size * 0.6;
-    const hw = Math.min(150, w / 2 + size * 0.14 + 4);
-    this.x[i] = Math.max(POP_L + hw, Math.min(POP_R - hw, x));
+    return Math.min(150, w / 2 + size * 0.14 + 4);
+  }
+
+  /** 起点最高能到哪：盖子下方留出整段上浮；顶部「新发现」小横幅（y 150±18）在场时再让到它下面 */
+  private minY(size: number): number {
+    const top = this.topT < this.topDur ? 168 : POP_TOP;
+    return top + 36 + size * 0.7;
+  }
+
+  /** 当前（上浮后的）y */
+  private curY(i: number): number {
+    return this.y[i]! - 36 * ease.quadOut(Math.min(1, this.t[i]! / this.dur[i]!));
+  }
+
+  add(text: string, x: number, y: number, size: number, style: TextStyle, sub = '', dur = 0.8): number {
+    const i = this.head;
+    this.head = (this.head + 1) % CAP;
+    if (i === this.lastScore) this.lastScore = -1;
+    this.text[i] = text;
+    this.sub[i] = sub;
+    this.isScore[i] = 0;
+    // 按估算字宽夹在罐内，长字（「惊险救场 +50」）贴墙时不被玻璃挡住
+    const hw = Popups.halfW(text, size);
+    this.hw[i] = hw;
+    const px = Math.max(POP_L + hw, Math.min(POP_R - hw, x));
     // 水果往上浮、合成多发生在罐顶：起点压到盖子下方，保证整段上浮（36px）都在罐内、不钻到盖子和图鉴后面
-    this.y[i] = Math.max(y, POP_TOP + 36 + size * 0.7);
+    let py = Math.max(y, this.minY(size));
+    // 纵向避让：和还清晰可见的跳字重叠时往下让（罐顶没有往上的余地）
+    for (let pass = 0; pass < 4; pass++) {
+      let moved = false;
+      for (let j = 0; j < CAP; j++) {
+        if (j === i || this.t[j]! >= this.dur[j]! * 0.75) continue;
+        if (Math.abs(this.x[j]! - px) >= this.hw[j]! + hw) continue;
+        const oy = this.curY(j);
+        const oh = this.size[j]! * (this.sub[j] ? 1.35 : 0.75);
+        const gap = oh + size * 0.75;
+        if (Math.abs(oy - py) < gap) {
+          py = oy + gap;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    this.x[i] = px;
+    this.y[i] = py;
     this.t[i] = 0;
     this.dur[i] = dur;
     this.size[i] = size;
     this.style[i] = style;
+    return i;
+  }
+
+  /**
+   * 合成得分跳字：0.45 s 内、附近再次合成时累加到同一条（「+110」→「+260」），
+   * 连击小字只保留最新的一条，快速连锁不会叠成一团。
+   */
+  score(gained: number, x: number, y: number, size: number, style: TextStyle, sub: string): void {
+    const j = this.lastScore;
+    if (j >= 0 && this.isScore[j] && this.t[j]! < 0.45 && Math.abs(this.x[j]! - x) < 130 && Math.abs(this.curY(j) - y) < 130) {
+      this.lastSum += gained;
+      this.text[j] = '+' + this.lastSum;
+      this.sub[j] = sub;
+      this.size[j] = Math.max(this.size[j]!, size);
+      this.style[j] = style;
+      this.hw[j] = Popups.halfW(this.text[j]!, this.size[j]!);
+      this.x[j] = Math.max(POP_L + this.hw[j]!, Math.min(POP_R - this.hw[j]!, this.x[j]!));
+      this.y[j] = Math.max(this.y[j]!, this.minY(this.size[j]!));
+      this.t[j] = 0.06; // 重新弹一下（跳过最开始的缩小）
+      return;
+    }
+    if (sub) for (let k = 0; k < CAP; k++) if (this.isScore[k]) this.sub[k] = '';
+    const i = this.add('+' + gained, x, y, size, style, sub, 0.8);
+    this.isScore[i] = 1;
+    this.lastScore = i;
+    this.lastSum = gained;
   }
 
   banner(text: string, kind: 'gold' | 'mint' | 'pink', dur = 2.2): void {

@@ -15,7 +15,7 @@ import { tier, vibrate } from '../render/fx/shake.ts';
 import { C, drawGoldCoin } from '../render/kit.ts';
 import { inRect, type BagRect } from '../render/layout.ts';
 import { drawItemAt } from '../render/sprites.ts';
-import { HAND, text } from '../render/text.ts';
+import { LOGO, text } from '../render/text.ts';
 import { drawStamp, showToast } from '../render/ui/widgets.ts';
 import { drawMergeGlow, drawPlacement, drawPulseDots, type Placement } from '../render/views/bagView.ts';
 import { drawLinkCurve, linkKey, linkMid } from '../render/views/linkView.ts';
@@ -511,7 +511,7 @@ export class ArrangeController {
     sfx('buy');
     tier('T1', false);
     const gr = gs.L.gold;
-    popup('−' + price, gr.x + 70, gr.y + gr.h + 8, '#ffb4a0', 20, { ui: true, life: 0.9, vy: 30 });
+    popup('−' + price, gr.x + gr.w - 20, gr.y + gr.h / 2, '#ffb4a0', 20, { ui: true, life: 0.9, vy: -26 });
     gs.flyCoins(cx, cy, 2, false);
     emit('coin', cx, cy, 2, { speed: 90, life: 0.5 });
   }
@@ -1021,17 +1021,6 @@ export class ArrangeController {
     const gs = this.gs;
     const g = gs.bagRect();
     const d = this.drag;
-    if (d && d.zone.kind === 'merge') {
-      const it = find(gs.run, d.zone.uid);
-      if (it) {
-        if (it.zone === 'bag') drawMergeGlow(ctx, g, it, time);
-        const v = gs.views.get(it.uid);
-        if (v) {
-          v.center(it.zone === 'bag' ? g : null, TMP);
-          drawStamp(ctx, it.lv >= 2 ? '合成 ★★★' : '合成 ★★', TMP.x, TMP.y - 34 - (it.zone === 'bag' ? g.cell * 0.4 : 20), 15, C.wax, -0.08, 1, 1 + 0.04 * Math.sin(time * 9));
-        }
-      }
-    }
     for (const c of this.crosses) drawCross(ctx, c.x, c.y, c.t);
     for (const r of this.returners) {
       ctx.save();
@@ -1063,7 +1052,68 @@ export class ArrangeController {
       drawItemAt(ctx, f.id, f.lv, f.ang + f.spin * f.t, 0, 0, f.cell, 'tile', f.cell < 40);
       ctx.restore();
     }
-    if (d) this.drawDrag(ctx, d);
+    if (d) {
+      this.drawDrag(ctx, d);
+      this.drawDragCues(ctx, d, g, time);
+    }
+  }
+
+  /** 拖拽件的视觉中心与顶边（考虑旋转、倾斜和缩放） */
+  private dragBox(d: Drag): { cx: number; cy: number; top: number } {
+    const s0 = shapeOf(d.id, 0);
+    const cell = d.cell.x;
+    const ox = (s0.w / 2 - d.u0) * cell;
+    const oy = (s0.h / 2 - d.v0) * cell;
+    const a = d.ang.x + d.tilt.x;
+    const sc = d.scale.x;
+    const cx = d.pos.x + (Math.cos(a) * ox - Math.sin(a) * oy) * sc;
+    const cy = d.pos.y + (Math.sin(a) * ox + Math.cos(a) * oy) * sc;
+    const sh = shapeOf(d.id, d.rot);
+    return { cx, cy, top: cy - (sh.h * cell * sc) / 2 };
+  }
+
+  /** 落点反馈画在拖拽件之上：触屏上抬后拖拽件正好盖住吸附格 */
+  private drawDragCues(ctx: CanvasRenderingContext2D, d: Drag, g: BagRect, time: number): void {
+    const z = d.zone;
+    const gs = this.gs;
+    if (z.kind === 'bag') {
+      ctx.save();
+      ctx.globalAlpha *= 0.9;
+      drawPlacement(ctx, g, { id: d.id, rot: d.rot, x: z.x, y: z.y, ok: z.ok, conflict: z.conflict }, time);
+      ctx.restore();
+      if (!z.ok) {
+        const b = this.dragBox(d);
+        const sh = shapeOf(d.id, d.rot);
+        const out = z.x < 0 || z.y < 0 || z.x + sh.w > BAG.cols || z.y + sh.h > BAG.rows;
+        this.drawCueTag(ctx, b.cx, b.top - 8, '✕ ' + (z.reason || (out ? '超出背包 · 松手飞回' : '位置被占 · 松手飞回')), '#c2402c');
+      }
+    } else if (z.kind === 'merge') {
+      const it = find(gs.run, z.uid);
+      if (it) {
+        if (it.zone === 'bag') drawMergeGlow(ctx, g, it, time);
+        const b = this.dragBox(d);
+        drawStamp(ctx, it.lv >= 2 ? '合成 ★★★' : '合成 ★★', b.cx, Math.max(30, b.top - 22), 16, C.wax, -0.08, 1, 1 + 0.04 * Math.sin(time * 9));
+      }
+    }
+  }
+
+  private drawCueTag(ctx: CanvasRenderingContext2D, cx: number, by: number, label: string, color: string): void {
+    ctx.save();
+    let tw = 0;
+    for (const ch of label) tw += ch.charCodeAt(0) > 255 ? 13 : 7;
+    const w = Math.min(300, tw + 24);
+    const h = 26;
+    const x = Math.max(8, Math.min(382 - w, cx - w / 2));
+    const y = Math.max(8, by - h);
+    ctx.fillStyle = 'rgba(43,29,20,0.9)';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    text(ctx, label, x + w / 2, y + h / 2 + 1, { size: 13, weight: 900, color: '#ffb59e' });
   }
 
   private drawDrag(ctx: CanvasRenderingContext2D, d: Drag): void {
@@ -1087,7 +1137,11 @@ export class ArrangeController {
     ctx.rotate(d.tilt.x);
     ctx.scale(d.scale.x, d.scale.x);
     ctx.rotate(d.ang.x);
+    // 有落点时拖拽件半透明，露出下面的格子
+    const over = d.zone.kind === 'bag' || d.zone.kind === 'merge';
+    if (over) ctx.globalAlpha *= 0.72;
     drawItemAt(ctx, d.id, d.lv, 0, ox, oy, cell, 'tile', small);
+    if (over) ctx.globalAlpha /= 0.72;
     if (d.zone.kind === 'sell') {
       ctx.globalAlpha *= 0.35;
       drawItemAt(ctx, d.id, d.lv, 0, ox, oy, cell, 'gray');
@@ -1120,7 +1174,7 @@ export class ArrangeController {
     const ty = full ? -6 : 0;
     text(ctx, '出售', -30, ty - 1, { size: 18, weight: 900, color: C.paper });
     drawGoldCoin(ctx, 4, ty - 1, 9);
-    text(ctx, '+' + price, 17, ty + 1, { size: 26, family: HAND, color: C.goldLight, align: 'left' });
+    text(ctx, '+' + price, 17, ty + 1, { size: 24, family: LOGO, color: C.goldLight, align: 'left' });
     if (full) text(ctx, '刚买的 · 全额退款', 0, ty + 21, { size: 10, weight: 700, color: C.chalk });
     ctx.restore();
   }

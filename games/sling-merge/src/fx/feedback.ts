@@ -498,7 +498,7 @@ export class Feedback {
       r.popups.add('惊险救场 +' + CONFIG.score.clutchBonus, x, py - (e.trick ? 50 : 26), 18, 'gold', '', 1.1);
     }
     if (quiet) return;
-    r.popups.add('+' + e.gained, x, py, size, style, sub, 0.8);
+    r.popups.score(e.gained, x, py, size, style, sub);
     py = 0;
   }
 }

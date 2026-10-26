@@ -56,6 +56,8 @@ export class Hud {
   private cdLeft = 3;
   private cdBump = 1;
   private cdA = 0;
+  /** 倒计时的 x（默认 195；越线果靠近中间时让到另一侧） */
+  private cdX = 195;
   private t = 0;
   private iconFn: (ctx: CanvasRenderingContext2D, level: number, r: number) => void = drawIdleFace;
 
@@ -164,6 +166,42 @@ export class Hud {
     const danger = g.dangerLevel === 2 && g.scene === 'playing';
     this.cdA += ((danger ? 1 : 0) - this.cdA) * Math.min(1, dt * 12);
     if (this.cdBump > 1) this.cdBump = Math.max(1, this.cdBump - dt * 2);
+    {
+      const C = CONFIG.layout.countdown;
+      let tx = C.x;
+      if (danger) {
+        // 数字区约 ±46 px、y ≈ 606–690：从中间往两侧找第一个不压住任何水果的位置
+        const half = 46;
+        const y0 = C.labelY - 14;
+        const y1 = C.y + C.size * 0.6;
+        const L = CONFIG.layout.jar.inner.L + half;
+        const R = CONFIG.layout.jar.inner.R - half;
+        let best = C.x;
+        let bestHit = Infinity;
+        for (let k = 0; k <= 26; k++) {
+          const off = ((k + 1) >> 1) * 10 * (k & 1 ? 1 : -1);
+          const x = C.x + off;
+          if (x < L || x > R) continue;
+          let hit = 0;
+          for (const f of g.fruits) {
+            const b = f.body;
+            if (!b.alive || f.state === 'flying' || b.y - b.r > y1 || b.y + b.r < y0) continue;
+            const dx = Math.max(0, Math.abs(b.x - x) - half);
+            const dy = b.y < y0 ? y0 - b.y : b.y > y1 ? b.y - y1 : 0;
+            const pen = b.r - Math.hypot(dx, dy);
+            if (pen > 0) hit += pen;
+          }
+          if (hit < bestHit - 0.5) {
+            bestHit = hit;
+            best = x;
+            if (hit === 0) break;
+          }
+        }
+        tx = best;
+      }
+      if (this.cdA < 0.05) this.cdX = tx;
+      else this.cdX += (tx - this.cdX) * Math.min(1, dt * 10);
+    }
   }
 
   draw(ctx: CanvasRenderingContext2D, g: Game, painter: FruitPainter): void {
@@ -460,12 +498,12 @@ export class Hud {
     const C = CONFIG.layout.countdown;
     ctx.globalAlpha = this.show * this.cdA;
     ctx.save();
-    ctx.translate(C.x, C.labelY);
+    ctx.translate(this.cdX, C.labelY);
     candyText(ctx, '危险！', 0, 0, 16, 'red', '#FF3B5C');
     ctx.restore();
     const b = this.cdBump;
     ctx.save();
-    ctx.translate(C.x, C.y);
+    ctx.translate(this.cdX, C.y);
     ctx.scale(b, b);
     candyText(ctx, CD_TXT[Math.max(1, Math.min(3, this.cdLeft))]!, 0, 0, C.size, 'red', '#FF3B5C');
     ctx.restore();

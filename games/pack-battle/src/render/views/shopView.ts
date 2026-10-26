@@ -7,7 +7,7 @@ import { inkStroke, rectPts, type Pts } from '../ink.ts';
 import { C, RARITY_COLOR, RARITY_TINT, cached, drawGoldCoin, drawPaper, pat } from '../kit.ts';
 import type { ArrangeLayout } from '../layout.ts';
 import { drawItemAt } from '../sprites.ts';
-import { HAND, drawSprite, text } from '../text.ts';
+import { LOGO, drawSprite, text } from '../text.ts';
 import { rgba } from '../textures.ts';
 import { drawStamp, regSpring } from '../ui/widgets.ts';
 
@@ -254,7 +254,7 @@ export class ShopView {
     const afford = o.gold >= c.shownPrice;
     drawSprite(ctx, priceRibbon(r.w - 6, def.rarity), -r.w / 2 + 3, r.h - 27);
     drawGoldCoin(ctx, -12, r.h - 14, 8);
-    text(ctx, String(c.shownPrice), 2, r.h - 13, { size: 21, family: HAND, color: afford ? '#fff6dc' : '#ffb4a0', stroke: C.ink, strokeW: 3.5, align: 'left' });
+    text(ctx, String(c.shownPrice), 2, r.h - 13, { size: 19, family: LOGO, color: afford ? '#fff6dc' : '#ffb4a0', stroke: C.ink, strokeW: 3.5, align: 'left' });
     if (!afford) {
       ctx.fillStyle = 'rgba(40,20,10,0.18)';
       ctx.fillRect(-r.w / 2 + 3, 4, r.w - 6, r.h - 32);
@@ -270,11 +270,15 @@ export class ShopView {
     }
     // 稀有度角标（精良以上）
     if (def.rarity > 0) {
+      // 纯色小签 + 白字（11px），在羊皮纸上也读得清
       ctx.fillStyle = RARITY_COLOR[def.rarity];
+      ctx.strokeStyle = 'rgba(43,29,20,0.7)';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(-r.w / 2 + 9, 11, 3.2, 0, Math.PI * 2);
+      ctx.roundRect(-r.w / 2 + 3, 3, 30, 16, 4);
       ctx.fill();
-      text(ctx, RARITY_NAMES[def.rarity], -r.w / 2 + 15, 11, { size: 9, weight: 800, color: RARITY_COLOR[def.rarity], align: 'left' });
+      ctx.stroke();
+      text(ctx, RARITY_NAMES[def.rarity], -r.w / 2 + 18, 11.5, { size: 11, weight: 900, color: '#ffffff' });
     }
     if (o.hover === i && !c.lifted) {
       ctx.strokeStyle = rgba(C.goldLight, 0.8);

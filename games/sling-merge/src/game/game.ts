@@ -295,7 +295,7 @@ export class Game {
         s.hopLevel = this.run.next;
         s.hopT = 0;
         const forced = this.tutorial.forcedNext();
-        this.run.next = forced ?? this.spawner.roll(this.run.highestLevel);
+        this.run.next = forced ?? this.spawner.roll(this.run.highestLevel, this.run.shots, this.rescueLevel());
         bus.emit({ t: 'nextChanged', level: this.run.next });
         bus.emit({ t: 'hop', level: s.hopLevel });
       }
@@ -699,6 +699,18 @@ export class Game {
   }
 
   // ───────────── 警戒线 ─────────────
+
+  /** 预警 / 危险中：返回最该被救的那颗果的等级（越线最久的，否则最低的），否则 0 */
+  private rescueLevel(): number {
+    if (this.dangerLevel === 0) return 0;
+    if (this.dangerCulprit && this.dangerMax > 0) return this.dangerCulprit.level;
+    let low: Fruit | null = null;
+    for (const f of this.fruits) {
+      if (f.state !== 'active') continue;
+      if (!low || f.body.y + f.body.r > low.body.y + low.body.r) low = f;
+    }
+    return low ? low.level : 0;
+  }
 
   private updateDanger(dt: number): void {
     const D = CONFIG.danger;
