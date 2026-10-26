@@ -209,7 +209,14 @@ export class Screens {
   }
 
   // ---------------------------------------------------------------- toast
-  toast(text: string, ms = 3000): void {
+  /** replace = 先淡出现有提示（操作触发的提示打断旧提示） */
+  toast(text: string, ms = 3000, replace = false): void {
+    if (replace)
+      for (const old of Array.from(this.toasts.children) as HTMLElement[]) {
+        if (old.classList.contains('out')) continue;
+        old.classList.add('out');
+        window.setTimeout(() => old.remove(), 320);
+      }
     const t = h('div', 'toast');
     t.textContent = text;
     this.toasts.appendChild(t);

@@ -124,14 +124,15 @@ const PANEL_H = H_TOP + GAP1 + H_SCORE + GAP2 + H_MSG + GAP4 + H_ROSTER; // 208
 const PANEL_W = REF_OUTER;
 
 function landscapeLayout(vw: number, vh: number, safeTop: number, safeBottom: number, dpr: number): Layout {
-  const availH = vh - safeTop - safeBottom - 12;
-  const frame0 = 5;
+  // 高度决定格子大小（12 行竖排）：上下不留边，边框压到 3px，让格子尽量大
+  const availH = vh - safeTop - safeBottom;
+  const frame0 = 3;
   const cell = Math.max(20, Math.min(64, Math.floor((availH - 2 * frame0) / ROWS)));
   const ow0 = cell * COLS + 2 * frame0;
   const GAP = 18;
   const PAD = 10;
   const s = Math.max(0.7, Math.min(1.15, (availH - 8) / (PANEL_H + 34), (vw - ow0 - GAP - 2 * PAD) / PANEL_W));
-  const frame = Math.max(4, Math.round(FRAME * Math.min(1, cell / 40)));
+  const frame = Math.max(frame0, Math.min(Math.round(FRAME * Math.min(1, cell / 40)), Math.floor((availH - cell * ROWS) / 2)));
   const ow = cell * COLS + 2 * frame;
   const oh = cell * ROWS + 2 * frame;
   const S = (v: number) => Math.round(v * s);
@@ -139,7 +140,7 @@ function landscapeLayout(vw: number, vh: number, safeTop: number, safeBottom: nu
   const colW = Math.min(vw, ow + GAP + pw + 2 * PAD);
   const colX = Math.floor((vw - colW) / 2);
   const bx = PAD;
-  const by = Math.round(safeTop + Math.max(6, (vh - safeTop - safeBottom - oh) / 2));
+  const by = Math.round(safeTop + Math.max(0, (vh - safeTop - safeBottom - oh) / 2));
   const boardOuter: Rect = { x: bx, y: by, w: ow, h: oh };
   const board: Rect = { x: bx + frame, y: by + frame, w: cell * COLS, h: cell * ROWS };
   const x0 = bx + ow + GAP;

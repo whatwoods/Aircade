@@ -32,6 +32,9 @@ const ROLL = CONFIG.timing.numberRollMs;
  * 格子视图状态（SoA）：翻牌、波纹、光照缓动、数字滚轮、标记、道具、剪影弹出。
  * 显示值独立于逻辑真相，由 director 按时间线推进。
  */
+/** 入口火把在楼梯格内的横向位置（格宽比例），side 0 = 左、1 = 右 */
+export const torchOffset = (side: number): number => (side === 0 ? 5.5 : 34.5) / 40;
+
 export class BoardView {
   game!: Game;
   readonly face = new Uint8Array(N);
@@ -336,17 +339,19 @@ export class BoardView {
       const ds = s * (0.55 + 0.05 * L);
       ctx.drawImage(T.decal[(v >> 2) % 3].c, x + (s - ds) / 2, y + (s - ds) / 2, ds, ds);
     }
-    if (i === START_CELL) ctx.drawImage(T.stairs.c, x, y, s, s);
+    if (i === START_CELL) {
+      ctx.drawImage(T.stairs.c, x, y, s, s);
+      // 入口火把：立在楼梯格两侧（楼梯格没有数字，给相邻格数字留足空间）
+      const k = s / 40;
+      for (let side = 0; side < 2; side++) {
+        const tx = x + torchOffset(side) * s;
+        ctx.drawImage(T.torch.c, tx - 5 * k, y + s - 17 * k, 10 * k, 15.7 * k);
+      }
+    }
     if (this.game.b.candle[i]) {
       const k = s / 40;
       // 小号矮烛，缩在左下角，不压格内数字（数字在烛台格右移让位）
       ctx.drawImage(T.candleBase.c, x + 2 * k, y + s - 11 * k, 7.5 * k, 9.6 * k);
-    }
-    const ex = cx(i);
-    const ey = cy(i);
-    if (ey === 11 && (ex === 3 || ex === 5)) {
-      const k = s / 40;
-      ctx.drawImage(T.torch.c, x + (ex === 3 ? 4.8 : s / k - 4.8) * k - 7 * k, y + 1 * k, 14 * k, 22 * k);
     }
   }
 
@@ -668,12 +673,12 @@ export class BoardView {
         }
       }
     }
-    // 入口火把火焰
-    for (const ex of [3, 5]) {
-      const i = 11 * COLS + ex;
+    // 入口火把火焰（楼梯格两侧）
+    for (let side = 0; side < 2; side++) {
+      const i = 11 * COLS + 3 + side * 2;
       if (this.faceShown(i, world) !== 1 || this.light[i] < 0.05) continue;
-      const fx0 = bx + (ex === 3 ? 3 : 6) * s + (ex === 3 ? 4.8 : -4.8) * k;
-      calls += this.drawFlame(ctx, base, fx0, by + 11 * s + 2 * k, 1.05 * k, tSec, ex * 7, this.ext[i] * Math.min(1, this.light[i] / 0.6));
+      const fx0 = bx + (cx(START_CELL) + torchOffset(side)) * s;
+      calls += this.drawFlame(ctx, base, fx0, by + 12 * s - 13.5 * k, 0.7 * k, tSec, 21 + side * 14, this.ext[i] * Math.min(1, this.light[i] / 0.6));
     }
     // 升级：暗砖镀金边
     const gt = (world - this.goldT0) / 700;

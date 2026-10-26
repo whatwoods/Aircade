@@ -76,8 +76,9 @@ export class App implements Stage, InputHandler {
   settings: Settings;
   records: Records;
   tips: Record<string, boolean>;
-  private tipQueue: { id: string; text: string }[] = [];
+  private tipQueue: { id: string; text: string; urgent: boolean; expire: number }[] = [];
   private nextTipAt = 0;
+  private lastTipAt = -1e9;
   /** 本局玩家是否已做过第一次操作（之前不弹情境提示） */
   private userActed = false;
   opts: AppOptions;
@@ -471,6 +472,8 @@ export class App implements Stage, InputHandler {
     this.lethalCell = -1;
     this.userActed = false;
     this.tipQueue.length = 0;
+    this.lastTipAt = -1e9;
+    this.nextTipAt = 0;
     this.lowHp = false;
     this.tutEyes = false;
     this.closeRadial();
@@ -687,23 +690,34 @@ export class App implements Stage, InputHandler {
     if (this.game) this.game.chordEnabled = s.chord;
   }
 
-  /** 情境提示：排队，同一时刻只显示一条；引导期间和玩家首次操作前暂缓 */
-  tip(id: string, text: string): void {
+  /**
+   * 情境提示：排队，同一时刻只显示一条；引导期间和玩家首次操作前暂缓。
+   * urgent = 由玩家刚才的操作触发：插到队首、可打断当前提示，过期很快（过时就丢弃）。
+   */
+  tip(id: string, text: string, urgent = false): void {
     if (this.tips[id]) return;
     for (const q of this.tipQueue) if (q.id === id) return;
-    this.tipQueue.push({ id, text });
+    const T = CONFIG.timing;
+    const item = { id, text, urgent, expire: this.clock.real + (urgent ? T.tipUrgentTtlMs : T.tipTtlMs) };
+    if (urgent) this.tipQueue.unshift(item);
+    else this.tipQueue.push(item);
   }
 
   private tipUpdate(): void {
-    if (!this.tipQueue.length) return;
     const real = this.clock.real;
-    if (real < this.nextTipAt || this.state !== 'playing' || !this.userActed) return;
+    while (this.tipQueue.length && this.tipQueue[0].expire < real) this.tipQueue.shift();
+    if (!this.tipQueue.length) return;
+    if (this.state !== 'playing' || !this.userActed) return;
     if (this.tut.active) return;
     if (this.director.locked || this.screens.modalOpen) return;
-    const q = this.tipQueue.shift()!;
-    this.tips[q.id] = true;
+    const head = this.tipQueue[0];
+    const ready = head.urgent ? real >= this.lastTipAt + CONFIG.timing.tipMinShowMs : real >= this.nextTipAt;
+    if (!ready) return;
+    this.tipQueue.shift();
+    this.tips[head.id] = true;
     save('tips', this.tips);
-    this.screens.toast(q.text, CONFIG.timing.toastMs);
+    this.screens.toast(head.text, CONFIG.timing.toastMs, head.urgent);
+    this.lastTipAt = real;
     this.nextTipAt = real + CONFIG.timing.toastMs + CONFIG.timing.tipGapMs;
   }
 

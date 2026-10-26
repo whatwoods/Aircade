@@ -9,7 +9,7 @@ import type { Tweens } from '../core/tween';
 import { COLS, N, START_CELL, cx, cy } from '../game/board';
 import type { Game } from '../game/rules';
 import { type GameEvent, Kind } from '../game/types';
-import type { BoardView } from './boardView';
+import { type BoardView, torchOffset } from './boardView';
 import type { Camera } from './camera';
 import type { DragonView } from './dragonView';
 import { P, type Fx } from './fx';
@@ -38,7 +38,7 @@ export interface Stage {
   game: Game;
   ov: Overlay;
   reduced: boolean;
-  tip(id: string, text: string): void;
+  tip(id: string, text: string, urgent?: boolean): void;
   onSequenceEnd(won: boolean): void;
 }
 
@@ -222,7 +222,7 @@ export class Director {
           vibrate(15);
           s.cam.add(0.15);
           s.hud.message('巨龙之威：需要至少 14 点生命', 'red', s.clock.real);
-          s.tip('disturb', '巨龙需要生命 ≥ 14 才能挑战：先升级吧');
+          s.tip('disturb', '巨龙需要生命 ≥ 14 才能挑战：先升级吧', true);
           break;
         case 'dragonFight':
           flushXp();
@@ -280,7 +280,7 @@ export class Director {
         const r1 = (maxD + 1) * L.cell;
         s.fx.ring(this.px(origin), this.py(origin), L.cell * 0.4, r1, Math.min(T.rippleMaxMs, T.rippleStepMs * maxD) + 260, 0.25, 1, 0);
       }
-      if (fromKill && n > 1) s.tip('zero', '数字归零：周围没有怪了，自动展开！');
+      if (fromKill && n > 1) s.tip('zero', '数字归零：周围没有怪了，自动展开！', true);
     });
   }
 
@@ -310,11 +310,11 @@ export class Director {
     if (it === 1 && s.board.itemState[i] === 0) {
       s.sfx.chestReveal();
       for (let k = 0; k < 2; k++) s.fx.spawn(P.Spark, this.px(i) + s.fx.rr(-8, 8), this.py(i), s.fx.rr(-30, 30), s.fx.rr(-90, -40), 600, 4, 1, 120, 0.5);
-      s.tip('chest', '宝箱随时可以打开：快升级又残血时开，等于免费回满！');
+      s.tip('chest', '宝箱随时可以打开：快升级又残血时开，等于免费回满！', true);
     } else if (it === 2 && s.board.itemState[i] === 0) {
       s.sfx.potionReveal();
       for (let k = 0; k < 3; k++) s.fx.spawn(P.Bubble, this.px(i) + s.fx.rr(-5, 5), this.py(i) + 4, s.fx.rr(-6, 6), s.fx.rr(-30, -15), 900, 3, 2, -10, 0.2);
-      s.tip('potion', '血瓶随时可喝（+5 生命）；满血时不会浪费');
+      s.tip('potion', '血瓶随时可喝（+5 生命）；满血时不会浪费', true);
     }
   }
 
@@ -719,9 +719,9 @@ export class Director {
       s.sfx.ignite();
       vibrate(10);
       const L = s.L;
-      for (const ex of [3, 5]) {
-        const fx0 = L.board.x + (ex === 3 ? 3 : 6) * L.cell + (ex === 3 ? 4.8 : -4.8) * (L.cell / 40);
-        const fy0 = L.board.y + 11 * L.cell + 4;
+      for (let side = 0; side < 2; side++) {
+        const fx0 = L.board.x + (cx(START_CELL) + torchOffset(side)) * L.cell;
+        const fy0 = L.board.y + 12 * L.cell - 14 * (L.cell / 40);
         for (let k = 0; k < 8; k++) s.fx.spawn(P.Fire, fx0 + s.fx.rr(-3, 3), fy0, s.fx.rr(-30, 30), s.fx.rr(-140, -60), 500, s.fx.rr(6, 12), 2, -40, 0.8);
       }
     });

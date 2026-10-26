@@ -1,6 +1,7 @@
 import { flicker } from '../core/noise';
 import { COLS, ROWS, N, cx, cy, inLair } from '../game/board';
 import { type Sprite, makeCanvas, radialBlob } from './gfx';
+import { torchOffset } from './boardView';
 import type { Layout } from './layout';
 
 /** 每格 texel 数（文档 §4.4） */
@@ -189,8 +190,8 @@ export class Lighting {
       const rB = 3 * T;
       for (let side = 0; side < 2; side++) {
         const fl = flicker(tSec, 50 + side * 7);
-        const x = (side === 0 ? 3.12 : 5.88) * T + MARGIN * T + 0.6 * flicker(tSec * 1.4, 60 + side);
-        const y = (11.25 + MARGIN) * T;
+        const x = (4 + torchOffset(side)) * T + MARGIN * T + 0.6 * flicker(tSec * 1.4, 60 + side);
+        const y = (11.6 + MARGIN) * T;
         const s = Math.min(1, inp.brazier * (1 + 0.14 * fl) * boost * dim * inp.ext[COLS * 11 + 3 + side * 2]);
         d.globalAlpha = s;
         d.drawImage(this.white.c, x - rB, y - rB, rB * 2, rB * 2);

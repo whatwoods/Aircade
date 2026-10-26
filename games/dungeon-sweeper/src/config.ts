@@ -140,6 +140,10 @@ export const CONFIG = {
     toastMs: 3000,
     /** 两条情境提示之间的最小间隔 */
     tipGapMs: 1500,
+    /** 普通提示排队过期时间、操作触发提示过期时间、操作提示打断前一条的最短展示时间 */
+    tipTtlMs: 12000,
+    tipUrgentTtlMs: 2500,
+    tipMinShowMs: 900,
   },
 
   /** 打击感：trauma / hitstop / 震动（层级见文档 §5.1） */
