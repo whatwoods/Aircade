@@ -10,6 +10,14 @@ const pred = { x: 0, t: 0 };
 
 export class Autoplay {
   enabled = false;
+  /** "average player" mode for balancing: reacts every 0.2–0.3 s, catches with ±20 u error, random cards */
+  human = false;
+  private reactT = 0;
+  private hseed = 12345;
+  private hr(): number {
+    this.hseed = (Math.imul(this.hseed, 1664525) + 1013904223) >>> 0;
+    return this.hseed / 4294967296;
+  }
   private hold = 0;
   private lastTarget = 195;
   /** danger intervals on the catch line: [lo, hi, seconds until it arrives] */
@@ -45,6 +53,11 @@ export class Autoplay {
     if (!this.enabled) return;
     const p = g.player;
     const half = g.stats.paddleW / 2;
+    if (this.human) {
+      this.reactT -= dt;
+      if (this.reactT > 0) return;
+      this.reactT = 0.2 + this.hr() * 0.1;
+    }
     let target = this.lastTarget;
     // 1) catch the most valuable ball arriving within 0.9 s
     let best = -1;
@@ -114,6 +127,7 @@ export class Autoplay {
       }
       target = bestE;
     }
+    if (this.human) target += (this.hr() - 0.5) * 40;
     this.hold -= dt;
     this.lastTarget = target;
     p.targetX = Math.max(F.wallL + half, Math.min(F.wallR - half, target));
@@ -137,6 +151,10 @@ export class Autoplay {
   }
 
   pickCard(g: Game, cards: Card[]): number {
+    if (this.human) {
+      for (let i = 0; i < cards.length; i++) if (cards[i]!.kind === 'evolution') return i;
+      return Math.floor(this.hr() * cards.length) % cards.length;
+    }
     let best = 0;
     let bv = -1;
     for (let i = 0; i < cards.length; i++) {
