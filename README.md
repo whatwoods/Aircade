@@ -29,7 +29,7 @@
 | dungeon-sweeper | Canvas 2D 单画布 + 低分辨率光照图（烛光/黑暗）；菜单与弹窗用 DOM + CSS | 带种子的地图生成器（入口安全、巨龙巢穴固定在中心）；伪 3D 翻牌 | 炭黑冷灰石砖 + 琥珀烛光 | Cinzel / Cinzel Decorative |
 | brick-survivor | 自研 WebGL 精灵批渲染器（WebGL2，回退 WebGL1）：预烘焙辉光 + 加色混合 + 1/4 分辨率 bloom，按帧时自动降画质 | 自研 120 Hz 固定步长碰撞，砖块网格 O(1) 查询 | 深空黑紫 + 高饱和霓虹 | Orbitron / Rajdhani |
 | sling-merge | Canvas 2D，水果、阴影、粒子预渲染成精灵 | 自研圆形刚体求解器（子步 + 热启动 + 休眠），弹道预测和实际轨迹逐步一致 | 奶油马卡龙糖果色、果冻 Q 弹 | Fredoka |
-| pack-battle | Canvas 2D 全屏单画布 + 离屏分层缓存，UI 控件也画在画布里 | 背包格子摆放 / 相邻加成 / 合成升星；固定 1/60 s 步长的自动战斗模拟 | 皮革、木桌、羊皮纸、墨线手绘 | Patrick Hand / Kalam |
+| pack-battle | Canvas 2D 全屏单画布 + 离屏分层缓存，UI 控件也画在画布里 | 6 列 × 5 行背包的格子摆放 / 相邻加成 / 合成升星；固定 1/60 s 步长的自动战斗模拟 | 皮革、木桌、羊皮纸、墨线手绘 | Patrick Hand / Kalam |
 
 ## 本地运行
 
