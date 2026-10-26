@@ -505,6 +505,7 @@ export class App implements Stage, InputHandler {
     const b = g.breakdown ?? g.computeBreakdown(won);
     const r = commitRecords(this.records, b);
     this.state = 'result';
+    this.ov.bigOutT0 = this.clock.real;
     this.screens.showPauseBtn(false);
     this.lowHp = false;
     this.ov.lowHp = false;

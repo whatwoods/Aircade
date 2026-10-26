@@ -37,6 +37,8 @@ export class Overlay {
   bigText: Sprite | null = null;
   bigSub: Sprite | null = null;
   bigT0 = -1e9;
+  /** 结算面板出现时大字淡出 */
+  bigOutT0 = -1e9;
   xray = false;
   fog = true;
   lowHp = false;
@@ -52,6 +54,7 @@ export class Overlay {
     this.redVig.v = 0;
     this.bigText = null;
     this.bigSub = null;
+    this.bigOutT0 = -1e9;
   }
 }
 
@@ -357,7 +360,7 @@ export class Renderer {
     if (ov.bigText) {
       const t = clamp01((real - ov.bigT0) / 500);
       ctx.setTransform(d, 0, 0, d, 0, 0);
-      ctx.globalAlpha = t;
+      ctx.globalAlpha = t * (ov.bigOutT0 > ov.bigT0 ? 1 - clamp01((real - ov.bigOutT0) / 350) : 1);
       const sc = 1.25 - 0.25 * backOut(t);
       const y = L.board.y + L.board.h * 0.42;
       drawText(ctx, ov.bigText, W / 2, y, 0.5, d, sc);
