@@ -1,1 +1,0 @@
-export { updateProfile } from './actions';

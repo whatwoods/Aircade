@@ -1,7 +1,0 @@
-node_modules
-.next
-out
-coverage
-drizzle
-public/fonts
-pnpm-lock.yaml

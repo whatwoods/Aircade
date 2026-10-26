@@ -1,62 +1,8 @@
-# dependencies
-node_modules
-.pnpm-store
-
-# next.js
-.next
-out
-*.tsbuildinfo
-
-# env (keep .env.example)
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-!.env.example
-
-# logs
+node_modules/
+dist/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# vitest / coverage
-coverage
-.vitest
-
-# drizzle
-drizzle/.cache
-
-# uploads / runtime
-public/uploads
-
-# vercel
-.vercel
-
-# turbo
-.turbo
-
-# IDE / Editor
-.claude
-.idea
-.vscode/*
-!.vscode/settings.json
-*.swp
-*.swo
-.project
-.classpath
-.settings/
-
-# OS
 .DS_Store
-Thumbs.db
-desktop.ini
-
-# cache
-.eslintcache
-.stylelintcache
-
-# local git bundles
-*.bundle
+.vite/
+coverage/
+test-results/
+playwright-report/
