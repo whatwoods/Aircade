@@ -7,7 +7,7 @@ import { woodField } from '../textures.ts';
 import { drawDesktopDecor, drawCandleFlame, decorLayout } from './desktopDecor.ts';
 
 let bg: HTMLCanvasElement | null = null;
-let bgVer = -1;
+let bgVer = '';
 
 /** 逻辑坐标 → CSS 像素 */
 function cssX(x: number): number {
@@ -106,7 +106,7 @@ let comp: HTMLCanvasElement | null = null;
 let compK = -1;
 let compY = -1;
 let compL = -1;
-let compVer = -1;
+let compVer = '';
 
 /** 由场景在 update 里设置（0 = 关闭） */
 export function setBackdrop(k: number, bandY: number, lamp: number): void {
@@ -116,9 +116,11 @@ export function setBackdrop(k: number, bandY: number, lamp: number): void {
 }
 
 export function drawBackground(ctx: CanvasRenderingContext2D, time: number): void {
-  if (!bg || bgVer !== stage.version) {
+  // 只在几何变化时重画；字体加载（stage.version++）只影响桌面侧边道具上的文字
+  const key = `${stage.vw}x${stage.vh}@${stage.dpr}/${stage.s}/${stage.ox}/${stage.oy}/${stage.H}` + (stage.desktop ? '/' + stage.version : '');
+  if (!bg || bgVer !== key) {
     bg = build();
-    bgVer = stage.version;
+    bgVer = key;
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const kq = Math.round(shadeK * 16) / 16;
@@ -127,7 +129,7 @@ export function drawBackground(ctx: CanvasRenderingContext2D, time: number): voi
   else {
     if (!comp || comp.width !== bg.width || comp.height !== bg.height) {
       comp = makeCanvas(bg.width, bg.height)[0];
-      compVer = -1;
+      compVer = '';
     }
     if (kq !== compK || lq !== compL || shadeY !== compY || compVer !== bgVer) {
       const cc = comp.getContext('2d')!;

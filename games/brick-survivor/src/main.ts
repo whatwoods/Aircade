@@ -102,6 +102,7 @@ async function boot(): Promise<void> {
   const ctx = GLContext.create();
   if (!ctx) {
     showNoGl();
+    void loadFonts(() => {});
     return;
   }
   let atlasRef: Atlas | null = null;

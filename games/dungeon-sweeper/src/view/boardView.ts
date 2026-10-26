@@ -102,7 +102,9 @@ export class BoardView {
   private cache: HTMLCanvasElement;
   private cctx: CanvasRenderingContext2D;
   private cacheDirty = true;
-  private cacheKey = '';
+  private ckCell = -1;
+  private ckDpr = -1;
+  private ckVer = -1;
   version = 0;
 
   constructor(tex: Textures, gl: Glyphs, sil: Silhouettes, fx: Fx, hooks: BoardHooks) {
@@ -376,10 +378,11 @@ export class BoardView {
         const py = y + s * 0.88;
         const c = Math.cos(rot);
         const sn = Math.sin(rot);
-        const m = ctx.getTransform();
+        const m = this.curBase;
         ctx.transform(c, sn, -sn, c, px - c * px + sn * py, py - sn * px - c * py);
         ctx.drawImage(spr.c, x + (s - ds) / 2, y + (s - ds) / 2, ds, ds);
-        ctx.setTransform(m);
+        if (this.inFlip) ctx.setTransform(this.flipM.a, this.flipM.b, this.flipM.c, this.flipM.d, this.flipM.e, this.flipM.f);
+        else ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
       } else ctx.drawImage(spr.c, x + (s - ds) / 2, y + (s - ds) / 2, ds, ds);
     } else ctx.drawImage(spr.c, x, y, s, s);
     ctx.globalAlpha = 1;
@@ -426,8 +429,12 @@ export class BoardView {
   }
 
   // ------------------------------------------------------------ draw: 棋盘层（光照之下）
+  private curBase: Mat = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+  private flipM: Mat = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+  private inFlip = false;
   drawTiles(ctx: CanvasRenderingContext2D, base: Mat, L: Layout, world: number, real: number): number {
     if (this.hideBoard) return 0;
+    this.curBase = base;
     let calls = 0;
     const s = L.cell;
     const bx = L.board.x;
@@ -440,9 +447,10 @@ export class BoardView {
       if (dd !== this.dynPrev[i]) changed = true;
       this.dynPrev[i] = dd;
     }
-    const key = `${L.cell}|${L.dpr}|${this.version}`;
-    if (changed || this.cacheDirty || key !== this.cacheKey) {
-      this.cacheKey = key;
+    if (changed || this.cacheDirty || L.cell !== this.ckCell || L.dpr !== this.ckDpr || this.version !== this.ckVer) {
+      this.ckCell = L.cell;
+      this.ckDpr = L.dpr;
+      this.ckVer = this.version;
       this.rebuildCache(L, world);
       calls += 99;
     }
@@ -505,6 +513,8 @@ export class BoardView {
       ctx.drawImage(T.tileShadow.c, ccx - shS / 2, ccy + 3 * Lf + 2 * Lf - shS / 2, shS, shS);
       ctx.globalAlpha = 1;
       ctx.transform(a00, a01, a01, a11, ccx - a00 * ccx - a01 * ccy, ccy - a01 * ccx - a11 * ccy);
+      mulMat(base, a00, a01, a01, a11, ccx - a00 * ccx - a01 * ccy, ccy - a01 * ccx - a11 * ccy, this.flipM);
+      this.inFlip = true;
       const front = p < 0.5;
       const showRevealed = front ? this.flipTo[i] === 0 : this.flipTo[i] === 1;
       const oy = -2 * Lf;
@@ -516,6 +526,7 @@ export class BoardView {
       ctx.globalAlpha = (1 - c) * (front ? 0.5 : 0.35);
       ctx.drawImage(T.mask.c, x, y + oy, s, s);
       ctx.globalAlpha = 1;
+      this.inFlip = false;
       ctx.setTransform(base.a, base.b, base.c, base.d, base.e, base.f);
       // 厚度条
       if (c < 0.3) {
@@ -953,4 +964,20 @@ export class BoardView {
     }
     return calls;
   }
+}
+
+/** out = m · [a b c d e f]（Canvas 矩阵乘法顺序，与 ctx.transform 相同） */
+function mulMat(m: Mat, a: number, b: number, c: number, d: number, e: number, f: number, out: Mat): void {
+  const na = m.a * a + m.c * b;
+  const nb = m.b * a + m.d * b;
+  const nc = m.a * c + m.c * d;
+  const nd = m.b * c + m.d * d;
+  const ne = m.a * e + m.c * f + m.e;
+  const nf = m.b * e + m.d * f + m.f;
+  out.a = na;
+  out.b = nb;
+  out.c = nc;
+  out.d = nd;
+  out.e = ne;
+  out.f = nf;
 }

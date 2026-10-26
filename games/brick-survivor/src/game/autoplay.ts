@@ -12,6 +12,34 @@ export class Autoplay {
   enabled = false;
   private hold = 0;
   private lastTarget = 195;
+  /** danger intervals on the catch line: [lo, hi, seconds until it arrives] */
+  private zones = new Float32Array(64 * 3);
+  private nz = 0;
+
+  private addZone(a: number, b: number, t: number): void {
+    if (this.nz >= 64) return;
+    const i = this.nz * 3;
+    this.zones[i] = a;
+    this.zones[i + 1] = b;
+    this.zones[i + 2] = t;
+    this.nz++;
+  }
+
+  /** moving from a to b would sweep through a zone that lands within 0.3 s */
+  private blocked(a: number, b: number): boolean {
+    for (let i = 0; i < this.nz; i++) {
+      if (this.zones[i * 3 + 2]! > 0.3) continue;
+      const zl = this.zones[i * 3]!;
+      const zh = this.zones[i * 3 + 1]!;
+      if ((a <= zl && b > zl) || (a >= zh && b < zh)) return true;
+    }
+    return false;
+  }
+
+  private unsafe(x: number): boolean {
+    for (let i = 0; i < this.nz; i++) if (x > this.zones[i * 3]! && x < this.zones[i * 3 + 1]!) return true;
+    return false;
+  }
 
   decide(g: Game, dt: number): void {
     if (!this.enabled) return;
@@ -52,17 +80,39 @@ export class Autoplay {
       }
       target = gx >= 0 ? gx : this.threatX(g);
     }
-    // 3) dodge bullets / lasers
+    // 3) safety first: collect the danger intervals of incoming bullets and live/telegraphed lasers on the
+    //    catch line, and if the wanted spot is inside one, move to the nearest safe edge instead
+    this.nz = 0;
     for (const e of g.bulletsSys.pool) {
       if (!e.alive || e.vy <= 0) continue;
-      const t = (F.catchY - 10 - e.y) / e.vy;
-      if (t < 0 || t > 0.7) continue;
+      // bullets stay dangerous until they are fully below the paddle, not just past the catch line
+      if (e.y > F.catchY + config.player.paddleH + e.r + 4) continue;
+      const t = Math.max(0, (F.catchY - 10 - e.y) / e.vy);
+      if (t > 0.8) continue;
       const ex = e.x + e.vx * t;
-      if (Math.abs(ex - target) < half + 14) target = ex + (ex > target ? -(half + 22) : half + 22);
+      const m = half + e.r + 10;
+      this.addZone(ex - m, ex + m, t);
     }
-    for (const l of g.bulletsSys.lasers) {
-      if (!l.alive) continue;
-      if (Math.abs(l.x - target) < half + 24) target = l.x + (l.x > 195 ? -(half + 40) : half + 40);
+    const lw = config.bosses.omega.laserW * 0.5 + half * 0.6 + 14;
+    for (const l of g.bulletsSys.lasers) if (l.alive) this.addZone(l.x - lw, l.x + lw, Math.max(0, l.warnDur - l.warnT));
+    if (this.nz > 0 && (this.unsafe(target) || this.blocked(p.x, target))) {
+      // nearest safe edge that can be reached without sweeping through something about to land
+      const lo = F.wallL + half;
+      const hi = F.wallR - half;
+      let bestE = p.x;
+      let bestD = 1e9;
+      for (let i = 0; i < this.nz; i++) {
+        for (let k = 0; k < 2; k++) {
+          const e = this.zones[i * 3 + k]! + (k ? 1 : -1);
+          if (e < lo || e > hi || this.unsafe(e) || this.blocked(p.x, e)) continue;
+          const d = Math.abs(e - p.x) + 0.3 * Math.abs(e - target);
+          if (d < bestD) {
+            bestD = d;
+            bestE = e;
+          }
+        }
+      }
+      target = bestE;
     }
     this.hold -= dt;
     this.lastTarget = target;
@@ -103,7 +153,9 @@ export class Autoplay {
           if (e.main === id && g.levels[e.partner] > 0) v += 25;
           if (e.partner === id && g.levels[e.main] > 0 && lv < 3) v += 30;
         }
-        if (id === 'fire' || id === 'blast' || id === 'multi' || id === 'power') v += 6;
+        if (id === 'fire' || id === 'blast' || id === 'power') v += 6;
+        // more balls is the backbone of every build (3 → 9 main balls)
+        if (id === 'multi') v += 18;
         if (id === 'aegis' && g.player.hp < 5) v += 20;
         v += g.rng.next() * 4;
       }

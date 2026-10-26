@@ -50,7 +50,8 @@ export class Hud {
   private baseMsg = '';
   private baseTone: MsgTone = 'normal';
   private shield: Sprite | null = null;
-  private shieldKey = '';
+  private shieldW = -1;
+  private shieldD = -1;
   private tw: Tweens;
   private tex: Textures;
   private gl: Glyphs;
@@ -178,11 +179,14 @@ export class Hud {
   }
 
   private lb: { lv: Sprite; xp: Sprite; next: Sprite; score: Sprite; d13: Sprite; ready: Sprite; need: Sprite; hint: Sprite } | null = null;
-  private lbKey = '';
+  private lbS = -1;
+  private lbD = -1;
+  private lbHint = '';
   private bakeLabels(L: Layout): void {
-    const key = `${L.s}|${L.dpr}|${this.hintText}`;
-    if (key === this.lbKey && this.lb) return;
-    this.lbKey = key;
+    if (this.lb && L.s === this.lbS && L.dpr === this.lbD && this.hintText === this.lbHint) return;
+    this.lbS = L.s;
+    this.lbD = L.dpr;
+    this.lbHint = this.hintText;
     const s = L.s;
     const G = this.gl;
     this.lb = {
@@ -199,7 +203,7 @@ export class Hud {
 
   /** 字形重烘焙后调用 */
   invalidate(): void {
-    this.lbKey = '';
+    this.lbS = -1;
     this.msgTextShown = '\u0000';
   }
 
@@ -237,9 +241,9 @@ export class Hud {
 
   // ------------------------------------------------------------ draw
   private bakeShield(L: Layout): void {
-    const key = `${L.badge.w}|${L.dpr}`;
-    if (key === this.shieldKey && this.shield) return;
-    this.shieldKey = key;
+    if (this.shield && L.badge.w === this.shieldW && L.dpr === this.shieldD) return;
+    this.shieldW = L.badge.w;
+    this.shieldD = L.dpr;
     const d = L.dpr;
     const w = L.badge.w;
     const h = L.badge.h;

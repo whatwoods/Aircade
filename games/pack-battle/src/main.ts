@@ -85,7 +85,11 @@ window.addEventListener('resize', () => {
 const warm: (() => void)[] = [];
 for (const id of SHOP_POOL) warm.push(() => warmItem(id, 1));
 for (const p of ['slime', 'goblin', 'spider', 'skeleton', 'ogre', 'rats', 'witch', 'knight', 'ranger', 'dragon'] as PortraitId[]) {
-  warm.push(() => warmPortrait(p));
+  // 立牌分 15 步生成；没做完就把自己放回队首，下一帧接着做
+  const task = (): void => {
+    if (!warmPortrait(p)) warm.unshift(task);
+  };
+  warm.push(task);
 }
 function runWarm(): void {
   const t0 = performance.now();

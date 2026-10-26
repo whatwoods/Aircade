@@ -563,78 +563,163 @@ function silhouette(src: HTMLCanvasElement, color: string): HTMLCanvasElement {
   return c;
 }
 
-function dilate(ctx: CanvasRenderingContext2D, sil: HTMLCanvasElement, r: number, dx = 0, dy = 0): void {
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2;
-    ctx.drawImage(sil, dx + Math.cos(a) * r, dy + Math.sin(a) * r);
-  }
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 + 0.2;
-    ctx.drawImage(sil, dx + Math.cos(a) * r * 0.55, dy + Math.sin(a) * r * 0.55);
+/** 膨胀描边：16 个外圈 + 8 个内圈偏移叠印；part 0/1/2 分三次各画 8 个（用于分帧），省略则一次画完 */
+function dilate(ctx: CanvasRenderingContext2D, sil: HTMLCanvasElement, r: number, dx = 0, dy = 0, part = -1): void {
+  for (let p = part < 0 ? 0 : part; p <= (part < 0 ? 2 : part); p++) {
+    for (let i = 0; i < 8; i++) {
+      const a = p < 2 ? ((i * 2 + p) / 16) * Math.PI * 2 : (i / 8) * Math.PI * 2 + 0.2;
+      const k = p < 2 ? r : r * 0.55;
+      ctx.drawImage(sil, dx + Math.cos(a) * k, dy + Math.sin(a) * k);
+    }
   }
 }
 
-function buildStandee(id: PortraitId, ratio: number): Standee {
+/** 立牌分步生成（空闲预热时每帧只做一步，避免单帧 40ms 的卡顿） */
+interface StandeeBuild {
+  ratio: number;
+  step: number;
+  cc?: HTMLCanvasElement;
+  mc?: HTMLCanvasElement;
+  mctx?: CanvasRenderingContext2D;
+  sil?: HTMLCanvasElement[];
+  white?: HTMLCanvasElement;
+  red?: HTMLCanvasElement;
+}
+const building = new Map<string, StandeeBuild>();
+
+/** 离屏画布的绘制是延迟光栅化的：画到 1×1 画布上强制当场完成，把耗时留在这一步 */
+let flushCtx: CanvasRenderingContext2D | null = null;
+function flush(c: HTMLCanvasElement): void {
+  if (!flushCtx) flushCtx = makeCanvas(1, 1)[1];
+  flushCtx.drawImage(c, 0, 0, 1, 1);
+}
+
+/** 执行一步；返回 true 表示已完成并写入缓存 */
+function stepStandee(id: PortraitId, b: StandeeBuild): boolean {
+  const ratio = b.ratio;
   const W = PW + PADP * 2;
   const H = PH + PADP * 2 + BASE_H;
-  // 角色
-  const [cc, cctx] = makeCanvas(W * ratio, H * ratio);
-  cctx.setTransform(ratio, 0, 0, ratio, PADP * ratio, PADP * ratio);
-  DEFS[id].draw({ ctx: cctx, k: 1, seed: 7 });
-  // 纸板：墨边 → 纸板厚度 → 纸板面 → 角色
-  const [mc, mctx] = makeCanvas(W * ratio, H * ratio);
-  const inkSil = silhouette(cc, C.ink);
-  const thick = silhouette(cc, '#6b5236');
-  const board = silhouette(cc, '#e9dcc0');
-  dilate(mctx, thick, 4.6 * ratio, 2.2 * ratio, 2.4 * ratio);
-  dilate(mctx, inkSil, 5.6 * ratio);
-  dilate(mctx, board, 4.0 * ratio);
-  mctx.drawImage(cc, 0, 0);
-  // 底座（脚下的木块）
-  mctx.setTransform(ratio, 0, 0, ratio, PADP * ratio, PADP * ratio);
-  const bx = PW / 2 - 36;
-  const by = PH - 6;
-  const bp = rectPts(bx, by, 72, BASE_H, 4);
-  mctx.save();
-  mctx.translate(1.5, 3);
-  fillPts(mctx, bp, 'rgba(15,7,2,0.4)');
-  mctx.restore();
-  const g = mctx.createLinearGradient(0, by, 0, by + BASE_H);
-  g.addColorStop(0, '#9a6a3c');
-  g.addColorStop(1, '#5e3a20');
-  fillPts(mctx, bp, g);
-  mctx.strokeStyle = 'rgba(40,20,8,0.35)';
-  mctx.lineWidth = 0.8;
-  for (let i = 0; i < 3; i++) {
-    mctx.beginPath();
-    mctx.moveTo(bx + 4, by + 4 + i * 4 + hashf(i, 3));
-    mctx.lineTo(bx + 68, by + 4 + i * 4 - hashf(i, 5));
-    mctx.stroke();
+  switch (b.step++) {
+    case 0: {
+      // 角色
+      const [cc, cctx] = makeCanvas(W * ratio, H * ratio);
+      cctx.setTransform(ratio, 0, 0, ratio, PADP * ratio, PADP * ratio);
+      DEFS[id].draw({ ctx: cctx, k: 1, seed: 7 });
+      b.cc = cc;
+      flush(cc);
+      return false;
+    }
+    case 1: {
+      const cc = b.cc!;
+      b.sil = [silhouette(cc, C.ink), silhouette(cc, '#6b5236'), silhouette(cc, '#e9dcc0')];
+      for (const c of b.sil) flush(c);
+      return false;
+    }
+    case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9: case 10: {
+      // 纸板：纸板厚度 → 墨边 → 纸板面，三次膨胀各分三步，每步立即光栅化
+      if (!b.mc) {
+        const [mc, mctx] = makeCanvas(W * ratio, H * ratio);
+        b.mc = mc;
+        b.mctx = mctx;
+      }
+      const k = b.step - 3;
+      const which = Math.floor(k / 3);
+      const part = k % 3;
+      const sil = b.sil!;
+      if (which === 0) dilate(b.mctx!, sil[1], 4.6 * ratio, 2.2 * ratio, 2.4 * ratio, part);
+      else if (which === 1) dilate(b.mctx!, sil[0], 5.6 * ratio, 0, 0, part);
+      else {
+        dilate(b.mctx!, sil[2], 4.0 * ratio, 0, 0, part);
+        if (part === 2) {
+          b.mctx!.drawImage(b.cc!, 0, 0);
+          b.sil = undefined;
+          b.cc = undefined;
+        }
+      }
+      flush(b.mc);
+      return false;
+    }
+    case 11: {
+      // 底座（脚下的木块）
+      const mctx = b.mctx!;
+      mctx.setTransform(ratio, 0, 0, ratio, PADP * ratio, PADP * ratio);
+      const bx = PW / 2 - 36;
+      const by = PH - 6;
+      const bp = rectPts(bx, by, 72, BASE_H, 4);
+      mctx.save();
+      mctx.translate(1.5, 3);
+      fillPts(mctx, bp, 'rgba(15,7,2,0.4)');
+      mctx.restore();
+      const g = mctx.createLinearGradient(0, by, 0, by + BASE_H);
+      g.addColorStop(0, '#9a6a3c');
+      g.addColorStop(1, '#5e3a20');
+      fillPts(mctx, bp, g);
+      mctx.strokeStyle = 'rgba(40,20,8,0.35)';
+      mctx.lineWidth = 0.8;
+      for (let i = 0; i < 3; i++) {
+        mctx.beginPath();
+        mctx.moveTo(bx + 4, by + 4 + i * 4 + hashf(i, 3));
+        mctx.lineTo(bx + 68, by + 4 + i * 4 - hashf(i, 5));
+        mctx.stroke();
+      }
+      fillPts(mctx, rectPts(PW / 2 - 26, by + 1.5, 52, 3, 1.5), 'rgba(20,10,4,0.55)');
+      inkStroke(mctx, bp, true, 1.8, C.ink, 4, { unit: 1, jitter: 0.4, dry: false });
+      b.mctx = undefined;
+      flush(b.mc!);
+      return false;
+    }
+    case 12:
+      b.white = silhouette(b.mc!, '#ffffff');
+      flush(b.white);
+      return false;
+    case 13:
+      b.red = silhouette(b.mc!, '#ff5a3a');
+      flush(b.red);
+      return false;
+    default: {
+      const back = silhouette(b.mc!, '#8a6a46');
+      standees.set(id, { main: b.mc!, white: b.white!, red: b.red!, back, ratio });
+      building.delete(id);
+      return true;
+    }
   }
-  fillPts(mctx, rectPts(PW / 2 - 26, by + 1.5, 52, 3, 1.5), 'rgba(20,10,4,0.55)');
-  inkStroke(mctx, bp, true, 1.8, C.ink, 4, { unit: 1, jitter: 0.4, dry: false });
-  const white = silhouette(mc, '#ffffff');
-  const red = silhouette(mc, '#ff5a3a');
-  const back = silhouette(mc, '#8a6a46');
-  return { main: mc, white, red, back, ratio };
 }
 
-function getStandee(id: PortraitId): Standee {
+function standeeRatio(): number {
   const r = pxRatio() * 1.05;
   if (standeeVer !== stage.version) {
     standeeVer = stage.version;
     for (const [k, v] of standees) if (Math.abs(v.ratio - r) > 0.05) standees.delete(k);
+    for (const [k, v] of building) if (Math.abs(v.ratio - r) > 0.05) building.delete(k);
   }
+  return r;
+}
+
+function getStandee(id: PortraitId): Standee {
+  const r = standeeRatio();
   let s = standees.get(id);
   if (!s) {
-    s = buildStandee(id, r);
-    standees.set(id, s);
+    let b = building.get(id);
+    if (!b) {
+      b = { ratio: r, step: 0 };
+      building.set(id, b);
+    }
+    while (!stepStandee(id, b));
+    s = standees.get(id)!;
   }
   return s;
 }
 
-export function warmPortrait(id: PortraitId): void {
-  getStandee(id);
+/** 空闲预热：做一步；返回 true 表示这一张立牌已就绪 */
+export function warmPortrait(id: PortraitId): boolean {
+  const r = standeeRatio();
+  if (standees.has(id)) return true;
+  let b = building.get(id);
+  if (!b) {
+    b = { ratio: r, step: 0 };
+    building.set(id, b);
+  }
+  return stepStandee(id, b);
 }
 
 export type StandeeLayer = 'main' | 'white' | 'red' | 'back';
