@@ -6,6 +6,9 @@ import { drawNumber, drawWord } from '../render/text';
 import { ease } from '../core/ease';
 
 const MAX = 48;
+/** keep text inside the playfield: below the HUD band (ceiling 68 + drift) and off the walls */
+const MIN_Y = 92;
+const clampX = (x: number): number => (x < 30 ? 30 : x > 360 ? 360 : x);
 
 export class Floater {
   alive = false;
@@ -49,8 +52,8 @@ export class Floaters {
     f.value = v;
     f.prefix = prefix;
     f.suffix = suffix;
-    f.x = x;
-    f.y = y;
+    f.x = clampX(x);
+    f.y = y < MIN_Y ? MIN_Y : y;
     f.vy = -38;
     f.life = f.maxLife = life;
     f.color = color;
@@ -63,8 +66,8 @@ export class Floaters {
     const f = this.alloc();
     f.alive = true;
     f.word = w;
-    f.x = x;
-    f.y = y;
+    f.x = clampX(x);
+    f.y = y < MIN_Y ? MIN_Y : y;
     f.vy = -30;
     f.life = f.maxLife = life;
     f.color = color;

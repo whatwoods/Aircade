@@ -70,9 +70,10 @@ export function rollOffer(g: Game): Card[] {
   // first ever offer must include an element
   if (g.offersMade === 0) {
     const hasElement = cards.some((c) => c.id === 'fire' || c.id === 'ice' || c.id === 'blast');
-    if (!hasElement) {
-      const els: UpgradeId[] = ['fire', 'ice', 'blast'];
-      const id = els[rng.int(0, 2)]!;
+    // only elements that can still be taken (a debug-granted evolution may already have maxed them)
+    const els = upgradeCandidates(g).filter((c) => c.id === 'fire' || c.id === 'ice' || c.id === 'blast');
+    if (!hasElement && els.length > 0) {
+      const id = els[rng.int(0, els.length - 1)]!.id;
       const idx = cards.length >= 3 ? 2 : cards.length;
       cards[idx] = { kind: 'upgrade', id, from: g.levels[id], to: g.levels[id] + 1 };
     }

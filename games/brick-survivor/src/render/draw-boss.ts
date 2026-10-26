@@ -123,12 +123,16 @@ function drawSerpent(b: Batcher, s: Sprites, sp: Serpent, t: number, a: number):
     const sn = sp.snakes[p.snake];
     if (sn && sn.teleT > 0 && Math.sin(t * 60 + i) > 0) continue;
     lerpPos(p, a, P);
+    // segments still above the ceiling (entering from the top) materialise as they cross it instead of
+    // painting under the HUD band
+    const v = P.y >= 72 ? 1 : (P.y - 44) / 28;
+    if (v <= 0) continue;
     const head = p.kind === PART_HEAD;
     const fl = p.flashT > 0 ? p.flashT / 0.05 : 0;
     const wig = Math.sin(t * 8 + i * 0.7) * 0.15;
     if (head) {
-      b.spriteR(s.glow, P.x, P.y, p.r * 3, 0, col(pal.serpent, 0.5, 1));
-      b.sprite(s.panelHex, P.x, P.y, p.r / 32 * 1.1, p.r / 32 * 1.1, wig, col(mixHex(pal.serpent, 0xffffff, 0.15), 1, 0));
+      b.spriteR(s.glow, P.x, P.y, p.r * 3, 0, col(pal.serpent, 0.5 * v, 1));
+      b.sprite(s.panelHex, P.x, P.y, p.r / 32 * 1.1, p.r / 32 * 1.1, wig, col(mixHex(pal.serpent, 0xffffff, 0.15), v, 0));
       const dir = sn ? sn.dir : 1;
       const dropping = sn ? sn.dropping : false;
       const fx = dropping ? 0 : dir;
@@ -136,16 +140,16 @@ function drawSerpent(b: Batcher, s: Sprites, sp: Serpent, t: number, a: number):
       for (let k = -1; k <= 1; k += 2) {
         const ex = P.x + fx * p.r * 0.35 + -fy * k * p.r * 0.32 + (fy ? 0 : 0);
         const ey = P.y + fy * p.r * 0.35 + fx * k * p.r * 0.32 * 0.9 - (fy ? 0 : 2);
-        b.spriteR(s.glow, ex, ey, 6, 0, col(pal.danger, 0.8, 1));
-        b.spriteR(s.disc, ex, ey, 2.2, 0, col(0xffd0d8, 1, 0.2));
+        b.spriteR(s.glow, ex, ey, 6, 0, col(pal.danger, 0.8 * v, 1));
+        b.spriteR(s.disc, ex, ey, 2.2, 0, col(0xffd0d8, v, 0.2));
       }
     } else {
-      b.spriteR(s.glow, P.x, P.y, p.r * 2.2, 0, col(pal.serpent, 0.3, 1));
-      b.sprite(s.segment, P.x, P.y, p.r / 16, p.r / 16, wig + i * 0.3, col(mixHex(pal.serpent, 0xffffff, 0.2), 1, 0));
+      b.spriteR(s.glow, P.x, P.y, p.r * 2.2, 0, col(pal.serpent, 0.3 * v, 1));
+      b.sprite(s.segment, P.x, P.y, p.r / 16, p.r / 16, wig + i * 0.3, col(mixHex(pal.serpent, 0xffffff, 0.2), v, 0));
       const hpF = p.maxHp > 0 ? p.hp / p.maxHp : 1;
-      b.spriteR(s.disc, P.x, P.y, 2.5 + 2 * hpF, 0, col(mixHex(pal.danger, 0xffffff, 0.3), 0.85, 0.4));
+      b.spriteR(s.disc, P.x, P.y, 2.5 + 2 * hpF, 0, col(mixHex(pal.danger, 0xffffff, 0.3), 0.85 * v, 0.4));
     }
-    if (fl > 0) b.spriteR(s.disc, P.x, P.y, p.r, 0, col(0xffffff, fl * 0.6, 0.5));
+    if (fl > 0) b.spriteR(s.disc, P.x, P.y, p.r, 0, col(0xffffff, fl * 0.6 * v, 0.5));
     flames(b, s, p, P.x, P.y, t);
   }
   if (sp.chill > 0) {
