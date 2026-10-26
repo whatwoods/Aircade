@@ -615,6 +615,11 @@ export class Feedback implements FxSink {
         sfx.comboBreak();
         break;
       }
+      case 'tutCharge': {
+        this.floats.word(x, y, '充能', 0x7ff6ff, 16, 0.9);
+        this.ring(x, y + 30, 8, 60, 0.35, 0x7ff6ff, 0.8, false);
+        break;
+      }
       case 'comboDrop': {
         // dropped ball: the number shakes and sheds grey shards, the multiplier slides back in
         this.view.comboDropped();

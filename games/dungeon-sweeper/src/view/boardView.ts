@@ -328,7 +328,8 @@ export class BoardView {
     if (i === START_CELL) ctx.drawImage(T.stairs.c, x, y, s, s);
     if (this.game.b.candle[i]) {
       const k = s / 40;
-      ctx.drawImage(T.candleBase.c, x + 1 * k, y + s - 19 * k, 14 * k, 18 * k);
+      // 小号矮烛，缩在左下角，不压格内数字（数字在烛台格右移让位）
+      ctx.drawImage(T.candleBase.c, x + 2 * k, y + s - 11 * k, 7.5 * k, 9.6 * k);
     }
     const ex = cx(i);
     const ey = cy(i);
@@ -574,6 +575,10 @@ export class BoardView {
         const rt = (world - this.rollT0[i]) / ROLL;
         let ncx = x + s / 2;
         let ncy = y + s / 2 - 0.5;
+        if (this.game.b.candle[i]) {
+          ncx += (this.num[i] >= 10 || this.numPrev[i] >= 10 ? 4 : 2.5) * k;
+          ncy -= 1.5 * k;
+        }
         let size = 0;
         if (it) {
           ncx = x + s - 7 * k;
@@ -616,7 +621,7 @@ export class BoardView {
         ctx.globalAlpha = 1;
         // 烛火
         if (this.game.b.candle[i] && this.candle[i] > 0.05) {
-          calls += this.drawFlame(ctx, base, x + 8 * k, y + s - 15 * k, 0.75 * k, tSec, i, this.candle[i] * this.ext[i]);
+          calls += this.drawFlame(ctx, base, x + 5.75 * k, y + s - 9 * k, 0.4 * k, tSec, i, this.candle[i] * this.ext[i]);
         }
         // 宝箱流光
         if (this.item[i] === 1 && this.itemState[i] === 0) {

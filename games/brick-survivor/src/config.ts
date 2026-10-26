@@ -237,6 +237,7 @@ export const juice = {
   comboMilestone: { trauma: 0.08, hitstopMs: 0, particles: 30, haptic: 10, tier: 3 },
   comboBreak: { trauma: 0, hitstopMs: 0, particles: 12, haptic: 0, tier: 1 },
   comboDrop: { trauma: 0, hitstopMs: 0, particles: 6, haptic: 0, tier: 1 },
+  tutCharge: { trauma: 0, hitstopMs: 0, particles: 10, haptic: 10, tier: 2 },
   waveStart: { trauma: 0, hitstopMs: 0, particles: 0, haptic: 0, tier: 2 },
   bossWarning: { trauma: 0.1, hitstopMs: 0, particles: 0, haptic: [30, 60, 30], tier: 4 },
   bossArrive: { trauma: 0.3, hitstopMs: 0, particles: 40, haptic: 30, tier: 4 },

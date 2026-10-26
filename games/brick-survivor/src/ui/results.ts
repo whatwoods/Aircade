@@ -10,6 +10,7 @@ export interface ResultData {
   victory: boolean;
   endless: boolean;
   score: number;
+  /** best score before this run */
   best: number;
   newRecord: boolean;
   wave: number;
@@ -65,7 +66,7 @@ export class ResultsPanel {
     this.inner.innerHTML =
       `<div class="rt"><div class="bgw">${d.victory ? 'VICTORY' : 'GAME OVER'}</div><div class="fg">${d.victory ? '通关' : '信号中断'}</div></div>` +
       `<div class="endl">${d.endless ? 'ENDLESS · 无尽模式' : ''}</div>` +
-      `<div class="sc"><div class="lbl">SCORE</div><div class="v">0</div><div class="best">最高分 <b>${fmtInt(Math.max(d.best, d.newRecord ? d.score : 0))}</b></div></div>` +
+      `<div class="sc"><div class="lbl">SCORE</div><div class="v">0</div><div class="best">最高分 <b>${fmtInt(d.best)}</b></div></div>` +
       `<div class="stamp">新纪录！</div>` +
       `<div class="rows">${rows.map(([k, v]) => `<div class="rr"><span>${k}</span><b>${v}</b></div>`).join('')}</div>` +
       `<div class="bstrip">${build}</div>` +
@@ -89,10 +90,19 @@ export class ResultsPanel {
     // score roll 1.2 s (easeOutCubic) with ticks
     const t0 = performance.now() + 250;
     let lastTick = 0;
+    let stamped = false;
+    const bestEl = this.inner.querySelector('.sc .best b') as HTMLElement;
     const roll = (now: number): void => {
       const p = Math.max(0, Math.min(1, (now - t0) / 1200));
       const e = 1 - Math.pow(1 - p, 3);
-      this.scoreEl.textContent = fmtInt(d.score * e);
+      const v = d.score * e;
+      this.scoreEl.textContent = fmtInt(v);
+      // new record: the old best stays up until the roll passes it, then the stamp lands
+      if (d.newRecord && !stamped && (v > d.best || p >= 1)) {
+        stamped = true;
+        bestEl.textContent = fmtInt(d.score);
+        this.timers.push(window.setTimeout(() => this.celebrate(), 120));
+      }
       if (p > 0 && p < 1 && now - lastTick > 70) {
         lastTick = now;
         this.h.tick();
@@ -103,18 +113,26 @@ export class ResultsPanel {
     this.raf = requestAnimationFrame(roll);
     const rr = this.inner.querySelectorAll('.rr');
     rr.forEach((row, i) => this.timers.push(window.setTimeout(() => row.classList.add('in'), 450 + i * 90)));
-    if (d.newRecord) {
-      this.timers.push(
-        window.setTimeout(() => {
-          (this.inner.querySelector('.stamp') as HTMLElement).classList.add('go');
-          this.root.classList.add('rec');
-          this.h.record();
-        }, 1500),
-      );
+  }
+
+  private celebrate(): void {
+    (this.inner.querySelector('.stamp') as HTMLElement).classList.add('go');
+    this.root.classList.add('rec');
+    this.h.record();
+    // neon confetti in the DOM, above the opaque panel (the WebGL burst sits behind it)
+    const layer = el('div', 'confetti', this.root);
+    const cols = ['#2ee6ff', '#ff2fd0', '#ffc94d', '#b6ff2e', '#8a5cff', '#ffffff'];
+    for (let i = 0; i < 46; i++) {
+      const c = el('i', '', layer);
+      const x = 40 + Math.random() * 310;
+      const dx = (Math.random() - 0.5) * 120;
+      c.style.cssText = `left:${x}px;top:${150 + Math.random() * 60}px;background:${cols[i % cols.length]};--dx:${dx}px;--dy:${380 + Math.random() * 260}px;--r:${(Math.random() - 0.5) * 900}deg;animation-delay:${Math.random() * 0.25}s;animation-duration:${1.4 + Math.random() * 0.9}s;width:${4 + Math.random() * 4}px;height:${6 + Math.random() * 6}px`;
     }
+    this.timers.push(window.setTimeout(() => layer.remove(), 2800));
   }
 
   private clearTimers(): void {
+    this.root.querySelectorAll('.confetti').forEach((n) => n.remove());
     for (const t of this.timers) window.clearTimeout(t);
     this.timers = [];
     if (this.raf) cancelAnimationFrame(this.raf);

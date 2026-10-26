@@ -285,7 +285,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 #hud .score .lbl { font-size: 9px; letter-spacing: 0.25em; display: block; line-height: 12px; }
 #hud .score .sv { display: inline-block; font-size: 15px; line-height: 20px; color: var(--text); transform-origin: 100% 50%; transition: transform 0.18s var(--ease-back); }
 #hud .score .sv.bump { transform: scale(1.06); }
-#hud .pause { --c: 6px; left: 336px; top: 6px; width: 46px; height: 42px; display: grid; place-items: center; --fill: rgba(20, 12, 44, 0.62); --edge: rgba(107, 85, 200, 0.8); }
+#hud .pause { --c: 6px; left: 334px; top: 4px; width: 48px; height: 48px; display: grid; place-items: center; --fill: rgba(20, 12, 44, 0.62); --edge: rgba(107, 85, 200, 0.8); }
 #hud .pause svg { width: 18px; height: 18px; }
 #hud .pause::after { content: ''; position: absolute; inset: -4px; }
 #hud .lv { left: 12px; top: 44px; width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #2a1a5e, #120a28); border: 1.5px solid var(--gold); box-shadow: 0 0 8px rgba(255, 201, 77, 0.55); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2; }
@@ -303,6 +303,12 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 @keyframes xpSheen { from { left: -40px; } to { left: 100%; } }
 #hud .boss { left: 45px; top: 70px; width: 300px; opacity: 0; transform: scaleX(0.02); transition: opacity 0.2s, transform 0.5s var(--ease-out); }
 #hud .boss.on { opacity: 1; transform: none; }
+/* boss fights: the name + bar move into the HUD band above the field (clear of the first brick row) and the
+   XP bar slims down beneath it */
+#hud.bossfight .boss { top: 43px; }
+#hud.bossfight .boss::before { display: none; }
+#hud .xp { transition: top 0.3s var(--ease-out), height 0.3s var(--ease-out); }
+#hud.bossfight .xp { top: 64px; height: 3px; }
 #hud .boss::before { content: ''; position: absolute; left: -24px; right: -24px; top: -3px; bottom: -4px; background: linear-gradient(90deg, transparent, rgba(5, 3, 11, 0.78) 14%, rgba(5, 3, 11, 0.78) 86%, transparent); }
 #hud .boss .bn { position: relative; display: flex; justify-content: center; align-items: baseline; gap: 8px; height: 15px; white-space: nowrap; }
 #hud .boss .bn b { font-weight: 700; font-size: 11px; letter-spacing: 0.2em; color: #ffd3dc; }
@@ -403,6 +409,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 #levelup .head { position: absolute; left: 0; right: 0; top: 150px; text-align: center; }
 #levelup .head .t { font-family: var(--orb); font-weight: 900; font-size: 28px; letter-spacing: 0.14em; color: #fff; text-shadow: 0 0 10px var(--cyan), 0 0 24px rgba(46, 230, 255, 0.7); }
 #levelup .head .s { margin-top: 6px; font-size: 14px; letter-spacing: 0.3em; text-indent: 0.3em; color: var(--dim); }
+#levelup .head .s.tut { color: var(--cyan, #2ee6ff); letter-spacing: 0.16em; text-indent: 0.16em; text-shadow: 0 0 8px rgba(46, 230, 255, 0.6); }
 #levelup .head .more { position: absolute; left: 290px; top: 4px; height: 22px; min-width: 34px; padding: 0 8px; border-radius: 11px; background: var(--gold); color: #1a0d00; font-family: var(--orb); font-weight: 900; font-size: 12px; line-height: 22px; box-shadow: 0 0 10px rgba(255, 201, 77, 0.8); }
 #levelup .head, #levelup .reroll { opacity: 0; transition: opacity 0.2s; }
 #levelup.on .head, #levelup.on .reroll { opacity: 1; }
@@ -440,9 +447,11 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 .card .tg { position: absolute; left: 100px; right: 12px; bottom: 10px; display: flex; gap: 8px; align-items: center; font-size: 10px; letter-spacing: 0.12em; color: var(--dim); white-space: nowrap; overflow: hidden; }
 .card .tg .tag { padding: 1px 6px; border: 1px solid color-mix(in srgb, var(--k) 45%, transparent); color: var(--k); }
 .card .tg .rc { color: var(--gold); overflow: hidden; text-overflow: ellipsis; }
-.card.evo { --k: var(--gold); --edge: transparent; --fill: linear-gradient(110deg, rgba(58, 38, 8, 0.97), rgba(24, 14, 30, 0.97)); overflow: hidden; }
+.card.evo { --k: var(--gold); --edge: rgba(255, 201, 77, 0.35); --fill: linear-gradient(110deg, rgb(52, 34, 9), rgb(22, 13, 30)); overflow: hidden; }
 .card.evo .ring { position: absolute; inset: -120px; z-index: 0; background: conic-gradient(from 0deg, transparent 0 20%, #ffe7a6 25%, #ffc94d 30%, transparent 35% 70%, #ffe7a6 75%, #ffc94d 80%, transparent 85%); animation: spin 2.4s linear infinite; }
-.card.evo::before { z-index: 0; inset: 2px; }
+.card.evo::before { z-index: 1; inset: 2px; }
+/* the rotating light only shows in the 2 px border ring; the opaque fill and the text sit above it */
+.card.evo > *:not(.ring) { z-index: 2; }
 .card.evo .rib { position: absolute; left: -26px; top: 10px; width: 92px; transform: rotate(-38deg); background: linear-gradient(90deg, #ffc94d, #ff9a3a); color: #1a0d00; font-weight: 900; font-size: 10px; letter-spacing: 0.3em; text-indent: 0.3em; text-align: center; line-height: 16px; box-shadow: 0 0 8px rgba(255, 201, 77, 0.7); }
 .card.picked { animation: cardPick 0.42s var(--ease-io) forwards; z-index: 3; }
 @keyframes cardPick { 0% { transform: scale(1); filter: brightness(1); } 25% { transform: scale(1.04); filter: brightness(2.2); } 100% { transform: translateY(var(--fly, 300px)) scale(0.2); opacity: 0; } }
@@ -477,14 +486,16 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 /* ---------------------------------------------------------------- settings */
 #settings .panel { position: absolute; left: 35px; top: 150px; width: 320px; }
 #settings .inner { padding: 18px; }
-#settings .rowi { display: flex; align-items: center; justify-content: space-between; height: 40px; border-bottom: 1px solid rgba(59, 44, 115, 0.6); font-size: 14px; font-weight: 500; }
+#settings .rowi { display: flex; align-items: center; justify-content: space-between; height: 44px; border-bottom: 1px solid rgba(59, 44, 115, 0.6); font-size: 14px; font-weight: 500; }
 .tgl { width: 46px; height: 24px; border-radius: 12px; background: rgba(59, 44, 115, 0.9); position: relative; transition: background 0.2s; }
 .tgl::after { content: ''; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--dim); transition: transform 0.2s var(--ease-back), background 0.2s; }
 .tgl.on { background: rgba(46, 230, 255, 0.35); box-shadow: inset 0 0 0 1px var(--cyan); }
 .tgl.on::after { transform: translateX(22px); background: #fff; box-shadow: 0 0 8px var(--cyan); }
 .seg { display: flex; gap: 2px; }
-.seg button { height: 26px; padding: 0 9px; font-size: 12px; font-weight: 700; color: var(--dim); background: rgba(59, 44, 115, 0.6); }
+.seg button { height: 36px; min-width: 44px; padding: 0 8px; font-size: 12px; font-weight: 700; color: var(--dim); background: rgba(59, 44, 115, 0.6); }
 .seg button.on { background: var(--cyan); color: #07031a; }
+#settings .rowi.tap { cursor: pointer; }
+#settings .rowi.tap.down .tgl { filter: brightness(1.3); }
 #settings .acts { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 #settings .acts .btn { min-width: 0; font-size: 12px; letter-spacing: 0.1em; height: 40px; padding: 0 6px; }
 #settings .done { margin-top: 12px; width: 100%; }
@@ -494,9 +505,9 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 #results.on .panel { transform: none; transition: transform 0.5s var(--ease-out), opacity 0.3s; }
 #results .inner { padding: 22px 20px; height: 100%; }
 #results .rt { position: relative; height: 70px; text-align: center; }
-#results .rt .bgw { position: absolute; left: -8px; right: -8px; top: 10px; white-space: nowrap; overflow: hidden; font-family: var(--orb); font-weight: 900; font-size: 34px; letter-spacing: 0.06em; color: transparent; -webkit-text-stroke: 1px rgba(255, 51, 85, 0.35); }
+#results .rt .bgw { position: absolute; left: 0; right: 0; top: 57px; white-space: nowrap; font-family: var(--orb); font-weight: 700; font-size: 11px; letter-spacing: 0.6em; text-indent: 0.6em; text-align: center; color: rgba(255, 92, 122, 0.75); }
 #results .rt .fg { position: relative; top: 14px; font-weight: 900; font-size: 30px; letter-spacing: 0.4em; text-indent: 0.4em; color: #ffd3dc; text-shadow: 0 0 14px var(--danger); }
-#results.win .rt .bgw { -webkit-text-stroke-color: rgba(255, 201, 77, 0.4); }
+#results.win .rt .bgw { color: rgba(255, 201, 77, 0.8); }
 #results.win .rt .fg { color: #fff3c8; text-shadow: 0 0 14px var(--gold), 0 0 28px rgba(255, 201, 77, 0.6); }
 #results .endl { text-align: center; font-size: 12px; letter-spacing: 0.3em; color: var(--mag); height: 16px; }
 #results .sc { text-align: center; margin-top: 4px; }
@@ -508,6 +519,9 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 #results.rec .rows { margin-top: 48px; }
 #results .sc .best b { font-family: var(--orb); color: var(--gold); font-weight: 700; }
 #results .stamp { position: absolute; left: 50%; width: 140px; margin-left: -70px; box-sizing: border-box; text-align: center; top: 192px; padding: 6px 12px; border: 3px solid var(--gold); color: var(--gold); font-weight: 900; font-size: 18px; letter-spacing: 0.2em; transform: rotate(-8deg) scale(2); opacity: 0; text-shadow: 0 0 10px rgba(255, 201, 77, 0.8); box-shadow: 0 0 14px rgba(255, 201, 77, 0.5), inset 0 0 10px rgba(255, 201, 77, 0.35); background: rgba(40, 24, 4, 0.7); z-index: 3; }
+#results .confetti { position: absolute; left: 0; top: 0; width: 390px; height: 844px; pointer-events: none; z-index: 5; overflow: hidden; }
+#results .confetti i { position: absolute; opacity: 0; border-radius: 1px; box-shadow: 0 0 6px currentColor; animation: confetti 1.8s cubic-bezier(0.2, 0.6, 0.4, 1) forwards; }
+@keyframes confetti { 0% { opacity: 1; transform: translate(0, -40px) rotate(0); } 15% { opacity: 1; transform: translate(calc(var(--dx) * 0.3), -90px) rotate(calc(var(--r) * 0.2)); } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)); } }
 #results .stamp.go { animation: stamp 0.45s var(--ease-back) forwards; }
 @keyframes stamp { 0% { transform: rotate(-8deg) scale(2); opacity: 0; } 100% { transform: rotate(-8deg) scale(1); opacity: 1; } }
 #results .rows { margin-top: 14px; }
@@ -521,7 +535,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 
 /* ---------------------------------------------------------------- tutorial */
 #tutorial { left: 0; top: 0; width: 390px; height: 844px; }
-#tutorial .skip { --c: 6px; left: 268px; top: 76px; height: 30px; padding: 0 12px; font-size: 12px; letter-spacing: 0.16em; --fill: rgba(16, 10, 36, 0.72); --edge: rgba(107, 85, 200, 0.8); color: var(--text); display: flex; align-items: center; }
+#tutorial .skip { --c: 6px; left: 262px; top: 76px; height: 44px; padding: 0 14px; font-size: 12px; letter-spacing: 0.16em; --fill: rgba(16, 10, 36, 0.72); --edge: rgba(107, 85, 200, 0.8); color: var(--text); display: flex; align-items: center; }
 #tutorial .hint { left: 30px; width: 330px; top: 616px; text-align: center; transition: opacity 0.25s, transform 0.25s var(--ease-out); }
 #tutorial .hint.mid { top: 380px; }
 #tutorial .hint.swap { opacity: 0; transform: translateY(8px); }

@@ -131,6 +131,7 @@ export class Hud {
     this.xpBox.classList.remove('near', 'flash');
     this.bossOn = false;
     this.bossBox.classList.remove('on');
+    this.root.classList.remove('bossfight');
     this.buildSig = -1;
     this.order = [];
     this.build.innerHTML = '';
@@ -152,14 +153,17 @@ export class Hud {
       this.shownMax = max;
       this.hpBox.innerHTML = '';
       this.cells = [];
-      const w = Math.min(10, (150 - 3 * (max - 1)) / max);
+      // the cells never extend past x≈132, leaving ≥30 u of air before the centred wave block (any max HP)
+      const gap = max > 12 ? 2 : 3;
+      const w = Math.min(10, (118 - gap * (max - 1)) / max);
+      this.hpBox.style.gap = gap + 'px';
       for (let i = 0; i < max; i++) {
         const c = el('div', 'cell', this.hpBox);
         c.style.width = w + 'px';
         this.cells.push(c);
       }
       // the number sits on the label row, right-aligned to the end of the cells (clear of the centred wave)
-      this.hpNum.style.width = max * (w + 3) - 3 + 'px';
+      this.hpNum.style.width = max * (w + gap) - gap + 'px';
       this.shownHp = -1;
     }
     if (hp !== this.shownHp) {
@@ -286,6 +290,7 @@ export class Hud {
     if (on !== this.bossOn) {
       this.bossOn = on;
       this.bossBox.classList.toggle('on', on);
+      this.root.classList.toggle('bossfight', on);
       if (on) {
         this.bossV = this.trailV = 1;
         this.bossFill.style.transform = this.bossTrail.style.transform = 'scaleX(1)';

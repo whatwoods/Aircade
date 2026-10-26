@@ -4,7 +4,7 @@ import type { Game } from './game';
 
 const T = config.tutorial;
 
-export type TutHint = 't0' | 't1' | 't2' | 't3' | 't3miss' | 't4' | 't5' | 'ready' | '';
+export type TutHint = 't0' | 't1' | 't2' | 't3' | 't3miss' | 't3ok' | 't4' | 't5' | 'ready' | '';
 
 export class Tutorial {
   step = 0;
@@ -13,6 +13,7 @@ export class Tutorial {
   done = false;
   misses = 0;
   missHinted = false;
+  caught = false;
   gemsAt = 0;
   levelGranted = false;
   breached = false;
@@ -38,7 +39,7 @@ export class Tutorial {
   }
 
   onCatch(): void {
-    if (this.step === 3) this.go(4, 't4');
+    if (this.step === 3) this.caught = true;
   }
   onMiss(): void {
     if (this.step === 3) this.misses++;
@@ -72,15 +73,27 @@ export class Tutorial {
           this.go(3, 't3');
           this.misses = 0;
           this.missHinted = false;
+          this.caught = false;
         }
         break;
       case 3:
+        // the rule stays readable: the T3 bubble holds ≥ 1.5 s, then a catch confirms with "充能 +1" for 1.4 s
+        if (this.hint === 't3ok') {
+          if (this.t >= 1.4) this.go(4, 't4');
+          break;
+        }
+        if (this.caught && (this.hint !== 't3' || this.t >= 1.5)) {
+          this.hint = 't3ok';
+          this.t = 0;
+          this.g.sink.emit('tutCharge', this.g.player.x, config.field.catchY - 40, 0, 0);
+          break;
+        }
         if (this.misses >= 2 && !this.missHinted) {
           this.missHinted = true;
           this.hint = 't3miss';
           this.t = 0;
         }
-        if (this.missHinted && this.t > 1.8) this.go(4, 't4');
+        if (this.missHinted && this.t > 2.4) this.go(4, 't4');
         break;
       case 4:
         if (!this.levelGranted) {

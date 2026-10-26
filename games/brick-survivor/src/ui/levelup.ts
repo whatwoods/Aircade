@@ -49,6 +49,11 @@ export class LevelUpPanel {
   open(cards: Card[], pending: number): void {
     this.cards = cards;
     this.isOpen = true;
+    // T4 of the first-run tutorial: the subtitle carries the hint (the bubble would sit under the cards)
+    const sub = this.head.querySelector('.s') as HTMLElement;
+    const tut = !!this.g.tut;
+    sub.textContent = tut ? '三选一 · 点一张卡强化核心' : '选择一项强化';
+    sub.classList.toggle('tut', tut);
     this.busy = false;
     this.root.classList.remove('hidden', 'leaving');
     void this.root.offsetWidth;

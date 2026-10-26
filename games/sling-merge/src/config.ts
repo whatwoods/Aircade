@@ -232,12 +232,12 @@ export const CONFIG = {
     unlock5At: 6,
     /** 加压：第 rampStart 发起，在 rampShots 发内把各级权重乘到 (1 + rampBoost) */
     rampStart: 40,
-    rampShots: 100,
-    rampBoost: [0, 0, 0.3, 0.8, 1.0],
+    rampShots: 150,
+    rampBoost: [0, 0, 0.2, 0.5, 0.6],
     /** 救场：有水果进入预警区时，下一个以此概率直接出最低那颗果的等级（须在已解锁范围内） */
     rescueChance: 0.5,
     /** 已有水果越线（倒计时中）时的救场概率：奖励会瞄准越线果的玩家 */
-    rescueChanceOver: 0.5,
+    rescueChanceOver: 0.9,
     maxSameInRow: 3,
     opening: [1, 1, 2],
   },

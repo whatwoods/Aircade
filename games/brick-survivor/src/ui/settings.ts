@@ -45,7 +45,9 @@ export class SettingsPanel {
       const t = el('button', 'tgl ui', row);
       t.dataset.testid = 'set-' + k;
       t.setAttribute('aria-label', label);
-      onTap(t, () => {
+      // the whole 44 u row toggles (label included), not just the small switch
+      row.classList.add('tap');
+      onTap(row, () => {
         setSetting(k, !settings[k]);
         this.sync();
       });

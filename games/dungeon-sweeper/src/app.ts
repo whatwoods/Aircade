@@ -76,6 +76,10 @@ export class App implements Stage, InputHandler {
   settings: Settings;
   records: Records;
   tips: Record<string, boolean>;
+  private tipQueue: { id: string; text: string }[] = [];
+  private nextTipAt = 0;
+  /** 本局玩家是否已做过第一次操作（之前不弹情境提示） */
+  private userActed = false;
   opts: AppOptions;
   state: AppState = 'title';
   reduced = false;
@@ -310,11 +314,15 @@ export class App implements Stage, InputHandler {
     if (!this.dragon.hidden && this.dragon.riseT0 < 0)
       this.dragon.eyes = this.dragon.awake || this.tutEyes ? 2 : hud.level >= CONFIG.dragon.oneEyeAtLevel ? 1 : 0;
     // 低血
-    const low = g.phase === 'playing' && hud.hp > 0 && (hud.hp <= CONFIG.lowHpAbs || hud.hp <= hud.maxHp * CONFIG.lowHpFrac);
+    // 低血以逻辑生命为准（显示值在升级演出里会先掉后灌满，不能用来判定）；视觉还要等显示值也跟上
+    const P = g.player;
+    const lowReal = g.phase === 'playing' && P.hp > 0 && (P.hp <= CONFIG.lowHpAbs || P.hp <= P.maxHp * CONFIG.lowHpFrac);
+    const low = lowReal && hud.hp > 0 && (hud.hp <= CONFIG.lowHpAbs || hud.hp <= hud.maxHp * CONFIG.lowHpFrac);
     if (low && !this.lowHp) {
       vibrate([6, 60, 6, 60, 6]);
       this.tip('lowhp', '生命垂危！喝血瓶、开宝箱，或去打能让你升级的怪（升级回满血）');
     }
+    this.tipUpdate();
     this.lowHp = low;
     hud.lowHp = low;
     this.ov.lowHp = low;
@@ -413,6 +421,8 @@ export class App implements Stage, InputHandler {
     this.timerOn = false;
     this.lockUntil = 0;
     this.lethalCell = -1;
+    this.userActed = false;
+    this.tipQueue.length = 0;
     this.lowHp = false;
     this.tutEyes = false;
     this.closeRadial();
@@ -622,11 +632,24 @@ export class App implements Stage, InputHandler {
     if (this.game) this.game.chordEnabled = s.chord;
   }
 
+  /** 情境提示：排队，同一时刻只显示一条；引导期间和玩家首次操作前暂缓 */
   tip(id: string, text: string): void {
     if (this.tips[id]) return;
-    this.tips[id] = true;
+    for (const q of this.tipQueue) if (q.id === id) return;
+    this.tipQueue.push({ id, text });
+  }
+
+  private tipUpdate(): void {
+    if (!this.tipQueue.length) return;
+    const real = this.clock.real;
+    if (real < this.nextTipAt || this.state !== 'playing' || !this.userActed) return;
+    if (this.tut.active) return;
+    if (this.director.locked || this.screens.modalOpen) return;
+    const q = this.tipQueue.shift()!;
+    this.tips[q.id] = true;
     save('tips', this.tips);
-    this.screens.toast(text, CONFIG.timing.toastMs);
+    this.screens.toast(q.text, CONFIG.timing.toastMs);
+    this.nextTipAt = real + CONFIG.timing.toastMs + CONFIG.timing.tipGapMs;
   }
 
   // ================================================================== 引导
@@ -876,6 +899,7 @@ export class App implements Stage, InputHandler {
   }
 
   applyMark(cell: number, m: number): void {
+    this.userActed = true;
     const g = this.game;
     if (cell < 0 || g.revealed[cell]) return;
     const ev = g.setMark(cell, m);
@@ -890,6 +914,7 @@ export class App implements Stage, InputHandler {
   }
 
   tapCell(c: number): void {
+    this.userActed = true;
     if (c < 0 || !this.canAct()) return;
     const g = this.game;
     const real = this.clock.real;

@@ -441,7 +441,7 @@ export class App implements FxHost {
       victory,
       endless: g.endless,
       score: g.score,
-      best: Math.max(prev, newRecord ? g.score : 0),
+      best: prev,
       newRecord,
       wave: g.wave,
       time: g.runTime,

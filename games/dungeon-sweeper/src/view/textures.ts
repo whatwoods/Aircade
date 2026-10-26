@@ -117,8 +117,8 @@ export class Textures {
       roundRect(c, i, i, s, s, 4 * u);
       const g = c.createLinearGradient(0, 0, px, px);
       const lift = (v - 1.5) * 0.03;
-      g.addColorStop(0, shade('#4A556B', lift));
-      g.addColorStop(1, shade('#343D50', lift));
+      g.addColorStop(0, shade('#3E475A', lift));
+      g.addColorStop(1, shade('#2B3243', lift));
       c.fillStyle = g;
       c.fill();
       c.save();
@@ -168,7 +168,7 @@ export class Textures {
       c.restore();
       // 倒角：左上高光、右下阴影
       c.lineWidth = 2 * u;
-      c.strokeStyle = rgba('#6E7C96', 0.6);
+      c.strokeStyle = rgba('#6E7C96', 0.34);
       c.beginPath();
       c.moveTo(i + 2 * u, px - i - 4 * u);
       c.lineTo(i + 1 * u, i + 4 * u);

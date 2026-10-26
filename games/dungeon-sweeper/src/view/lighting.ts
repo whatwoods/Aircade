@@ -1,5 +1,5 @@
 import { flicker } from '../core/noise';
-import { COLS, ROWS, N, cx, cy } from '../game/board';
+import { COLS, ROWS, N, cx, cy, inLair } from '../game/board';
 import { type Sprite, makeCanvas, radialBlob } from './gfx';
 import type { Layout } from './layout';
 
@@ -71,8 +71,13 @@ export class Lighting {
   private edge: HTMLCanvasElement;
   private fogSpr: Sprite;
   private fogs: Fog[] = [];
-  darkAlpha = 0.85;
-  glowAlpha = 0.26;
+  /** 基础黑暗。远处暗砖还会再叠一层「暗砖压暗」，最终约 0.89 */
+  darkAlpha = 0.76;
+  glowAlpha = 0.42;
+  /** 已翻开地面的环境底光（挖掉的黑暗比例）：地面约 65% 亮，烛光热点叠到 100% */
+  floorAmbient = 0.46;
+  /** 暗砖额外压暗（source-over）：前沿即使被烛光照满，也只有约 40% 亮，并保持偏冷 */
+  hiddenDim = 0.42;
   /** 用于其他模块查询：每格最终亮度估计（0..1） */
   readonly bright = new Float32Array(N);
 
@@ -150,34 +155,34 @@ export class Lighting {
     g.globalCompositeOperation = 'lighter';
     const T = TEX;
     const dim = 1 - inp.dim * 0.1;
-    // 已翻开格
-    const rC = 1.5 * T;
+    // 已翻开格：紧凑的环境底光（半径约 1.1 格，几乎不渗到暗邻格）
+    const rC = 1.12 * T;
+    const amb = this.floorAmbient;
     for (let i = 0; i < N; i++) {
       const l = inp.cell[i] * inp.ext[i];
       this.bright[i] = 0;
       if (l <= 0.01) continue;
       const x = (cx(i) + MARGIN) * T + T / 2;
       const y = (cy(i) + MARGIN) * T + T / 2;
-      const f = 1 + 0.05 * flicker(tSec, i * 0.37);
-      const s = Math.min(1, l * f * boost * dim);
+      const s = Math.min(1, (l / 0.85) * amb * boost * dim);
       d.globalAlpha = s;
       d.drawImage(this.soft.c, x - rC, y - rC, rC * 2, rC * 2);
-      g.globalAlpha = Math.min(1, 0.32 * l * boost * dim);
+      g.globalAlpha = Math.min(1, 0.07 * l * boost * dim);
       g.drawImage(this.amber.c, x - rC, y - rC, rC * 2, rC * 2);
     }
-    // 烛台
-    const rK = 2.4 * T;
+    // 烛台：局部暖光池（半径 ~2.5 格、半径和亮度都在闪烁），在底光之上叠到全亮
     for (let i = 0; i < N; i++) {
       const k = inp.candle[i] * inp.ext[i];
       if (k <= 0.01) continue;
       const fl = flicker(tSec, i * 1.13 + 3);
-      const x = (cx(i) + MARGIN) * T + T * 0.28 + 0.6 * flicker(tSec * 1.3, i + 9);
-      const y = (cy(i) + MARGIN) * T + T * 0.62 + 0.6 * flicker(tSec * 1.1, i + 21);
-      const s = Math.min(1, k * (1 + 0.14 * fl) * boost * dim);
+      const rK = (2.0 + 0.12 * fl) * T;
+      const x = (cx(i) + MARGIN) * T + T * 0.15 + 0.5 * flicker(tSec * 1.3, i + 9);
+      const y = (cy(i) + MARGIN) * T + T * 0.7 + 0.5 * flicker(tSec * 1.1, i + 21);
+      const s = Math.min(1, k * (0.92 + 0.12 * fl) * boost * dim);
       d.globalAlpha = s;
       d.drawImage(this.white.c, x - rK, y - rK, rK * 2, rK * 2);
-      g.globalAlpha = Math.min(1, 0.95 * s);
-      g.drawImage(this.amber.c, x - rK, y - rK, rK * 2, rK * 2);
+      g.globalAlpha = Math.min(1, 0.85 * s);
+      g.drawImage(this.amber.c, x - rK * 0.8, y - rK * 0.8, rK * 1.6, rK * 1.6);
     }
     // 入口火把
     if (inp.brazier > 0.01) {
@@ -240,6 +245,21 @@ export class Lighting {
     d.globalAlpha = 1;
     d.drawImage(this.edge, 0, 0);
     d.globalCompositeOperation = 'source-over';
+    // 暗砖压暗：未翻开格整格再盖一层冷暗色，前沿迅速落入黑暗，不会比已探索区更抢眼
+    const hd = this.hiddenDim * (1 - dawn);
+    if (hd > 0.01) {
+      d.fillStyle = 'rgb(6,8,16)';
+      for (let i = 0; i < N; i++) {
+        const x = cx(i);
+        const y = cy(i);
+        if (inLair(x, y)) continue;
+        const h = hd * (1 - Math.min(1, inp.cell[i] / 0.85));
+        if (h <= 0.01) continue;
+        d.globalAlpha = h;
+        d.fillRect((x + MARGIN) * T, (y + MARGIN) * T, T, T);
+      }
+      d.globalAlpha = 1;
+    }
     g.globalCompositeOperation = 'source-over';
     g.globalAlpha = 1;
     // 雾：仅在黑暗处

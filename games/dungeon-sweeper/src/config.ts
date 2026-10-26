@@ -126,6 +126,8 @@ export const CONFIG = {
     levelUpPauseMs: 80,
     dealStaggerMs: 10,
     toastMs: 3000,
+    /** 两条情境提示之间的最小间隔 */
+    tipGapMs: 1500,
   },
 
   /** 打击感：trauma / hitstop / 震动（层级见文档 §5.1） */
