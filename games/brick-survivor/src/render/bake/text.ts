@@ -21,7 +21,7 @@ export interface GlyphSet {
 
 export const WORDS = [
   '完美', '热冲击!', '警告', '冻结', '碎冰', '屏障', '拦截', '治疗', '进化', '通关', '充能', '连锁',
-  'COMBO', 'MAX', 'BOSS', 'LV', '准备好了!',
+  'COMBO', 'MAX', 'BOSS', 'LV', '准备好了!', '连击减半',
 ] as const;
 export type WordId = (typeof WORDS)[number];
 

@@ -106,6 +106,8 @@ export class Game {
   lowestRowN = 0;
   /** pressure director HP multiplier for newly spawned wave rows */
   pressure = 1;
+  /** formation step count when the current post-boss settle window began */
+  pressureFrom = 0;
   waveStartTime = 0;
   waveTimes: number[] = [];
   bossStartTime = 0;
@@ -196,6 +198,7 @@ export class Game {
     }
     this.beginWave(w);
     f.quickSteps = w === 1 ? config.advance.prefillRows : config.advance.prefillAfterBoss;
+    this.pressureFrom = f.stepsTaken;
     f.stepTimer = 0;
   }
 
@@ -309,7 +312,9 @@ export class Game {
     if (P.on && this.phase === 'wave' && this.tut === null && this.formation.mode === 'waves' && this.formation.quickSteps === 0) {
       const target = P.target[this.wave] ?? P.endlessTarget;
       const err = target - Math.max(0, lr);
-      this.pressure = Math.max(P.min, Math.min(P.max, this.pressure * Math.exp(P.gain * err)));
+      // slow to tighten, quick to relax; ignore the first few steps after a boss while the field refills
+      if (err < 0 || this.formation.stepsTaken - this.pressureFrom >= P.settleSteps)
+        this.pressure = Math.max(P.min, Math.min(P.max, this.pressure * Math.exp((err > 0 ? P.gainUp : P.gainDown) * err)));
     }
   }
 
@@ -389,6 +394,7 @@ export class Game {
       } else {
         this.beginWave(next);
         this.formation.quickSteps = config.advance.prefillAfterBoss;
+        this.pressureFrom = this.formation.stepsTaken;
         this.formation.stepTimer = 0;
         this.formation.armed = false;
       }
@@ -444,6 +450,7 @@ export class Game {
     this.player.alive = true;
     this.beginWave(21);
     this.formation.quickSteps = config.advance.prefillAfterBoss;
+    this.pressureFrom = this.formation.stepsTaken;
   }
 
   // ================================================================== player
@@ -505,11 +512,24 @@ export class Game {
     return this.comboTier >= 0 ? config.combo.mults[this.comboTier]! : 1;
   }
 
+  comboWindow(): number {
+    const C = config.combo;
+    const t = Math.max(0, Math.min(1, (this.combo - C.shrinkFrom) / (C.shrinkTo - C.shrinkFrom)));
+    return C.window - (C.window - C.windowMin) * t;
+  }
+
+  private tierOf(c: number): number {
+    const tiers = config.combo.tiers;
+    let tier = -1;
+    for (let i = 0; i < tiers.length; i++) if (c >= tiers[i]!) tier = i;
+    return tier;
+  }
+
   addCombo(n: number): void {
     if (this.tut && this.tut.step < 1) return;
     const before = this.combo;
     this.combo += n;
-    this.comboT = config.combo.window;
+    this.comboT = this.comboWindow();
     if (this.combo > this.maxCombo) this.maxCombo = this.combo;
     const tiers = config.combo.tiers;
     let tier = -1;
@@ -548,6 +568,18 @@ export class Game {
   }
   onMiss(): void {
     this.tut?.onMiss();
+    // a dropped main ball costs half the combo (and the tier with it)
+    if (this.combo <= 0) return;
+    const kept = Math.floor(this.combo * config.combo.missKeep);
+    if (kept < config.combo.tiers[0]!) {
+      this.breakCombo(false);
+      return;
+    }
+    const lost = this.combo - kept;
+    this.combo = kept;
+    this.comboTier = this.tierOf(kept);
+    this.comboT = Math.min(this.comboT, this.comboWindow());
+    this.sink.emit('comboDrop', 372, 505, lost, kept);
   }
 
   bossChillMult(): number {

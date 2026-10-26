@@ -63,6 +63,12 @@ export function candyText(ctx: CanvasRenderingContext2D, text: string, x: number
 }
 
 const CAP = 24;
+/** 避让候选偏移（单位：列宽, 行高），按距离从近到远 */
+const OFFS = [0, 0, 0, 1, -1, 0, 1, 0, -1, 1, 1, 1, 0, 2, -1, 2, 1, 2, -2, 0, 2, 0, -2, 1, 2, 1];
+/** 跳字最低不压到警戒线 */
+const POP_MAX_Y = CONFIG.layout.dangerY - 20;
+/** 同屏得分跳字上限 */
+const SCORE_MAX = 6;
 /** 罐内腔顶（盖子下沿） */
 const POP_TOP = CONFIG.layout.jar.inner.T;
 const POP_L = CONFIG.layout.jar.inner.L;
@@ -118,6 +124,26 @@ export class Popups {
     return top + 36 + size * 0.7;
   }
 
+  private static halfH(size: number, sub: string): number {
+    return sub ? size * 0.62 + 10 : size * 0.62;
+  }
+
+  /** 和还清晰可见的跳字（含它剩余的上浮路径）是否相交 */
+  private hits(x: number, y: number, hw: number, hh: number): boolean {
+    for (let j = 0; j < CAP; j++) {
+      if (this.t[j]! >= this.dur[j]! * 0.8) continue;
+      const ohw = this.hw[j]!;
+      if (Math.abs(this.x[j]! - x) >= ohw + hw + 4) continue;
+      const ohh = Popups.halfH(this.size[j]!, this.sub[j]!);
+      const oy = this.curY(j);
+      // 上浮路径：从当前位置到终点（y − 36）
+      const top = this.y[j]! - 36 - ohh;
+      const bot = oy + ohh;
+      if (y + hh + 2 > top && y - hh - 2 < bot) return true;
+    }
+    return false;
+  }
+
   /** 当前（上浮后的）y */
   private curY(i: number): number {
     return this.y[i]! - 36 * ease.quadOut(Math.min(1, this.t[i]! / this.dur[i]!));
@@ -126,29 +152,31 @@ export class Popups {
   add(text: string, x: number, y: number, size: number, style: TextStyle, sub = '', dur = 0.8, optional = false): number {
     // 按估算字宽夹在罐内，长字（「惊险救场 +50」）贴墙时不被玻璃挡住
     const hw = Popups.halfW(text, size);
-    const px = Math.max(POP_L + hw, Math.min(POP_R - hw, x));
+    const px0 = Math.max(POP_L + hw, Math.min(POP_R - hw, x));
     // 水果往上浮、合成多发生在罐顶：起点压到盖子下方，保证整段上浮（36px）都在罐内、不钻到盖子和图鉴后面
     const base = Math.max(y, this.minY(size));
+    // 二维避让：按「原位 → 下方 → 左右 → 斜下 → 再下一行」的顺序找第一个不和可见跳字相交的位置，
+    // 罐内多处同时合成时各自让开；实在找不到时，可选的得分跳字直接省略（分数照常进 HUD），其余留在原位
+    const hh = Popups.halfH(size, sub);
+    const rowH = hh * 2 + 4;
+    const colW = hw * 2 + 8;
+    let px = px0;
     let py = base;
-    // 纵向避让：和还清晰可见的跳字重叠时往下让（罐顶没有往上的余地），最多让 64 px
-    let clear = false;
-    for (let pass = 0; pass < 4 && !clear; pass++) {
-      clear = true;
-      for (let j = 0; j < CAP; j++) {
-        if (this.t[j]! >= this.dur[j]! * 0.75) continue;
-        if (Math.abs(this.x[j]! - px) >= this.hw[j]! + hw) continue;
-        const oy = this.curY(j);
-        const oh = this.size[j]! * (this.sub[j] ? 1.35 : 0.75);
-        const gap = oh + size * 0.75;
-        if (Math.abs(oy - py) < gap) {
-          py = oy + gap;
-          clear = false;
-        }
+    let found = false;
+    for (let c = 0; c < OFFS.length; c += 2) {
+      const cx = Math.max(POP_L + hw, Math.min(POP_R - hw, px0 + OFFS[c]! * colW));
+      const cy = base + OFFS[c + 1]! * rowH;
+      if (cy > Math.max(POP_MAX_Y, base)) continue;
+      if (!this.hits(cx, cy, hw, hh)) {
+        px = cx;
+        py = cy;
+        found = true;
+        break;
       }
     }
-    if (!clear || py > base + 64) {
-      // 让不开：可选的得分跳字直接省略（分数照常进 HUD），其余留在原位
+    if (!found) {
       if (optional) return -1;
+      px = px0;
       py = base;
     }
     const i = this.head;
@@ -185,6 +213,9 @@ export class Popups {
       this.t[j] = 0.06; // 重新弹一下（跳过最开始的缩小）
       return;
     }
+    let live = 0;
+    for (let k = 0; k < CAP; k++) if (this.isScore[k] && this.t[k]! < this.dur[k]!) live++;
+    if (live >= SCORE_MAX) return;
     if (sub) for (let k = 0; k < CAP; k++) if (this.isScore[k]) this.sub[k] = '';
     const i = this.add('+' + gained, x, y, size, style, sub, 0.8, true);
     if (i < 0) return;

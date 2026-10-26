@@ -63,8 +63,8 @@ export const config = {
   // (display row, 0 = top, 21 = danger line). Bounded, so strong builds still out-pace it and weak builds get
   // only partial relief.
   pressure: {
-    on: true, gain: 0.035, min: 0.8, max: 3.2,
-    target: [0, 5, 6, 7, 8, 8, 9, 10, 11, 12, 12, 12, 13, 13, 13, 15, 14, 15, 16, 16, 16] as readonly number[],
+    on: true, gainUp: 0.025, gainDown: 0.07, settleSteps: 4, min: 0.8, max: 3.2,
+    target: [0, 5, 6, 7, 8, 8, 9, 10, 11, 12, 12, 9, 11, 13, 13, 15, 12, 14, 15, 16, 16] as readonly number[],
     endlessTarget: 16,
   },
   advance: {
@@ -143,8 +143,10 @@ export const config = {
   fillers: { batteryHeal: 2, cachePerWave: 150 },
   rerolls: { start: 1, perBoss: 1 },
   combo: {
-    window: 1.8, tiers: [10, 25, 50, 100, 200, 400], mults: [1.2, 1.5, 2.0, 2.5, 3.0, 4.0],
-    milestones: [50, 100, 200, 500, 1000],
+    // the window shrinks from 1.8 s (≤100) to 0.9 s (≥1000); a missed main ball halves the combo
+    window: 1.8, windowMin: 0.9, shrinkFrom: 100, shrinkTo: 1000, missKeep: 0.5,
+    tiers: [10, 25, 50, 100, 250, 600], mults: [1.2, 1.5, 2.0, 2.5, 3.0, 4.0],
+    milestones: [50, 100, 250, 500, 1000, 2000, 5000],
   },
   score: {
     brick: 10, wavePct: 0.15, perfect: 20, intercept: 5, bossBase: 2000, noDamageMult: 1.5,
@@ -234,6 +236,7 @@ export const juice = {
   comboTier: { trauma: 0, hitstopMs: 0, particles: 8, haptic: 0, tier: 2 },
   comboMilestone: { trauma: 0.08, hitstopMs: 0, particles: 30, haptic: 10, tier: 3 },
   comboBreak: { trauma: 0, hitstopMs: 0, particles: 12, haptic: 0, tier: 1 },
+  comboDrop: { trauma: 0, hitstopMs: 0, particles: 6, haptic: 0, tier: 1 },
   waveStart: { trauma: 0, hitstopMs: 0, particles: 0, haptic: 0, tier: 2 },
   bossWarning: { trauma: 0.1, hitstopMs: 0, particles: 0, haptic: [30, 60, 30], tier: 4 },
   bossArrive: { trauma: 0.3, hitstopMs: 0, particles: 40, haptic: 30, tier: 4 },

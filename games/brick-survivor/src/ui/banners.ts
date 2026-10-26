@@ -55,8 +55,9 @@ export class Banners {
   }
 
   combo(m: number): void {
-    const color = m >= 1000 ? '#ffffff' : m >= 500 ? '#ff2fd0' : m >= 200 ? '#ff2fd0' : m >= 100 ? '#ff7a1a' : '#b6ff2e';
-    this.add('combo', `<div class="t">${m} COMBO!</div>`, 0.95, color);
+    const color = m >= 1000 ? '#ffffff' : m >= 250 ? '#ff2fd0' : m >= 100 ? '#ff7a1a' : '#b6ff2e';
+    const label = m >= 1000 ? `${m / 1000}k` : `${m}`;
+    this.add('combo', `<div class="t">${label} COMBO!</div>`, 0.95, color);
   }
 
   levelUp(): void {

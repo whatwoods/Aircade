@@ -594,7 +594,7 @@ export class Feedback implements FxSink {
       }
       case 'comboMilestone': {
         // neon ring in the milestone colour (matches the DOM banner): white alone reads as grey smoke
-        const mc = a >= 1000 ? 0xffffff : a >= 200 ? pal.blast : a >= 100 ? pal.fire : 0xb6ff2e;
+        const mc = a >= 1000 ? 0xffffff : a >= 250 ? pal.blast : a >= 100 ? pal.fire : 0xb6ff2e;
         this.ring(195, 330, 20, 220, 0.45, mc, 0.9);
         this.ring(195, 330, 10, 150, 0.3, 0xffffff, 0.7);
         for (let i = 0; i < this.n(30); i++) {
@@ -613,6 +613,15 @@ export class Feedback implements FxSink {
           this.parts.spawn(FR_TRI, 372 - r.range(0, 60), 505 + r.range(-10, 10), r.range(-60, 60), r.range(-80, 0), r.range(0.5, 0.8), 3, 2, 0xbdb6d8, 0x5a5478, 0.8, 0.2, P_FADE_LATE, 500, 0.5, r.next() * TAU, r.range(-10, 10));
         }
         sfx.comboBreak();
+        break;
+      }
+      case 'comboDrop': {
+        // dropped ball: the number shakes and sheds grey shards, the multiplier slides back in
+        this.view.comboDropped();
+        for (let i = 0; i < this.n(6); i++) {
+          this.parts.spawn(FR_TRI, 372 - r.range(0, 50), 505 + r.range(-8, 8), r.range(-50, 50), r.range(-70, 0), r.range(0.4, 0.6), 3, 2, 0xbdb6d8, 0x5a5478, 0.7, 0.2, P_FADE_LATE, 500, 0.5, r.next() * TAU, r.range(-10, 10));
+        }
+        this.floats.word(330, 466, '连击减半', 0xbdb6d8, 11, 0.6);
         break;
       }
       case 'waveStart': {

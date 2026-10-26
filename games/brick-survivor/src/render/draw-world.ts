@@ -139,6 +139,11 @@ export class WorldView {
     this.multSlide = Math.max(0, this.multSlide - realDt * 4);
   }
 
+  comboDropped(): void {
+    this.comboBounceV -= 10;
+    this.multSlide = 1;
+  }
+
   comboBroken(v: number): void {
     this.comboBreakT = 0.3;
     this.comboBreakVal = v;
@@ -274,7 +279,8 @@ export class WorldView {
     const yB = 520;
     if (this.comboBreakT > 0) {
       const a = this.comboBreakT / 0.3;
-      drawNumber(b, t.numL, this.comboBreakVal, xR, yB - 14 + (1 - a) * 18, 30, 1, col(0x8f86b8, a * 0.7, 0), 0);
+      const bv = this.comboBreakVal;
+      drawNumber(b, t.numL, bv >= 1000 ? Math.floor(bv / 100) / 10 : bv, xR, yB - 14 + (1 - a) * 18, 30, 1, col(0x8f86b8, a * 0.7, 0), 0, bv >= 1000 ? NUM_DEC1 : 0, 0, bv >= 1000 ? C_K : 0);
     }
     if (this.comboVis <= 0 || this.comboShown < 10) return;
     const c = this.comboShown;
@@ -303,13 +309,15 @@ export class WorldView {
     }
     // label
     drawWord(b, t, 'COMBO', xR - 26, cy - size * 0.62, 10, col(0xede9ff, a * 0.8 * vis, 0), col(color, 0.4 * vis, 1));
-    drawNumber(b, t.numL, c, xR + jx, cy + jy, size, 1, col(0xffffff, a, 0.1), col(color, a * (0.8 + this.comboTierFlash * 0.4), 1));
+    // ≥1000 reads as "1.2k" so the counter does not turn into a long, meaningless string
+    if (c >= 1000) drawNumber(b, t.numL, Math.floor(c / 100) / 10, xR + jx, cy + jy, size, 1, col(0xffffff, a, 0.1), col(color, a * (0.8 + this.comboTierFlash * 0.4), 1), NUM_DEC1, 0, C_K);
+    else drawNumber(b, t.numL, c, xR + jx, cy + jy, size, 1, col(0xffffff, a, 0.1), col(color, a * (0.8 + this.comboTierFlash * 0.4), 1));
     // multiplier ×1.5 sliding in from the right
     const mult = config.combo.mults[tier]!;
     const slide = this.multSlide * 20;
     drawNumber(b, t.numS, mult, xR + slide, yB + 10, 13, 1, col(color, a * vis, 0.2), col(color, 0.4 * vis, 1), NUM_DEC1, C_TIMES);
     // window timer bar (80u)
-    const frac = Math.max(0, g.comboT / config.combo.window);
+    const frac = Math.max(0, Math.min(1, g.comboT / g.comboWindow()));
     const red = g.comboT < 0.4;
     const bc = red ? col(pal.danger, (0.5 + 0.5 * Math.sin(this.time * 40)) * vis, 0.3) : col(color, 0.75 * vis, 0.3);
     b.rect(s.white, xR - 80, yB + 21, 80, 1.5, col(0x3b2c73, 0.6 * vis, 0));
