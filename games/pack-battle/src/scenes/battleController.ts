@@ -405,7 +405,7 @@ export class BattleController {
           if (amt > 0) {
             // 立牌上的伤害数字：5 条车道左右交错、逐条上移，700ms 内不重叠
             const p = lane('h1', TMP.x + 8, TMP.y - 6, 24, 700, 1.6);
-            popup(String(amt), p.x, p.y, big ? '#fff3c4' : '#ffffff', big ? 32 : fast ? 20 : 24, { life: fast ? 0.6 : 0.9, vy: -60 });
+            popup(String(amt), p.x, p.y, big ? '#fff3c4' : '#ffffff', big ? 32 : fast ? 20 : 24, { life: fast ? 0.6 : 0.9, vy: -60, heavy: true });
           }
           emit('ink', TMP.x, TMP.y, big ? 8 : fast ? 2 : 4, { speed: 120, life: 0.5, size: 2.4 });
           if (big) {
@@ -416,7 +416,8 @@ export class BattleController {
           } else sfx('hit');
         } else {
           if (amt > 0) {
-            const p = lane('h0', TMP.x + (Math.random() - 0.3) * 40, TMP.y - 16);
+            // 玩家血条旁的伤害与回复共用一条车道：同一瞬间出现时上下错开
+            const p = lane('pbar', TMP.x - 30, TMP.y - 16, 22, 380);
             popup('−' + amt, p.x, p.y, '#ff9a7a', big ? 30 : fast ? 18 : 22, { ui: true, life: fast ? 0.6 : 0.9, vy: -40 });
           }
           this.jolt.v += big ? 220 : 120;
@@ -459,7 +460,7 @@ export class BattleController {
         this.barCenter(e.side, TMP);
         // 4× 时小额回复不飘字（血条绿色前沿已显示）
         if (!fast || (e.amount ?? 0) >= res.maxHp[e.side] * 0.08) {
-          const p = lane(e.side === 0 ? 'l0' : 'l1', TMP.x + 40, buffY(e.side, TMP.y, -16), e.side === 1 ? -14 : 14);
+          const p = e.side === 0 ? lane('pbar', TMP.x + 60, TMP.y - 16, 22, 380) : lane('l1', TMP.x + 40, buffY(e.side, TMP.y, -16), -14);
           popup('+' + (e.amount ?? 0), p.x, p.y, C.healLight, fast ? 16 : 22, { ui: true, life: 0.9, vy: buffVy(e.side, -40) });
         }
         if (!fast) emit('leaf', TMP.x, TMP.y, 4, { color: C.heal, speed: 60, life: 0.7, ui: true });

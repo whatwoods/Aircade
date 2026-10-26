@@ -104,6 +104,8 @@ export class Game {
   victoryReached = false;
   lowestRowSum = 0;
   lowestRowN = 0;
+  /** pressure director HP multiplier for newly spawned wave rows */
+  pressure = 1;
   waveStartTime = 0;
   waveTimes: number[] = [];
   bossStartTime = 0;
@@ -163,6 +165,7 @@ export class Game {
     this.victoryReached = false;
     this.lowestRowSum = 0;
     this.lowestRowN = 0;
+    this.pressure = 1;
     this.waveTimes = [];
     this.formation.reset();
     this.bricksSys.reset();
@@ -302,6 +305,12 @@ export class Game {
     const lr = this.formation.lowestDisplayRow();
     this.lowestRowSum += Math.max(0, lr);
     this.lowestRowN++;
+    const P = config.pressure;
+    if (P.on && this.phase === 'wave' && this.tut === null && this.formation.mode === 'waves' && this.formation.quickSteps === 0) {
+      const target = P.target[this.wave] ?? P.endlessTarget;
+      const err = target - Math.max(0, lr);
+      this.pressure = Math.max(P.min, Math.min(P.max, this.pressure * Math.exp(P.gain * err)));
+    }
   }
 
   hostile(): boolean {

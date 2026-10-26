@@ -15,15 +15,17 @@ export interface Popup {
   cn: boolean;
   ui: boolean;
   delay: number;
+  /** 深色衬底 + 加粗描边（立牌白闪时也读得清） */
+  heavy: boolean;
 }
 
 export const popups = new Pool<Popup>(
-  () => ({ x: 0, y: 0, vy: 0, s: '', color: '#fff', size: 20, life: 0, max: 1, cn: false, ui: false, delay: 0 }),
+  () => ({ x: 0, y: 0, vy: 0, s: '', color: '#fff', size: 20, life: 0, max: 1, cn: false, ui: false, delay: 0, heavy: false }),
   40,
   20,
 );
 
-export function popup(s: string, x: number, y: number, color: string, size = 20, o: { cn?: boolean; ui?: boolean; life?: number; vy?: number; delay?: number } = {}): void {
+export function popup(s: string, x: number, y: number, color: string, size = 20, o: { cn?: boolean; ui?: boolean; life?: number; vy?: number; delay?: number; heavy?: boolean } = {}): void {
   const p = popups.get();
   p.s = s;
   p.x = x;
@@ -35,6 +37,7 @@ export function popup(s: string, x: number, y: number, color: string, size = 20,
   p.cn = o.cn ?? false;
   p.ui = o.ui ?? false;
   p.delay = o.delay ?? 0;
+  p.heavy = o.heavy ?? false;
 }
 
 export function updatePopups(dt: number): void {
@@ -66,13 +69,21 @@ export function drawPopups(ctx: CanvasRenderingContext2D, ui: boolean): void {
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.scale(k, k);
+    if (p.heavy) {
+      const w = p.s.length * p.size * 0.5 + 12;
+      const h = p.size + 4;
+      ctx.fillStyle = `rgba(20,10,4,${(0.55 * a).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
+      ctx.fill();
+    }
     text(ctx, p.s, 0, 0, {
       size: p.size,
       weight: p.cn ? 900 : 400,
       family: p.cn ? CN : HAND,
       color: p.color,
       stroke: C.ink,
-      strokeW: Math.max(3, p.size * 0.2),
+      strokeW: Math.max(3, p.size * (p.heavy ? 0.28 : 0.2)),
       alpha: a,
     });
     ctx.restore();

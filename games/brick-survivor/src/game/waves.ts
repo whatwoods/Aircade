@@ -15,7 +15,11 @@ export class Waves {
   constructor(private g: Game) {}
 
   baseHp(w: number): number {
-    if (w <= 20) return Math.round(W.hpBase * Math.pow(W.hpGrowth, w - 1));
+    if (w <= 20) {
+      const early = Math.min(w, W.hpLateFrom) - 1;
+      const late = Math.max(0, w - W.hpLateFrom);
+      return Math.round(W.hpBase * Math.pow(W.hpGrowth, early) * Math.pow(W.hpGrowthLate, late));
+    }
     const c = this.hpCache.get(w);
     if (c !== undefined) return c;
     const v = Math.round(this.baseHp(w - 1) * W.hpGrowth * W.endless.extraGrowth);
@@ -94,7 +98,7 @@ export class Waves {
     const rng = g.rng;
     const w = g.wave;
     const dens = this.density(w);
-    const base = this.baseHp(w);
+    const base = this.baseHp(w) * g.pressure;
     const jitter = 1 + rng.range(-W.hpJitter, W.hpJitter);
     const mask = this.patternMask(rowIdx);
     const structured = this.pattern !== 'random' && rng.next() < 0.8;

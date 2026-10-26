@@ -59,12 +59,20 @@ export const config = {
   },
   xp: { base: 5, perLevel: 3 },
   levelup: { inputLockMs: 350, easeIn: 0.25, easeOut: 0.4, cardStagger: 0.07 },
+  // pressure director (docs §3.16): new-row HP is scaled so the formation settles near a per-wave target depth
+  // (display row, 0 = top, 21 = danger line). Bounded, so strong builds still out-pace it and weak builds get
+  // only partial relief.
+  pressure: {
+    on: true, gain: 0.035, min: 0.8, max: 3.2,
+    target: [0, 5, 6, 7, 8, 8, 9, 10, 11, 12, 12, 12, 13, 13, 13, 15, 14, 15, 16, 16, 16] as readonly number[],
+    endlessTarget: 16,
+  },
   advance: {
     bpm: 120, slideTime: 0.32, bounce: 2, sparseThreshold: 5, sparseBeats: 2, breachCapPerStep: 4,
     postBreachBeats: 2, armEpsilon: 0.05, prefillRows: 3, prefillAfterBoss: 2, spawnScale: 0.3,
   },
   waves: {
-    hpBase: 10, hpGrowth: 1.17, densityBase: 0.52, densityStep: 0.02, densityMax: 0.85, gapRows: 1,
+    hpBase: 10, hpGrowth: 1.17, hpGrowthLate: 1.22, hpLateFrom: 5, densityBase: 0.52, densityStep: 0.02, densityMax: 0.85, gapRows: 1,
     hpJitter: 0.1, minPerRow: 2, table: waveTable,
     special: {
       armored: { from: 3, base: 0.08, perWave: 0.012 },
@@ -149,8 +157,8 @@ export const config = {
     victory: { hitstopMs: 200, slowScale: 0.1, slowReal: 1.5 },
     reward: { largeGems: 3, heal: 3, rerolls: 1 },
     monolith: {
-      hp: 1500, coreR: 40, plates: 6, plateR: 12, plateOrbit: 72, plateSpeed: 50, plateSpeed2: 90, plateHits: 3,
-      plateRegen: 6, regenAnim: 0.5, swayAmp: 70, swayPeriod: 8, homeY: 180, slamDmg: 4, slamReturn: 1.2,
+      hp: 1300, coreR: 40, plates: 6, plateR: 12, plateOrbit: 72, plateSpeed: 50, plateSpeed2: 90, plateHits: 3,
+      plateRegen: 6, regenAnim: 0.5, swayAmp: 70, swayPeriod: 8, homeY: 180, slamDmg: 3, slamReturn: 1.2,
       summonEvery: 9, summonWarn: 0.8, summonCount: 3, summonHp: 19, phase2: 0.5, shotEvery: 4, shotWarn: 0.5,
       shotSpeed: 200, stepBeats: 6,
     },
@@ -161,7 +169,7 @@ export const config = {
       enrage: 0.3, splitHitstopMs: 120,
     },
     serpent: {
-      hp: 22000, segments: 14, headHp: 2400, headR: 18, segR: 14, spacing: 30, speed: 120, speedPerLost: 5,
+      hp: 18000, segments: 14, headHp: 2400, headR: 18, segR: 14, spacing: 30, speed: 120, speedPerLost: 5,
       speedMax: 190, dropTime: 0.25, wreckHp: 90, reachDmg: 2, teleport: 0.6, spitEvery: 6, spitCount: 3,
       spitSpeed: 200, spitMinY: 300, startRow: 1,
     },
