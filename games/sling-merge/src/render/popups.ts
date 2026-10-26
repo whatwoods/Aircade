@@ -123,35 +123,41 @@ export class Popups {
     return this.y[i]! - 36 * ease.quadOut(Math.min(1, this.t[i]! / this.dur[i]!));
   }
 
-  add(text: string, x: number, y: number, size: number, style: TextStyle, sub = '', dur = 0.8): number {
-    const i = this.head;
-    this.head = (this.head + 1) % CAP;
-    if (i === this.lastScore) this.lastScore = -1;
-    this.text[i] = text;
-    this.sub[i] = sub;
-    this.isScore[i] = 0;
+  add(text: string, x: number, y: number, size: number, style: TextStyle, sub = '', dur = 0.8, optional = false): number {
     // 按估算字宽夹在罐内，长字（「惊险救场 +50」）贴墙时不被玻璃挡住
     const hw = Popups.halfW(text, size);
-    this.hw[i] = hw;
     const px = Math.max(POP_L + hw, Math.min(POP_R - hw, x));
     // 水果往上浮、合成多发生在罐顶：起点压到盖子下方，保证整段上浮（36px）都在罐内、不钻到盖子和图鉴后面
-    let py = Math.max(y, this.minY(size));
-    // 纵向避让：和还清晰可见的跳字重叠时往下让（罐顶没有往上的余地）
-    for (let pass = 0; pass < 4; pass++) {
-      let moved = false;
+    const base = Math.max(y, this.minY(size));
+    let py = base;
+    // 纵向避让：和还清晰可见的跳字重叠时往下让（罐顶没有往上的余地），最多让 64 px
+    let clear = false;
+    for (let pass = 0; pass < 4 && !clear; pass++) {
+      clear = true;
       for (let j = 0; j < CAP; j++) {
-        if (j === i || this.t[j]! >= this.dur[j]! * 0.75) continue;
+        if (this.t[j]! >= this.dur[j]! * 0.75) continue;
         if (Math.abs(this.x[j]! - px) >= this.hw[j]! + hw) continue;
         const oy = this.curY(j);
         const oh = this.size[j]! * (this.sub[j] ? 1.35 : 0.75);
         const gap = oh + size * 0.75;
         if (Math.abs(oy - py) < gap) {
           py = oy + gap;
-          moved = true;
+          clear = false;
         }
       }
-      if (!moved) break;
     }
+    if (!clear || py > base + 64) {
+      // 让不开：可选的得分跳字直接省略（分数照常进 HUD），其余留在原位
+      if (optional) return -1;
+      py = base;
+    }
+    const i = this.head;
+    this.head = (this.head + 1) % CAP;
+    if (i === this.lastScore) this.lastScore = -1;
+    this.text[i] = text;
+    this.sub[i] = sub;
+    this.isScore[i] = 0;
+    this.hw[i] = hw;
     this.x[i] = px;
     this.y[i] = py;
     this.t[i] = 0;
@@ -180,7 +186,8 @@ export class Popups {
       return;
     }
     if (sub) for (let k = 0; k < CAP; k++) if (this.isScore[k]) this.sub[k] = '';
-    const i = this.add('+' + gained, x, y, size, style, sub, 0.8);
+    const i = this.add('+' + gained, x, y, size, style, sub, 0.8, true);
+    if (i < 0) return;
     this.isScore[i] = 1;
     this.lastScore = i;
     this.lastSum = gained;

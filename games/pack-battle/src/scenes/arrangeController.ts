@@ -15,7 +15,7 @@ import { tier, vibrate } from '../render/fx/shake.ts';
 import { C, drawGoldCoin } from '../render/kit.ts';
 import { inRect, type BagRect } from '../render/layout.ts';
 import { drawItemAt } from '../render/sprites.ts';
-import { LOGO, text } from '../render/text.ts';
+import { text } from '../render/text.ts';
 import { drawStamp, showToast } from '../render/ui/widgets.ts';
 import { drawMergeGlow, drawPlacement, drawPulseDots, type Placement } from '../render/views/bagView.ts';
 import { drawLinkCurve, linkKey, linkMid } from '../render/views/linkView.ts';
@@ -1174,7 +1174,7 @@ export class ArrangeController {
     const ty = full ? -6 : 0;
     text(ctx, '出售', -30, ty - 1, { size: 18, weight: 900, color: C.paper });
     drawGoldCoin(ctx, 4, ty - 1, 9);
-    text(ctx, '+' + price, 17, ty + 1, { size: 24, family: LOGO, color: C.goldLight, align: 'left' });
+    text(ctx, '+' + price, 17, ty + 1, { size: 22, weight: 900, color: C.goldLight, align: 'left' });
     if (full) text(ctx, '刚买的 · 全额退款', 0, ty + 21, { size: 10, weight: 700, color: C.chalk });
     ctx.restore();
   }

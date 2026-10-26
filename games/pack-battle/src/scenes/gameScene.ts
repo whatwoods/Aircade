@@ -952,7 +952,7 @@ export class GameScene implements Scene {
     if (!h) return;
     const k = Math.min(1, (3.4 - h.t) / 0.25);
     const a = h.t < 0.3 ? h.t / 0.3 : 1;
-    const y = this.phase === 'arrange' || this.phase === 'receipt' ? this.L.bubbleY - 36 : this.B.band.y + this.B.band.h + 32;
+    const y = this.phase === 'arrange' || this.phase === 'receipt' ? this.L.bubbleY - 36 : this.B.band.y + this.B.band.h + (this.phase === 'result' ? 42 : 32);
     ctx.save();
     ctx.globalAlpha *= a;
     drawBubble(ctx, '💡 ' + h.s, 195, y, 330, null, k);

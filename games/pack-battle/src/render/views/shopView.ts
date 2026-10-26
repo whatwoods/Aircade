@@ -7,7 +7,7 @@ import { inkStroke, rectPts, type Pts } from '../ink.ts';
 import { C, RARITY_COLOR, RARITY_TINT, cached, drawGoldCoin, drawPaper, pat } from '../kit.ts';
 import type { ArrangeLayout } from '../layout.ts';
 import { drawItemAt } from '../sprites.ts';
-import { LOGO, drawSprite, text } from '../text.ts';
+import { drawSprite, text } from '../text.ts';
 import { rgba } from '../textures.ts';
 import { drawStamp, regSpring } from '../ui/widgets.ts';
 
@@ -254,7 +254,7 @@ export class ShopView {
     const afford = o.gold >= c.shownPrice;
     drawSprite(ctx, priceRibbon(r.w - 6, def.rarity), -r.w / 2 + 3, r.h - 27);
     drawGoldCoin(ctx, -12, r.h - 14, 8);
-    text(ctx, String(c.shownPrice), 2, r.h - 13, { size: 19, family: LOGO, color: afford ? '#fff6dc' : '#ffb4a0', stroke: C.ink, strokeW: 3.5, align: 'left' });
+    text(ctx, String(c.shownPrice), 2, r.h - 13, { size: 18, weight: 900, color: afford ? '#fff6dc' : '#ffb4a0', stroke: C.ink, strokeW: 3.5, align: 'left' });
     if (!afford) {
       ctx.fillStyle = 'rgba(40,20,10,0.18)';
       ctx.fillRect(-r.w / 2 + 3, 4, r.w - 6, r.h - 32);

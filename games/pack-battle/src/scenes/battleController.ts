@@ -428,8 +428,8 @@ export class BattleController {
         }
         if ((e.absorbed ?? 0) > 0) {
           this.barCenter(tgt, TMP2);
-          const p = lane(tgt === 0 ? 'a0' : 'a1', TMP2.x - 100, buffY(tgt, TMP2.y, -14));
-          popup('−' + e.absorbed, p.x, p.y, C.shieldLight, fast ? 15 : 17, { ui: true, life: 0.7, vy: -30 });
+          const p = lane(tgt === 0 ? 'a0' : 'a1', TMP2.x - 100, buffY(tgt, TMP2.y, -14), tgt === 1 ? -14 : 14);
+          popup('−' + e.absorbed, p.x, p.y, C.shieldLight, fast ? 15 : 17, { ui: true, life: 0.7, vy: buffVy(tgt, -30) });
           if (e.shield[tgt] === 0) {
             sfx('shieldBreak');
             tier('T2');
@@ -443,8 +443,8 @@ export class BattleController {
         this.barCenter(e.side, TMP);
         // 4× 时小额护盾不飘字（血条护盾徽章已显示），避免满屏数字
         if (!fast || amt >= res.maxHp[e.side] * 0.08) {
-          const p = lane(e.side === 0 ? 's0' : 's1', TMP.x - 110, buffY(e.side, TMP.y, -16));
-          popup('+' + amt, p.x, p.y, C.shieldLight, fast ? 15 : 19, { ui: true, life: 0.8, vy: -36 });
+          const p = lane(e.side === 0 ? 's0' : 's1', TMP.x - 110, buffY(e.side, TMP.y, -16), e.side === 1 ? -14 : 14);
+          popup('+' + amt, p.x, p.y, C.shieldLight, fast ? 15 : 19, { ui: true, life: 0.8, vy: buffVy(e.side, -36) });
         }
         if (!fast) emit('shard', TMP.x - 120, TMP.y, 4, { color: C.shieldLight, speed: 70, life: 0.4, ui: true });
         sfx('shield');
@@ -459,8 +459,8 @@ export class BattleController {
         this.barCenter(e.side, TMP);
         // 4× 时小额回复不飘字（血条绿色前沿已显示）
         if (!fast || (e.amount ?? 0) >= res.maxHp[e.side] * 0.08) {
-          const p = lane(e.side === 0 ? 'l0' : 'l1', TMP.x + 40, buffY(e.side, TMP.y, -16));
-          popup('+' + (e.amount ?? 0), p.x, p.y, C.healLight, fast ? 16 : 22, { ui: true, life: 0.9, vy: -40 });
+          const p = lane(e.side === 0 ? 'l0' : 'l1', TMP.x + 40, buffY(e.side, TMP.y, -16), e.side === 1 ? -14 : 14);
+          popup('+' + (e.amount ?? 0), p.x, p.y, C.healLight, fast ? 16 : 22, { ui: true, life: 0.9, vy: buffVy(e.side, -40) });
         }
         if (!fast) emit('leaf', TMP.x, TMP.y, 4, { color: C.heal, speed: 60, life: 0.7, ui: true });
         sfx('heal');
@@ -486,8 +486,8 @@ export class BattleController {
       }
       case 'poisonTick': {
         this.barCenter(e.side, TMP);
-        const p = lane(e.side === 0 ? 'p0' : 'p1', TMP.x + 70, buffY(e.side, TMP.y, -14));
-        popup('−' + (e.amount ?? 0), p.x, p.y, '#c99bef', fast ? 16 : 20, { ui: true, life: 0.8, vy: -30 });
+        const p = lane(e.side === 0 ? 'p0' : 'p1', TMP.x + 70, buffY(e.side, TMP.y, -14), e.side === 1 ? -14 : 14);
+        popup('−' + (e.amount ?? 0), p.x, p.y, '#c99bef', fast ? 16 : 20, { ui: true, life: 0.8, vy: buffVy(e.side, -30) });
         emit('bubble', TMP.x + 70, TMP.y, 3, { color: C.poisonLight, speed: 40, life: 0.8, ui: true });
         sfx('gulp');
         break;
@@ -856,4 +856,8 @@ function lane(key: string, x: number, y: number, dy = 14, win = 380, kx = 1): { 
 /** 敌方血条上方是名字：敌方的护盾/回复/中毒等跳字放到血条下方 */
 function buffY(side: Side, barY: number, dy: number): number {
   return side === 1 ? barY + 30 : barY + dy;
+}
+/** 敌方增益跳字向下飘，不回到血条上 */
+function buffVy(side: Side, vy: number): number {
+  return side === 1 ? 14 : vy;
 }
