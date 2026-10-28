@@ -286,6 +286,16 @@ export class Play {
       chain: '合成出来的字还能当部件用：先拼出「相」',
     };
     if (tip && texts[tip]) this.tipOnce(tip, texts[tip], 5200);
+    if (this.s.orders.some((o) => o.hint === 0)) this.structTip();
+  }
+
+  /** 第一次出现只有结构图的卷轴：解释图标（延后，避开开局的情境提示） */
+  private structTip(): void {
+    if (this.tut || save.tips.has('struct')) return;
+    const g = this.game;
+    window.setTimeout(() => {
+      if (this.game === g && !this.over) this.tipOnce('struct', '卷轴上的小方框是结构图：中间一竖 = 左右结构，一横 = 上下结构。点卷轴可看部件提示', 5000);
+    }, 5600);
   }
 
   private tipOnce(id: string, text: string, ms = 4000): void {
@@ -351,8 +361,10 @@ export class Play {
           this.fx.startMerge(e.a, e.b, e.result, e.cell, sx, sy, first && !(this.tut && e.recipe === '林'), zone === 'right' || zone === 'bottom');
           save.stats.merges++;
           const r = RECIPE_MAP.get(e.recipe);
-          if (r && r.parts.some((p) => p === '水' || p === '人' || p === '手' || p === '心' || p === '火' || p === '言')) {
-            if (first && !this.tut) this.tipOnce('variant', '水在左边写作「氵」——部件会按位置自动变形', 4000);
+          const vv = r?.vv ? [...r.vv] : null;
+          const vi = vv && r ? vv.findIndex((c, i) => c !== r.parts[i]) : -1;
+          if (r && vv && vi >= 0 && first && !this.tut) {
+            this.tipOnce('variant', `「${r.parts[vi]}」在「${r.c}」里写作「${vv[vi]}」——不少部件入字后会写成偏旁的样子`, 4000);
           }
           if (!first && !s.orders.some((o) => o.ch === e.recipe)) {
             // 重复合成已知字：小气泡 1.2 s
@@ -373,6 +385,7 @@ export class Play {
         case 'orderOpened':
           this.scrolls.orderOpened(e.order);
           this.audio.swish(0.08);
+          if (e.order.hint === 0) this.structTip();
           break;
         case 'discarded': {
           const d = this.discards.find((x) => !x.on) ?? this.discards[0];
@@ -499,7 +512,7 @@ export class Play {
       this.host.showBrief(ch);
       return;
     }
-    const note = this.tut && ch === '森' ? '以后每认识一个新字，都会收进图鉴' : '';
+    const note = '';
     // 新字卡等「成」印落下、字飞进卷轴之后再弹（P1-3：不切断高潮）
     this.cardQueue = ch;
     this.cardNote = note;
@@ -1024,25 +1037,6 @@ export class Play {
     o.alpha = 1;
     o.scale = 1;
     o.fade = 0;
-    // 不能合成的目标：淡灰 ✕（拖拽悬停时，或拖错后 0.45 s）
-    const xc = d && this.badHover >= 0 ? this.badHover : this.fail.on && this.fail.t < FAIL_WOBBLE + 0.15 ? this.fail.cell : -1;
-    if (xc >= 0) {
-      const X = cx(xc);
-      const Y = cy(xc);
-      const r = LAYOUT.cell * 0.22;
-      ctx.strokeStyle = INK.light;
-      ctx.globalAlpha = 0.55;
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(X - r, Y - r);
-      ctx.lineTo(X + r, Y + r);
-      ctx.moveTo(X + r, Y - r);
-      ctx.lineTo(X - r, Y + r);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.lineCap = 'butt';
-    }
     // 方位箭头（同部件多结果）
     if (d && this.hover >= 0 && this.popups.arrow) {
       const hx = cx(this.hover);
@@ -1104,7 +1098,7 @@ export class Play {
     // 拖拽物：悬停在可合成的目标上时缩小、半透明，让下面的目标牌（石绿光晕、朱描边）露出来
     if (d) {
       const P = this.dragPos;
-      const over = this.hover >= 0 ? 1 : this.badHover >= 0 ? 0.5 : 0;
+      const over = this.hover >= 0 ? 1 : this.badHover >= 0 ? 0.8 : 0;
       const gs = BS * lerp(1.08, 0.8, over);
       const ga = lerp(0.96, 0.55, over);
       o.scale = gs;
@@ -1121,6 +1115,25 @@ export class Play {
         ctx.arc(P.x, P.y, 40, 0, Math.PI * 2);
         ctx.fill();
       }
+    }
+    // 不能合成的目标：淡灰 ✕（拖拽悬停时，或拖错后 0.45 s）
+    const xc = d && this.badHover >= 0 ? this.badHover : this.fail.on && this.fail.t < FAIL_WOBBLE + 0.15 ? this.fail.cell : -1;
+    if (xc >= 0) {
+      const X = cx(xc);
+      const Y = cy(xc);
+      const r = LAYOUT.cell * 0.22;
+      ctx.strokeStyle = INK.light;
+      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(X - r, Y - r);
+      ctx.lineTo(X + r, Y + r);
+      ctx.moveTo(X + r, Y - r);
+      ctx.lineTo(X - r, Y + r);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.lineCap = 'butt';
     }
     this.popups.draw(ctx, BODY_STACK);
     ctx.restore();

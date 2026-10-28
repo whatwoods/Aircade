@@ -77,8 +77,15 @@ export function scanGlyphs(): ScanResult {
   walk(path.join(root, 'src'), files);
   const reCanvas = new RegExp(String.raw`(?:glyphs\.(?:label|draw|get|drawFit)|popups\.float|\.float)\(\s*(?:[\w.]+\s*,\s*)?` + LIT + String.raw`([^;\n]*)`, 'g');
   const reSeal = new RegExp(String.raw`\bseal\(\s*` + LIT + String.raw`([^;\n]*)`, 'g');
-  const reH = new RegExp(String.raw`\bh\(\s*'(\w+)'\s*,\s*` + LIT + String.raw`\s*,\s*` + LIT, 'g');
-  const reBtn = new RegExp(String.raw`\bbtn\(\s*` + LIT + String.raw`\s*,\s*` + LIT, 'g');
+  // 文本参数可以是表达式（如 a ? '收起' : '收入图鉴'）：取到箭头函数 / 行尾为止，收集其中全部字面量
+  const reH = new RegExp(String.raw`\bh\(\s*'(\w+)'\s*,\s*` + LIT + String.raw`\s*,\s*([^;\n]*)`, 'g');
+  const reBtn = new RegExp(String.raw`\bbtn\(\s*` + LIT + String.raw`\s*,\s*([^;\n]*)`, 'g');
+  const reLit = new RegExp(LIT, 'g');
+  const exprText = (expr: string): string => {
+    const cut = expr.search(/\(\)\s*=>|\(\w*\)\s*=>|\bfunction\b/);
+    const e = cut >= 0 ? expr.slice(0, cut) : expr;
+    return [...e.matchAll(reLit)].map((x) => literalText(x[1])).join('');
+  };
   for (const f of files) {
     const src = fs.readFileSync(f, 'utf8');
     const rel = path.relative(root, f);
@@ -87,11 +94,11 @@ export function scanGlyphs(): ScanResult {
     for (const m of src.matchAll(reSeal)) add(literalText(m[1]), /'logo'/.test(m[2]) ? 'logo' : 'kai', loc(m.index!));
     for (const m of src.matchAll(reH)) {
       const font = fontOfClass(literalText(m[2]), m[1]);
-      if (font) add(literalText(m[3]), font, loc(m.index!));
+      if (font) add(exprText(m[3]), font, loc(m.index!));
     }
     for (const m of src.matchAll(reBtn)) {
       const font = fontOfClass(literalText(m[1]), 'button');
-      if (font) add(literalText(m[2]), font, loc(m.index!));
+      if (font) add(exprText(m[2]), font, loc(m.index!));
     }
   }
   scanHtml(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), 'index.html', res, sel);

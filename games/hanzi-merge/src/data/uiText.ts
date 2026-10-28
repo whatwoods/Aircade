@@ -22,6 +22,8 @@ export const KAI = {
   stars: '星',
   chapters: '叠字会意偏旁上下与包围字上生字三才',
   misc: '新字得来一局成淼',
+  /** 卷轴 hint=0 时结构图标旁的说明（scrolls.ts STRUCT_SHORT） */
+  struct: '左右上下全包围品',
   digits: '0123456789',
   punct: '·：/+？−×—（）',
 } as const;

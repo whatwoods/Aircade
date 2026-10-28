@@ -364,7 +364,7 @@ export class Screens {
     }
     const sec = h('div', 'sect');
     sec.append(h('span', 'kai', '部件'), h('span', 'cnt', String(BASES.length)));
-    list.append(sec, h('div', 'astats', '小字为偏旁变体，按位置自动变形'), grid);
+    list.append(sec, h('div', 'astats', '小字为常见偏旁变体；用不用、用哪个，由具体的字决定（如 炎 下面仍是火，照 下面才是灬）'), grid);
   }
 
   // ───────── 设置 ─────────

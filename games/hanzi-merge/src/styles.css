@@ -400,6 +400,11 @@ button {
 .card {
   display: flex;
   flex-direction: column;
+  /* 高度随内容（P1-5：不留大片空白），最矮 40%、最高 70% */
+  height: auto;
+  min-height: 40%;
+  max-height: 70%;
+  overflow-y: auto;
 }
 .card .top {
   display: flex;
@@ -495,7 +500,7 @@ button {
   color: var(--ink3);
 }
 .card .foot {
-  margin-top: auto;
+  margin-top: 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -505,14 +510,16 @@ button {
   color: var(--ink3);
 }
 .card .note {
-  margin-top: auto;
-  padding-bottom: 10px;
+  margin-top: 18px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(184, 49, 42, 0.06);
   font-size: 13px;
   color: var(--cinnabar-lo);
   text-align: center;
 }
 .card .note + .foot {
-  margin-top: 0;
+  margin-top: 14px;
 }
 .brief {
   position: absolute;

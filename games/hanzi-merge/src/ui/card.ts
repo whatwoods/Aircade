@@ -4,44 +4,11 @@
  */
 import { CONFIG } from '../config.ts';
 import { BASE_MAP, RECIPE_MAP } from '../core/recipes.ts';
-import { ALT, RECIPES, type RecipeDef, type Struct } from '../data/hanzi.ts';
+import { ALT, RECIPES, type RecipeDef } from '../data/hanzi.ts';
 import { partBoxes } from '../render/compose.ts';
 import { INK, glyphs } from '../render/glyphs.ts';
-import { save } from '../save.ts';
+import { markTip, save } from '../save.ts';
 import { btn, h } from './dom.ts';
-
-export function structSvg(s: Struct, size = 22): string {
-  const k = size;
-  const box = `<rect x="1" y="1" width="${k - 2}" height="${k - 2}" fill="none" stroke="currentColor" stroke-width="1.4"/>`;
-  const m = k / 2;
-  let inner = '';
-  switch (s) {
-    case '⿰':
-      inner = `<line x1="${m - 1}" y1="1" x2="${m - 1}" y2="${k - 1}" stroke="currentColor" stroke-width="1.4"/>`;
-      break;
-    case '⿱':
-      inner = `<line x1="1" y1="${m - 1}" x2="${k - 1}" y2="${m - 1}" stroke="currentColor" stroke-width="1.4"/>`;
-      break;
-    case '⿴':
-      inner = `<rect x="${k * 0.3}" y="${k * 0.3}" width="${k * 0.4}" height="${k * 0.4}" fill="none" stroke="currentColor" stroke-width="1.4"/>`;
-      break;
-    case '⿵':
-      inner = `<polyline points="${k * 0.3},${k - 1} ${k * 0.3},${k * 0.35} ${k * 0.7},${k * 0.35} ${k * 0.7},${k - 1}" fill="none" stroke="currentColor" stroke-width="1.4"/>`;
-      break;
-    case '⿹':
-      inner = `<polyline points="1,${k * 0.35} ${k * 0.65},${k * 0.35} ${k * 0.65},${k - 1}" fill="none" stroke="currentColor" stroke-width="1.4"/>`;
-      break;
-    case '⿺':
-      inner = `<polyline points="${k * 0.35},1 ${k * 0.35},${k * 0.65} ${k - 1},${k * 0.65}" fill="none" stroke="currentColor" stroke-width="1.4"/>`;
-      break;
-    case '⿸':
-      inner = `<polyline points="${k - 1},${k * 0.35} ${k * 0.35},${k * 0.35} ${k * 0.35},${k - 1}" fill="none" stroke="currentColor" stroke-width="1.4"/>`;
-      break;
-    default:
-      inner = `<line x1="1" y1="${m}" x2="${k - 1}" y2="${m}" stroke="currentColor" stroke-width="1.4"/><line x1="${m}" y1="${m}" x2="${m}" y2="${k - 1}" stroke="currentColor" stroke-width="1.4"/>`;
-  }
-  return `<svg viewBox="0 0 ${k} ${k}" width="${k}" height="${k}" aria-hidden="true">${box}${inner}</svg>`;
-}
 
 const STRUCT_NAME: Record<string, string> = {
   '⿰': '左右结构', '⿱': '上下结构', '⿴': '全包围', '⿵': '上三包围', '⿸': '左上包围', '⿹': '右上包围', '⿺': '左下包围', 品: '品字结构',
@@ -125,11 +92,8 @@ export class Card {
       } else if (b?.v && Object.values(b.v).includes('') && r.s === '⿱' && i === 0) {
         vnames.push(`${p}在上时压扁书写${b.vn ? '（' + b.vn + '）' : ''}`);
       }
-      if (i < r.parts.length - 1) {
-        const op = h('span', 'op');
-        op.innerHTML = i === 0 ? structSvg(r.s, 20) : '';
-        decomp.append(op);
-      }
+      // 结构见右侧结构图，这里只用「+」连接，避免 ⿱ 图标被看成「日」
+      if (i < r.parts.length - 1) decomp.append(h('span', 'op', '+'));
     });
     const vn = h('div', 'vname', vnames.join('；'));
     const tags = h('div', 'tags');
@@ -160,7 +124,8 @@ export class Card {
     else foot.append(btn('primary kai', '收入图鉴', () => this.close(false)));
     card.append(top, text);
     if (note) card.append(h('div', 'note', note));
-    else if (!readOnly && got <= 1) card.append(h('div', 'note', '以后每认识一个新字，都会收进图鉴'));
+    else if (!readOnly && !save.tips.has('atlasCard')) card.append(h('div', 'note', '以后每认识一个新字，都会收进图鉴'));
+    if (!readOnly) markTip('atlasCard');
     card.append(foot);
     scr.append(card);
     scr.addEventListener('pointerup', () => this.close(false));

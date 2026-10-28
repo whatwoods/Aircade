@@ -259,7 +259,10 @@ export class Scrolls {
     if (!r) return;
     const flash = v.hintFlash > 0 ? 1 + v.hintFlash * 1.2 : 1;
     if (v.hint <= 0) {
-      structIcon(ctx, r.s, cx, y, 14, INK.light);
+      // 结构图标 + 文字说明（P2-8：新玩家不认识 ⿰ 这类符号）
+      const label = STRUCT_SHORT[r.s] ?? '';
+      structIcon(ctx, r.s, cx - 22, y, 14, INK.light);
+      glyphs.label(ctx, label, cx - 10, y, 12, INK.light, 0, 1);
       return;
     }
     const parts = hintParts(v.ch, v.hint);
@@ -274,6 +277,11 @@ export class Scrolls {
     }
   }
 }
+
+/** 结构的简称（字都在 uiText KAI.struct 里） */
+const STRUCT_SHORT: Record<string, string> = {
+  '⿰': '左右', '⿱': '上下', '⿴': '全包围', '⿵': '上包围', '⿸': '左上包', '⿹': '右上包', '⿺': '左下包', 品: '品字',
+};
 
 /** 结构图标（⿰⿱⿴…，字体里没有这些码位，程序绘制） */
 export function structIcon(ctx: CanvasRenderingContext2D, s: Struct, cx: number, cy: number, size: number, color: string): void {
