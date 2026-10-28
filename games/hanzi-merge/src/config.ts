@@ -1,7 +1,8 @@
 /** 造字记 — 全部可调数值（docs/hanzi-merge.md §3.12）。关卡数据见 src/data/levels.ts。 */
 
 export const CONFIG = {
-  board: { cols: 5, rows: 6 },
+  /** 4×4：盘面会真的被占满（满了只能花墨洗掉旧牌），牌也更大。focus = 引导与调试默认格 */
+  board: { cols: 4, rows: 4, focus: 9 },
   rack: { preview: 2 },
   director: {
     guaranteeWindow: 5,
@@ -18,9 +19,9 @@ export const CONFIG = {
     inkLeft: 40,
   },
   endless: {
-    startInk: 20,
+    startInk: 30,
     refundBonus: 1,
-    refundDecayStages: 3,
+    refundDecayStages: 2,
     refundMin: -1,
     ordersPerStage: 5,
     decoyStart: 0.12,
@@ -59,10 +60,10 @@ export const CONFIG = {
 export const LAYOUT = {
   W: 390,
   H: 844,
-  cell: 66,
-  gap: 6,
-  boardX: 18,
-  boardY: 194,
+  cell: 82,
+  gap: 8,
+  boardX: 19,
+  boardY: 230,
   scrollY: 58,
   scrollW: 112,
   scrollH: 124,
@@ -78,6 +79,9 @@ export const LAYOUT = {
   tipBar: { x: 120, y: 770, w: 254, h: 44 },
   pauseBtn: { x: 12, y: 6, w: 44, h: 44 },
 } as const;
+
+/** 盘面牌相对设计基准（66 px 格）的缩放 */
+export const BS = LAYOUT.cell / 66;
 
 export function cellXY(i: number): { x: number; y: number } {
   const c = i % CONFIG.board.cols;

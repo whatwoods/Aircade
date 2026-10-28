@@ -2,7 +2,7 @@
  * 游戏中场景：把 core 的事件变成动画、声音、提示与界面（§3、§6.6、§7.2、§8.3–§8.6）。
  * 输入 → Action → core.apply → GameEvent[] → 视图。core 不知道任何渲染细节。
  */
-import { CONFIG, LAYOUT, cellXY } from './config.ts';
+import { BS, CONFIG, LAYOUT, cellXY } from './config.ts';
 import { Game, createEndless, createLevel, hintCost, hintMax, stars as starsOf } from './core/game.ts';
 import { RECIPE_MAP, canMergeTiles, resolveMerge } from './core/recipes.ts';
 import type { Action, GameEvent, LevelDef, Order, Source, Tile, Zone } from './core/types.ts';
@@ -862,7 +862,7 @@ export class Play {
     this.bg.drawGrid(ctx);
     // 引导：亮格
     if (this.tut && this.tut.step === 1) {
-      const p = cellXY(12);
+      const p = cellXY(CONFIG.board.focus);
       ctx.strokeStyle = INK.red;
       ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 4);
       ctx.lineWidth = 2;
@@ -901,18 +901,18 @@ export class Play {
         const br = 0.35 + 0.15 * Math.sin((t / 1.2) * Math.PI * 2);
         const hot = this.hover === i ? 0.3 : 0;
         ctx.fillStyle = `rgba(95,127,106,${br + hot})`;
-        roundRect(ctx, x - 35, y - 35, 70, 70, 9);
+        roundRect(ctx, x - 35 * BS, y - 35 * BS, 70 * BS, 70 * BS, 9);
         ctx.fill();
         if (g === 2) {
           ctx.strokeStyle = INK.red;
           ctx.lineWidth = 1.6;
-          roundRect(ctx, x - 33, y - 33, 66, 66, 8);
+          roundRect(ctx, x - 33 * BS, y - 33 * BS, 66 * BS, 66 * BS, 8);
           ctx.stroke();
         }
       }
       const isSrc = d && d.from === i;
       o.alpha = isSrc ? 0.3 : 1;
-      o.scale = sc;
+      o.scale = sc * BS;
       o.lift = 0;
       o.fade = fade >= 0 ? clamp((fade - i * 0.03) / 0.3) : 0;
       o.bloom = this.idleCell === i ? Math.sin(this.idleBloom * Math.PI) : 0;
@@ -949,7 +949,7 @@ export class Play {
       const u = easeInOutQuad(clamp(dd.t / 0.3));
       const bx = LAYOUT.bowl.x + 35;
       const by = LAYOUT.bowl.y + 35;
-      o.scale = lerp(1, 0.3, u);
+      o.scale = lerp(BS, 0.3, u);
       o.alpha = 1 - seg(dd.t, 0.25, 0.4);
       drawTile(ctx, dd.tile, lerp(dd.x, bx, u), lerp(dd.y, by, u) - Math.sin(u * Math.PI) * 30, o);
     }
@@ -991,8 +991,8 @@ export class Play {
     const tu = this.tut!;
     let x0 = LAYOUT.rackCur.x + 44;
     let y0 = LAYOUT.rackCur.y + 44;
-    let x1 = cx(12);
-    let y1 = cy(12);
+    let x1 = cx(CONFIG.board.focus);
+    let y1 = cy(CONFIG.board.focus);
     const s = this.s;
     if (tu.step === 2 || tu.step === 4) {
       const target = tu.step === 2 ? '木' : '林';

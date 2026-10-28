@@ -2,7 +2,7 @@
  * 构建后检查（npm run build 最后一步）：
  *  - dist 中的楷体 / Logo 字体必须覆盖当前字库与界面文字的全部字符（防止字体过期）
  *  - dist/index.html 中以打包字体显示的文字（.kai / .logo 等）必须全部在子集里
- *  - 字体体积预算：楷体 ≤ 120 KB，Logo ≤ 15 KB
+ *  - 字体体积预算：楷体 ≤ 140 KB（含卡片上的 50 余个繁体字形），Logo ≤ 15 KB
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,7 +29,7 @@ else {
   if (ml.length) errs.push('Logo 子集缺字：' + ml.join(''));
   const sk = fs.statSync(k).size / 1024;
   const sl = fs.statSync(l).size / 1024;
-  if (sk > 120) errs.push(`楷体 ${sk.toFixed(1)} KB 超出 120 KB 预算`);
+  if (sk > 140) errs.push(`楷体 ${sk.toFixed(1)} KB 超出 140 KB 预算`);
   if (sl > 15) errs.push(`Logo ${sl.toFixed(1)} KB 超出 15 KB 预算`);
   console.log(`[check-dist] 楷体 ${sk.toFixed(1)} KB，Logo ${sl.toFixed(1)} KB，字符覆盖完整`);
 }

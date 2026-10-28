@@ -27,7 +27,7 @@ export function kaiCharset(): string[] {
   s += kaiUiChars() + CHAPTER_NAMES.join('');
   // 源码里所有以打包楷体显示的字面量（画布 glyphs.* / seal、DOM .kai 等，见 glyph-scan.ts）
   s += [...scanGlyphs().kai].join('');
-  s += 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ';
+  s += ' ';
   return [...new Set([...s])].filter((c) => c.trim() !== '' || c === ' ').sort();
 }
 export function logoCharset(): string[] {

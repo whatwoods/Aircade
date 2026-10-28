@@ -78,7 +78,8 @@ for (const r of RECIPES.filter((x) => x.parts.length === 3)) {
 // 4b. 卡片文字用系统字体渲染：只允许基本区汉字（U+4E00–9FFF），避免扩展区字在手机上显示成方框
 console.log('[4b] 卡片文字字符集');
 for (const x of [...RECIPES, ...BASES]) {
-  const text = x.g + ('basis' in x ? x.basis : '');
+  // phn（声旁本字）也用正文字体显示在卡片标签里
+  const text = x.g + ('basis' in x ? x.basis + (x.phn ?? '') : '');
   for (const ch of text) {
     const cp = ch.codePointAt(0)!;
     if (cp >= 0x3400 && !(cp >= 0x4e00 && cp <= 0x9fff) && !(cp >= 0x3000 && cp <= 0x303f) && !(cp >= 0xff00 && cp <= 0xffef) && cp !== 0x2026)
@@ -164,8 +165,8 @@ for (const r of RECIPES) {
   const show = r.vv ? [...r.vv][r.ph] : P;
   const ok = new Set([P, show, ...(r.phn ? [r.phn] : [])]);
   const text = r.basis + ' ' + (r.check ?? '');
-  const named = [...text.matchAll(/([\u4e00-\u9fff])(?:省|亦)?声(?![旁音调字])/g), ...text.matchAll(/([\u4e00-\u9fff])表音/g)]
-    .map((m) => m[1]).filter((y) => y !== '形');
+  const named = [...new Set([...text.matchAll(/([\u4e00-\u9fff])(?:省|亦)?声(?![旁音调字])/g), ...text.matchAll(/([\u4e00-\u9fff])表音/g)]
+    .map((m) => m[1]).filter((y) => y !== '形'))];
   for (const y of named) if (!ok.has(y)) err(`${r.c} 构形依据点名「${y}」为声旁，但卡片标签是「${P}${r.phn ? '（本作' + r.phn + '）' : ''}表音」——请改 ph 或补 phn`);
   if (!text.includes(P) && !(r.phn && text.includes(r.phn))) err(`${r.c} 构形依据里没有提到声旁「${P}」`);
 }

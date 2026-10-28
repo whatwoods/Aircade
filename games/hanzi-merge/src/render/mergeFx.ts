@@ -8,7 +8,7 @@
  *   ⑤ 交付（另一段动画 Deliver）：抬起 → 弧线飞向卷轴（拖淡墨尾迹）→ 卷轴描红被笔扫填满 → 「成」印
  * 动画对象全部池化；动画期间对应格子锁定（不可拖、不可落）。
  */
-import { LAYOUT, cellXY } from '../config.ts';
+import { BS, LAYOUT, cellXY } from '../config.ts';
 import { RECIPE_MAP } from '../core/recipes.ts';
 import type { Tile } from '../core/types.ts';
 import type { RecipeDef } from '../data/hanzi.ts';
@@ -169,8 +169,9 @@ export class MergeFx {
     m.cell = cell;
     m.cx = x + LAYOUT.cell / 2;
     m.cy = y + LAYOUT.cell / 2;
-    m.ax = ax;
-    m.ay = ay;
+    // 起点换算到缩放前的坐标系（draw 时以格心为原点放大 BS 倍）
+    m.ax = m.cx + (ax - m.cx) / BS;
+    m.ay = m.cy + (ay - m.cy) / BS;
     m.a = a;
     m.b = b;
     m.result = result;
@@ -237,7 +238,7 @@ export class MergeFx {
       }
     };
     addParts(b, bParts, ib, false, m.cx, m.cy);
-    addParts(a, aParts, ia, true, ax, ay);
+    addParts(a, aParts, ia, true, m.ax, m.ay);
     this.hooks.beat('fly', this.meta(m, 0));
   }
 
@@ -320,7 +321,16 @@ export class MergeFx {
   }
 
   draw(ctx: CanvasRenderingContext2D, time: number): void {
-    for (const m of this.merges) if (m.on) this.drawMerge(ctx, m, time);
+    // 动画按 66 px 设计格绘制，整体缩放到实际格（BS）
+    for (const m of this.merges) {
+      if (!m.on) continue;
+      ctx.save();
+      ctx.translate(m.cx, m.cy);
+      ctx.scale(BS, BS);
+      ctx.translate(-m.cx, -m.cy);
+      this.drawMerge(ctx, m, time);
+      ctx.restore();
+    }
   }
 
   /** 交付飞行层（画在 HUD 之上） */
@@ -485,7 +495,7 @@ export class MergeFx {
     o.method = false;
     if (t < D_LIFT) {
       const u = t / D_LIFT;
-      o.scale = 1 + 0.1 * u;
+      o.scale = BS * (1 + 0.1 * u);
       o.lift = u;
       o.alpha = 1;
       drawTile(ctx, { kind: 'char', ch: d.ch }, d.x0, d.y0 - u * 4, o);
@@ -513,7 +523,7 @@ export class MergeFx {
     }
     ctx.globalAlpha = 1;
     // 牌底在途中淡出，字放大到卷轴描红的字号（60 px）
-    const size = lerp(1.1, 60 / GLYPH_CHAR, u);
+    const size = lerp(1.1 * BS, 60 / GLYPH_CHAR, u);
     o.scale = size;
     o.alpha = 1;
     drawCard(ctx, x, y, size, 1 - seg(u, 0.3, 0.8), 1);

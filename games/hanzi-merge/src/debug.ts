@@ -76,7 +76,8 @@ export function installDebug(app: App): void {
     const s = need();
     s.board[cell] = null;
     const free = empty().filter((i) => i !== cell);
-    const other = free.find((i) => Math.abs((i % 5) - (cell % 5)) + Math.abs(Math.floor(i / 5) - Math.floor(cell / 5)) <= 2) ?? free[0];
+    const W = CONFIG.board.cols;
+    const other = free.find((i) => Math.abs((i % W) - (cell % W)) + Math.abs(Math.floor(i / W) - Math.floor(cell / W)) <= 2) ?? free[0];
     if (other === undefined) throw new Error('board full');
     if (r.parts.length === 3) {
       s.board[cell] = mkTile(`${r.parts[0]}+${r.parts[1]}`);
@@ -129,7 +130,7 @@ export function installDebug(app: App): void {
     },
     deliver: (ch: string) => {
       const free = empty();
-      const cell = free.includes(12) ? 12 : free[0];
+      const cell = free.includes(CONFIG.board.focus) ? CONFIG.board.focus : free[0];
       const [f, t, z] = stage(ch, cell);
       return play.act({ t: 'drop', from: f, cell: t, zone: z });
     },
@@ -140,7 +141,7 @@ export function installDebug(app: App): void {
         save.atlas.add(ch);
         saveAtlas();
       }
-      const [f, t, z] = stage(ch, 12);
+      const [f, t, z] = stage(ch, CONFIG.board.focus);
       return play.act({ t: 'drop', from: f, cell: t, zone: z });
     },
     showcase: async (chapter?: number, gapMs = 900) => {
