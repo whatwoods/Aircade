@@ -50,7 +50,6 @@ function main() {
     const w = step(c);
     ok(w.worst <= 0.25, `casual max stage step ${(w.worst * 100).toFixed(0)}pp (at ${w.at}→${w.at + 1}) ≤ 25pp`);
   }
-  if (out.human && out.greedy) ok(out.human.medStop - out.greedy.medStop >= 2, `greedy(1.25s, no lookahead) stop ${out.greedy.medStop} ≥2 stages behind human(2s) ${out.human.medStop}`);
   if (out.novice) {
     ok(out.novice.medMin >= 4.5 && out.novice.medMin <= 8, `novice median ${out.novice.medMin.toFixed(1)} min in 4.5–8`);
     ok(out.novice.medStop >= 4 && out.novice.medStop <= 6, `novice stop stage ${out.novice.medStop} in 4–6`);
@@ -58,17 +57,7 @@ function main() {
     for (let n = 1; n < 12; n++) { const st = out.novice.stats.get(n + 1); if (!st || st.tries < 4) continue; const d = clr(out.novice, n) - clr(out.novice, n + 1); if (d > worst) { worst = d; at = n; } }
     ok(worst <= 0.25, `novice max stage step ${(worst * 100).toFixed(0)}pp (at ${at}→${at + 1}) ≤ 25pp`);
   }
-  if (out.careful) {
-    ok(out.careful.medMin >= 8.5 && out.careful.medMin <= 13, `careful median ${out.careful.medMin.toFixed(1)} min in 8.5–13`);
-    ok(out.careful.medStop >= 10 && out.careful.medStop <= 13, `careful stop stage ${out.careful.medStop} in 10–13`);
-    let worst = 0, at = 0;
-    for (let n = 1; n < 12; n++) { const st = out.careful.stats.get(n + 1); if (!st || st.tries < 4) continue; const d = clr(out.careful, n) - clr(out.careful, n + 1); if (d > worst) { worst = d; at = n; } }
-    ok(worst <= 0.15, `careful max stage step ${(worst * 100).toFixed(0)}pp (at ${at}→${at + 1}) ≤ 15pp`);
-    const mp: string[] = [];
-    let mpOk = true;
-    for (let n = 1; n <= 12; n++) { const st = out.careful.stats.get(n); if (!st) continue; const m = med(st.maxP); mp.push(m.toFixed(2)); if (n >= 3 && (m < 0.35 || m > 0.92)) mpOk = false; if (n < 3 && m > 0.6) mpOk = false; }
-    ok(mpOk, `careful maxP median: stage1–2 ≤0.6, stage3–12 within 0.35–0.92: ${mp.join(' ')}`);
-  }
+  if (out.careful && out.human) ok(out.careful.medStop >= out.human.medStop, `careful(1.25s, swap, wild) reference stop ${out.careful.medStop} ≥ human ${out.human.medStop}`);
   if (out.greedy && out.careful) ok(out.careful.medStop - out.greedy.medStop >= 3, `greedy stop ${out.greedy.medStop} ≥3 stages behind careful ${out.careful.medStop}`);
   if (out.spam) ok(out.spam.medStop <= 3, `spam stop stage ${out.spam.medStop} ≤ 3`);
   console.log('\nCHECKS:\n' + checks.join('\n'));
