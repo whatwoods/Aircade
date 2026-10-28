@@ -70,6 +70,10 @@ export class BoardView {
     }
   }
 
+  get colsN(): number { return this.cols; }
+  private coldT = 1; private coldA = 0;
+  /** 多线时整块石板一次冷白微光（约 110ms） */
+  coldFlash(a: number): void { this.coldT = 0; this.coldA = a; }
   cx(c: number): number { return this.rect.x + c * this.rect.cell + this.rect.cell / 2; }
   cy(y: number): number { return this.rect.y + (y - this.hidden) * this.rect.cell + this.rect.cell / 2; }
 
@@ -224,6 +228,7 @@ export class BoardView {
   // ---------- 更新 ----------
   update(dt: number, game: Game): void {
     this.time += dt;
+    if (this.coldT < 1) this.coldT = Math.min(1, this.coldT + dt / 0.11);
     this.fx.update(dt);
     const p = game.active;
     if (p && p === this.pieceRef) {
@@ -346,8 +351,8 @@ export class BoardView {
     const D = this.art.D;
     const gs = this.garbageShift;
     // 连结：画在棋子下面，只在两颗子之间的缝里露出一截「颈」
-    ctx.fillStyle = 'rgba(127,219,255,0.42)';
-    const bw = Math.max(6, cell * 0.26), bh = bw / 2;
+    ctx.fillStyle = 'rgba(127,219,255,0.55)';
+    const bw = Math.max(8, cell * 0.32), bh = bw / 2;
     for (let y = 0; y < this.rows; y++) {
       for (let x = 0; x < this.cols; x++) {
         const i = y * this.cols + x;
@@ -443,6 +448,12 @@ export class BoardView {
       this.drawPiece(ctx, p);
     }
     ctx.restore();
+    if (this.coldT < 1) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(216,246,255,${this.coldA * (1 - easeOutQuad(this.coldT))})`;
+      ctx.fillRect(R.x - SLAB_PAD, R.y - SLAB_PAD, R.w + SLAB_PAD * 2, R.h + SLAB_PAD * 2);
+      ctx.globalCompositeOperation = 'source-over';
+    }
     // 特效（不裁剪，碎片可以飞出棋盘）
     this.fx.drawWorld(ctx, this.art);
     // 顶线（危险态）
@@ -551,7 +562,14 @@ export class BoardView {
       let x = ox + p.cx[i] * cell + cell / 2, y = oy + p.cy[i] * cell + cell / 2;
       if (rot) { const dx = x - ccx, dy = y - ccy; x = ccx + dx * cs - dy * sn; y = ccy + dx * sn + dy * cs; }
       let alpha = 1;
-      if (y < this.rect.y) alpha = clamp(1 - (this.rect.y - y) / cell, 0.25, 1);
+      const hiddenPart = y < this.rect.y;
+      if (hiddenPart) {
+        // 隐藏行里的部分：保持高不透明度并加冰蓝描边，黑子在深色 HUD 底上也看得出形状
+        alpha = clamp(1 - (this.rect.y - y) / cell, 0.85, 1);
+        ctx.globalAlpha = 0.75;
+        ctx.strokeStyle = C.accent; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, D / 2 + 1, 0, Math.PI * 2); ctx.stroke();
+      }
       ctx.globalAlpha = alpha * breath;
       this.art.draw(ctx, 'halo', x, y, D);
       ctx.globalAlpha = alpha;

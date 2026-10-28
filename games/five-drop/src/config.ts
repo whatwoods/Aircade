@@ -54,6 +54,10 @@ export const CONFIG = {
     flickVel: 1.1,
     flickMinPx: 56,
     flickWindowMs: 80,
+    /** 长甩：位移够长时放宽速度门槛（中速的一大段下划也判为硬降）；同时要求整段平均速度，排除「慢拖很久」 */
+    flickLongPx: 72,
+    flickLongVel: 0.7,
+    flickLongAvgVel: 0.45,
     dragSensitivity: { low: 1.1, mid: 0.9, high: 0.75 } as Record<'low' | 'mid' | 'high', number>,
     softDragPerRow: 0.8,
     das: 150,

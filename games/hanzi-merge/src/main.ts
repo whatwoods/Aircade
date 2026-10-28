@@ -300,7 +300,7 @@ export class App {
       if (e.repeat) return;
       const k = e.key.toLowerCase();
       if (k === 'escape' || k === 'p') {
-        if (this.card.isOpen()) this.card.close(true);
+        if (this.card.isOpen()) this.card.close(false);
         else if (this.scene === 'play' && this.play.paused && this.screens.isOpen('pause')) this.resume();
         else this.pause();
         return;

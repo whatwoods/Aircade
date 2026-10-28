@@ -350,7 +350,8 @@ export class SettingsOverlay {
     const lines: [string, number, string][] = [
       ['五子落 FIVE DROP', 16, C.text1],
       ['俄罗斯方块 × 五子棋。', 13, C.text2],
-      ['落下的方块由黑白棋子组成，横、竖、斜同色连成五子即消除；', 12, C.text2],
+      ['落下的方块由黑白棋子组成，', 12, C.text2],
+      ['横、竖、斜同色连成五子即消除；', 12, C.text2],
       ['形状要拼得紧，颜色要排得对。', 12, C.text2],
       ['画面、音效、音乐均为程序实时生成，不加载任何外部资源。', 12, C.text3],
       ['字体：Inter（SIL OFL 1.1）。', 12, C.text3],

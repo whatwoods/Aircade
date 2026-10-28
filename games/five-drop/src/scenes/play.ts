@@ -170,14 +170,17 @@ export class PlayScene {
         audio.shatter(s.removed.length);
         if (s.removedColors.some(c => c === 3)) audio.crystal();
         this.vibrate(heavy ? [20, 40, 30] : 20);
-        // 跳字：每条线一个，错开 120ms
-        const per = Math.round(s.score / n);
-        mids.forEach((m, i) => {
-          const off = v.fx.floatsActiveNear(m.mx, m.my, 30) * 24;
-          const ln = s.lines[i];
-          this.view.fx.float(clamp(m.mx, this.L.board.x + 30, this.L.board.x + this.L.board.w - 30), clamp(m.my - off, this.L.board.y + 20, this.L.board.y + this.L.board.h - 10), `+${per}`, ln.length >= 6 ? `${ln.length} 连` : ln.dir >= 2 ? '斜' : '', 20 + Math.min(8, s.k * 2), i * 0.12);
-        });
-        if (n >= 2) this.showToast(n >= 3 ? '三线' : '双线', `×${1 + CONFIG.score.crossStep * (n - 1)}`, 1.2, 3, 22);
+        // 跳字：同一轮的所有线合并成一个总分，从交点（或各线中点的重心）上浮；字号按档位放大
+        let fx0 = 0, fy0 = 0;
+        if (s.cross.length) { const k = s.cross[0]; fx0 = v.cx(k % v.colsN); fy0 = v.cy(Math.floor(k / v.colsN)); }
+        else { for (const m of mids) { fx0 += m.mx / mids.length; fy0 += m.my / mids.length; } }
+        const tier = n >= 3 || s.k >= 3 ? 34 : n === 2 ? 28 : 20 + Math.min(4, (s.k - 1) * 2);
+        const ln0 = s.lines[0];
+        const sub = n >= 2 ? `${n >= 3 ? '三线' : '双线'} ×${1 + CONFIG.score.crossStep * (n - 1)}` : long ? `${ln0.length} 连` : ln0.dir >= 2 ? '斜' : '';
+        const off = v.fx.floatsActiveNear(fx0, fy0, 30) * 24;
+        const B = this.L.board;
+        this.view.fx.float(clamp(fx0, B.x + 50, B.x + B.w - 50), clamp(fy0 - off, B.y + 30, B.y + B.h - 20), `+${s.score}`, sub, tier, 0.05);
+        if (n >= 2) v.coldFlash(n >= 3 ? 0.12 : 0.09);
         if (s.k >= 3) this.edgeFlash = 1;
         if (s.k >= 2) { this.showToast(`连锁 ×${CONFIG.score.chainMult[Math.min(s.k, 5) - 1]}`, '', 1.2, 4, 16 + Math.min(8, (s.k - 1) * 3)); this.hint('chain', '下落后再连成五子 = 连锁加倍'); }
         this.hooks.onFive?.(n, s.lines.map(l => l.dir));
@@ -267,7 +270,12 @@ export class PlayScene {
   rotate(d: 1 | -1): void { this.game.rotate(d); }
   invert(): void { this.game.invert(); }
   hold(): void { this.game.hold(); }
-  hardDrop(): void { this.game.hardDrop(); }
+  hardDrop(): void {
+    const g = this.game;
+    // 出块保护期内被吞掉的甩动：给一个轻微的抖动+提示音，让玩家知道「识别到了，只是太早」
+    if (g.phase === 'play' && g.active && !g.canHardDrop()) { this.view.onRotate(0, false); audio.rotFail(); return; }
+    g.hardDrop();
+  }
   softDrop(on: boolean): void { this.game.softDrop = on; }
 
   // ---------- 更新 ----------

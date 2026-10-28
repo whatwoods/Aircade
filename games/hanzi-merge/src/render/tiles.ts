@@ -1,5 +1,5 @@
 /** 牌面绘制（§6.4）：部件牌 / 字牌 / 未成牌。纸牌底预渲染，字走字形缓存。 */
-import { BASE_MAP, RECIPE_MAP } from '../core/recipes.ts';
+import { RECIPE_MAP } from '../core/recipes.ts';
 import type { Tile } from '../core/types.ts';
 import { pendingBoxes } from './compose.ts';
 import { INK, glyphs } from './glyphs.ts';
@@ -88,13 +88,6 @@ export function drawCard(ctx: CanvasRenderingContext2D, cx: number, cy: number, 
   ctx.globalAlpha = prev;
 }
 
-export function variantMark(ch: string): string {
-  const v = BASE_MAP.get(ch)?.v;
-  if (!v) return '';
-  for (const k of ['l', 't', 'b', 'r'] as const) if (v[k]) return v[k]!;
-  return '';
-}
-
 const METHOD_SHORT: Record<string, string> = { 会意: '会', 形声: '形', 指事: '指' };
 
 /** 画一张牌的字面（不含牌底） */
@@ -105,8 +98,6 @@ export function drawFace(ctx: CanvasRenderingContext2D, t: Pick<Tile, 'kind' | '
   if (t.kind === 'base') {
     const col = fadeCol ? INK.wash : INK.light;
     glyphs.draw(ctx, t.ch, cx, cy, GLYPH_BASE, col, a, GLYPH_BASE * s, GLYPH_BASE * s);
-    const vm = variantMark(t.ch);
-    if (vm) glyphs.draw(ctx, vm, cx - 21 * s, cy - 20 * s, 12, INK.red, a * 0.9, 12 * s, 12 * s);
   } else if (t.kind === 'char') {
     const col = fadeCol ? INK.wash : INK.ink;
     const py = o.pinyin;

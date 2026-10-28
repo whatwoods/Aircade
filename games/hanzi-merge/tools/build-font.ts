@@ -22,7 +22,8 @@ const check = process.argv.includes('--check');
 export function kaiCharset(): string[] {
   let s = '';
   for (const b of BASES) s += b.c + b.py + Object.values(b.v ?? {}).join('');
-  for (const r of RECIPES) s += r.c + r.py;
+  // vv：入字后的实际字形（含 炏 这类重排形）；trad：卡片上以楷体显示的繁体
+  for (const r of RECIPES) s += r.c + r.py + (r.vv ?? '') + (r.trad ?? '');
   s += kaiUiChars() + CHAPTER_NAMES.join('');
   // 源码里所有以打包楷体显示的字面量（画布 glyphs.* / seal、DOM .kai 等，见 glyph-scan.ts）
   s += [...scanGlyphs().kai].join('');

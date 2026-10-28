@@ -94,7 +94,7 @@ export class Fx {
 
   float(x: number, y: number, text: string, sub = '', size = 20, delay = 0): void {
     const o = take(this.floats);
-    o.on = true; o.x = x; o.y = y; o.text = text; o.sub = sub; o.size = size; o.life = 0; o.max = 0.7; o.delay = delay;
+    o.on = true; o.x = x; o.y = y; o.text = text; o.sub = sub; o.size = size; o.life = 0; o.max = size >= 28 ? 1.0 : 0.7; o.delay = delay;
   }
 
   trail(x: number, y0: number, y1: number, w: number): void {
@@ -248,10 +248,11 @@ export class Fx {
       ctx.fillStyle = C.text1;
       ctx.fillText(f.text, 0, 0);
       if (f.sub) {
-        ctx.font = fCn(600, 11);
+        // 小标随档位放大：单线 11px，双线 14px，三线/连锁 17px
+        ctx.font = fCn(600, Math.max(11, Math.round(f.size * 0.5)));
         ctx.fillStyle = C.accent;
-        ctx.strokeText(f.sub, 0, -f.size * 0.85);
-        ctx.fillText(f.sub, 0, -f.size * 0.85);
+        ctx.strokeText(f.sub, 0, -f.size * 0.9);
+        ctx.fillText(f.sub, 0, -f.size * 0.9);
       }
       ctx.restore();
     }

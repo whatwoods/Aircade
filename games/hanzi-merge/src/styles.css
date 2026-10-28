@@ -397,36 +397,43 @@ button {
   border-radius: 6px;
   background: linear-gradient(#c79a5f, #a77a43 55%, #7d5a2f);
 }
+.card {
+  display: flex;
+  flex-direction: column;
+}
+.card .top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 4px;
+}
 .card .big {
-  position: absolute;
-  left: 18px;
-  top: 26px;
-  width: 132px;
+  flex: 0 0 auto;
+  width: 128px;
   text-align: center;
 }
 .card .big .ch {
   font-family: var(--kai);
-  font-size: 112px;
-  line-height: 1.1;
+  font-size: 120px;
+  line-height: 1.08;
   color: var(--ink);
 }
 .card .big .py {
   font-family: var(--kai);
-  font-size: 20px;
+  font-size: 22px;
   color: var(--ink3);
 }
 .card .right {
-  position: absolute;
-  left: 160px;
-  right: 18px;
-  top: 30px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-top: 8px;
 }
 .card .decomp {
   display: flex;
   align-items: center;
   gap: 8px;
   font-family: var(--kai);
-  font-size: 30px;
+  font-size: 34px;
   color: var(--ink3);
 }
 .card .decomp .v {
@@ -446,7 +453,7 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 .tag {
   font-size: 13px;
@@ -460,28 +467,35 @@ button {
   color: var(--cinnabar-lo);
   box-shadow: inset 0 0 0 1px var(--cinnabar);
 }
+.card .fig {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-top: 10px;
+}
+.card .fig .fn {
+  font-size: 11px;
+  color: var(--ink3);
+}
+.card .text {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(110, 102, 92, 0.3);
+}
 .card .gloss {
-  position: absolute;
-  left: 22px;
-  right: 22px;
-  top: 196px;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--ink2);
 }
 .card .basis {
-  position: absolute;
-  left: 22px;
-  right: 22px;
-  top: 226px;
-  font-size: 14px;
-  line-height: 1.6;
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.7;
   color: var(--ink3);
 }
 .card .foot {
-  position: absolute;
-  left: 22px;
-  right: 22px;
-  bottom: calc(16px + var(--safe-bottom));
+  margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -491,13 +505,14 @@ button {
   color: var(--ink3);
 }
 .card .note {
-  position: absolute;
-  left: 22px;
-  right: 22px;
-  bottom: calc(72px + var(--safe-bottom));
-  font-size: 12px;
+  margin-top: auto;
+  padding-bottom: 10px;
+  font-size: 13px;
   color: var(--cinnabar-lo);
   text-align: center;
+}
+.card .note + .foot {
+  margin-top: 0;
 }
 .brief {
   position: absolute;

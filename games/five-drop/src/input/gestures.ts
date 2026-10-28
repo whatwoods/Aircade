@@ -155,7 +155,8 @@ export class Gestures {
     } else if (t.axis === 'v') {
       const { vy } = this.velocity(t);
       const dy = p.y - t.sy;
-      if (vy >= I.flickVel && dy >= I.flickMinPx && t.epoch === this.epoch) this.h.flickDown();
+      const longFlick = dy >= I.flickLongPx && vy >= I.flickLongVel && dy / Math.max(1, dur) >= I.flickLongAvgVel;
+      if (((vy >= I.flickVel && dy >= I.flickMinPx) || longFlick) && t.epoch === this.epoch) this.h.flickDown();
       else if (vy <= -I.flickVel && dy <= -I.flickMinPx && t.epoch === this.epoch) this.h.flickUp();
     }
     this.h.release();

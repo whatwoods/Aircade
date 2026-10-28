@@ -3,9 +3,10 @@
  * 位置框以结果字的「墨迹包围盒」为单位方框 [0,1]²；部件按自身墨迹包围盒映射进去（可非等比压扁）。
  *   ⿰ 左 45% / 右 51%；⿱ 上 43% / 下 53%；包围：外框 100%、内框约 55% 放在开口处；
  *   品：一上两下（骂为二上一下）。
- * 变体（水→氵、火→灬…）来自 BASES.v；值为 '' 表示字体无独立字形，按位置压扁本字。
+ * 显示字形逐字取配方的 vv（hanzi.ts 唯一数据源；炎/灭/灾/焚 的火不变灬，只有 照/焦 等才是）。
+ * vv 缺省 = 部件本字；竹/羊 在上时字体无独立字头，直接压扁本字。
  */
-import { BASE_MAP, RECIPE_MAP } from '../core/recipes.ts';
+import { RECIPE_MAP } from '../core/recipes.ts';
 import type { RecipeDef } from '../data/hanzi.ts';
 
 export interface PartBox {
@@ -23,22 +24,16 @@ export interface PartBox {
 
 type Pos = 'l' | 'r' | 't' | 'b' | '';
 
-function variant(ch: string, pos: Pos): string {
-  if (!pos) return ch;
-  const b = BASE_MAP.get(ch);
-  const v = b?.v?.[pos];
-  if (v === undefined || v === '') return ch;
-  return v;
-}
-
 const cache = new Map<string, PartBox[]>();
 
 export function partBoxes(r: RecipeDef): PartBox[] {
   const hit = cache.get(r.c);
   if (hit) return hit;
   const p = r.parts;
-  const mk = (i: number, pos: Pos, x: number, y: number, w: number, h: number, outer = false): PartBox => ({
-    base: p[i], show: variant(p[i], pos), x, y, w, h, outer,
+  const vv = r.vv ? [...r.vv] : p;
+  // pos 仅作阅读提示，字形一律取 vv
+  const mk = (i: number, _pos: Pos, x: number, y: number, w: number, h: number, outer = false): PartBox => ({
+    base: p[i], show: vv[i] ?? p[i], x, y, w, h, outer,
   });
   let out: PartBox[];
   switch (r.s) {
