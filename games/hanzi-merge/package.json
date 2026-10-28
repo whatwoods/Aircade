@@ -1,0 +1,28 @@
+{
+  "name": "hanzi-merge",
+  "private": true,
+  "version": "1.0.0",
+  "description": "造字记 · Hanzi Merge — 汉字 × 合成",
+  "type": "module",
+  "scripts": {
+    "font": "node tools/build-font.ts",
+    "predev": "node tools/build-font.ts",
+    "dev": "vite",
+    "prebuild": "node tools/build-font.ts --check",
+    "build": "tsc && vite build && node tools/check-dist.ts",
+    "preview": "vite preview",
+    "verify": "node tools/verify-data.ts",
+    "sim": "node tools/sim.ts"
+  },
+  "devDependencies": {
+    "@fontsource/ma-shan-zheng": "5.3.1",
+    "fontkit": "2.0.4",
+    "lxgw-wenkai-webfont": "1.7.0",
+    "opencc-js": "1.4.2",
+    "opentype.js": "2.0.0",
+    "pinyin-pro": "3.29.5",
+    "subset-font": "2.9.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.5"
+  }
+}
