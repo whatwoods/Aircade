@@ -6,6 +6,7 @@ import { CONFIG } from '../src/config.ts';
 import type { BotKind } from '../src/game/bots.ts';
 import { med, pct, report } from '../src/game/simulate.ts';
 
+const fp = (a: number[]) => { const m = pct(a, 0.9); return (m >= 999 ? 'none' : m.toFixed(0)).padStart(5); };
 const fs = (a: number[]) => { const m = med(a); return (m >= 999 ? 'none' : m.toFixed(0)).padStart(8); };
 
 function main() {
@@ -20,9 +21,9 @@ function main() {
     out[k] = r;
     const mins = r.runs.map((x) => x.minutes), stops = r.runs.map((x) => x.stop);
     console.log(`\nbot=${k} runs=${runs} lives=${CONFIG.run.lives}  run: median ${r.medMin.toFixed(1)} min (${Math.min(...mins).toFixed(1)}–${Math.max(...mins).toFixed(1)}), stopStage median ${r.medStop} (${Math.min(...stops)}–${Math.max(...stops)})  [${((Date.now() - t) / 1000).toFixed(1)}s]`);
-    console.log('stage  tries clear%  time(s)  maxP   danger%  merges/shot  cascP90  seal1(s)  len@20→40s');
+    console.log('stage  tries clear%  time(s)  maxP   danger%  merges/shot  cascP90  seal1(s)  s1p90  t90  hd90  len@20→40s');
     for (const [n, st] of [...r.stats.entries()].sort((a, b) => a[0] - b[0])) {
-      console.log(`${String(n).padStart(4)}  ${String(st.tries).padStart(5)}  ${String(Math.round((100 * st.clears) / st.tries)).padStart(5)}  ${med(st.time).toFixed(0).padStart(7)}  ${med(st.maxP).toFixed(2)}  ${(100 * med(st.danger)).toFixed(1).padStart(7)}  ${(st.merges / Math.max(1, st.shots)).toFixed(2).padStart(10)}  ${String(pct(st.casc, 0.9)).padStart(7)}  ${fs(st.firstSeal)}  ${st.len20.length ? med(st.len20) + '→' + med(st.lenEnd) : '-'}`);
+      console.log(`${String(n).padStart(4)}  ${String(st.tries).padStart(5)}  ${String(Math.round((100 * st.clears) / st.tries)).padStart(5)}  ${med(st.time).toFixed(0).padStart(7)}  ${med(st.maxP).toFixed(2)}  ${(100 * med(st.danger)).toFixed(1).padStart(7)}  ${(st.merges / Math.max(1, st.shots)).toFixed(2).padStart(10)}  ${String(pct(st.casc, 0.9)).padStart(7)}  ${fs(st.firstSeal)}  ${fp(st.firstSeal)}  ${String(pct(st.time, 0.9).toFixed(0)).padStart(4)}  ${pct(st.maxP, 0.9).toFixed(2)}  ${st.len20.length ? med(st.len20) + '→' + med(st.lenEnd) : '-'}`);
     }
   }
   // CHECKS（docs §3.13）

@@ -6,6 +6,7 @@ import type { Session } from '../game/session';
 import * as sfx from '../audio/sfx';
 import { music } from '../audio/music';
 import type { Renderer } from '../render/renderer';
+import { rectHitsCircle } from '../render/popups';
 import { levelStyle } from '../render/palette';
 import { gateCenter } from '../render/scene';
 import type { Hud } from '../ui/hud';
@@ -49,6 +50,8 @@ export class Feedback {
     this.r.shakeMul = [0, 0.5, 1][settings.shake] ?? 1;
   }
 
+  private probePos = { x: 0, y: 0 };
+
   private at(sv: number): { x: number; y: number } {
     return this.s.track.posAt(sv, this.pos);
   }
@@ -67,6 +70,16 @@ export class Feedback {
       r.setTrack(this.s.track);
       r.popups.clear();
       r.popups.setTotem(this.s.totemX, this.s.totemY);
+      r.popups.setBallProbe((x, y, hw, hh) => {
+        const tr = this.s.track, hide = tr.visStart + tr.gateLen * 0.5;
+        for (const b of this.s.chain.balls) {
+          const sv = b.s + b.rOff;
+          if (sv < hide) continue;
+          const q = tr.posAt(sv, this.probePos);
+          if (rectHitsCircle(x, y, hw, hh, q.x, q.y, 19)) return true;
+        }
+        return false;
+      });
       r.gateDrop = 0;
       this.gate = gateCenter(this.s.track);
       const temple = Math.min(3, Math.floor((e.stage - 1) / 3));
@@ -106,7 +119,7 @@ export class Feedback {
       sfx.chime(e.step, e.level);
       if (e.triple) {
         sfx.chime(e.step + 2, e.level, 0.2);
-        r.tag(`三合一 ×4`, p.x, p.y - 40, '#FFE7A3', 17);
+        r.popups.label('三合一 ×4', p.x, p.y, '#FFE7A3', 14, 1.2, { above: true, delay: 0.14, rise: 28, pill: true });
         this.onTip?.(2);
       }
       if (e.step >= 3 || e.triple) {

@@ -133,6 +133,7 @@ export class Session {
     this.dangerLevel = 0;
     this.ammo.locked = false;
     this.ammo.armed = false;
+    this.ammo.drought = 0;
     this.chain.spawn();
     this.ammo.fill(this.chain);
     this.bus.emit('stageStart', { stage: n, cfg: this.cfg, retry });
@@ -265,6 +266,7 @@ export class Session {
         if (e.over) pts *= CONFIG.score.overSealMul;
         this.addScore(pts, e.cid, e.s, 'seal');
         this.seals++;
+        this.ammo.drought = 0;
         this.stats.seals++;
         if (this.cfg.sealLevel >= 11) this.stats.seal2048++;
         this.bus.emit('sealCount', { seals: this.seals, quota: this.cfg.quota });
@@ -342,6 +344,7 @@ export class Session {
     this.phaseT += dt;
     if (this.phase === 'live' || this.phase === 'intro' || this.phase === 'clearing') this.stats.time += dt;
     if (this.cooldown > 0) this.cooldown -= dt;
+    if (this.phase === 'live') this.ammo.drought += dt;
     this.stepProjectiles(dt);
     this.chain.step(dt);
 

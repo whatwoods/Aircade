@@ -10,6 +10,8 @@ export class Ammo {
   armed = false;
   /** 引导脚本锁定时不重抽 */
   locked = false;
+  /** 距上次封印的秒数（session 维护） */
+  drought = 0;
   private hist: number[] = [];
   private counts = new Int32Array(24);
   private rng: Rng;
@@ -31,6 +33,12 @@ export class Ammo {
         if (b.level <= maxL && chain.track.hittable(b.s)) cand.push(b.level);
       }
       if (cand.length) return this.remember(this.rng.pick(cand));
+    }
+    // 空窗救济（链头尚安全却久无封印，多见于贪连锁打法）：给链上最高的可打等级配对，推动下一枚金印
+    if (cfg.sealLevel >= A.droughtMinSeal && cfg.sealLevel <= A.droughtMaxSeal && this.drought >= A.droughtFrom && chain.headProgress() < A.rescueFrom && this.rng.chance(A.droughtChance)) {
+      let top = 0;
+      for (const b of chain.balls) if (b.level <= maxL && b.level > top && chain.track.hittable(b.s)) top = b.level;
+      if (top >= Math.max(cfg.lo, cfg.sealLevel - 4)) return this.remember(top);
     }
     let pick = this.weighted(cfg.lo, maxL);
     if (this.hist.length >= 2 && this.hist[0] === pick && this.hist[1] === pick) pick = this.weighted(cfg.lo, maxL);
