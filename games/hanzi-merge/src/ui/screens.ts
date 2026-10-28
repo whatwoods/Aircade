@@ -152,7 +152,14 @@ export class Screens {
       const locked = first > save.progress.unlocked && !this.unlockedAll;
       const vol = h('div', 'vol' + (locked ? ' locked' : ''));
       vol.append(h('h3', 'kai', `卷${NUM[c - 1]} · ${CHAPTER_NAMES[c - 1]}`));
-      vol.append(h('div', 'reps', '代表字：' + lv.map((l) => l.targets[l.targets.length - 1]).join(' ')));
+      // 代表字：每帖取一个本卷尚未用过的目标字（从最后一个往前找），不重复
+      const used = new Set<string>();
+      const reps = lv.map((l) => {
+        const ch = [...l.targets].reverse().find((x) => !used.has(x)) ?? l.targets[l.targets.length - 1];
+        used.add(ch);
+        return ch;
+      });
+      vol.append(h('div', 'reps', '代表字：' + reps.join(' ')));
       const grid = h('div', 'grid');
       for (const l of lv) {
         const unlocked = l.id <= save.progress.unlocked || this.unlockedAll;
@@ -217,7 +224,10 @@ export class Screens {
       } else if (r.missing.length) {
         const m = h('div', 'newchars');
         m.append(document.createTextNode('还差：'));
-        for (const ch of r.missing.slice(0, 6)) m.append(h('b', '', ch));
+        // 最多列 8 个，多出的写「等 N 字」，不静默截断
+        const MAX = 8;
+        for (const ch of r.missing.slice(0, MAX)) m.append(h('b', '', ch));
+        if (r.missing.length > MAX) m.append(document.createTextNode(` 等 ${r.missing.length} 字`));
         sc.append(m);
       }
     } else {

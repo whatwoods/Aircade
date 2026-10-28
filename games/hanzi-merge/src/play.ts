@@ -944,12 +944,18 @@ export class Play {
     this.rack.drawHeader(ctx, this.title);
     this.scrolls.draw(ctx, t);
     if (this.tut && this.tut.captionT > 0) {
+      // 放在卷轴下木轴与盘面第一行之间的空隙里，衬一条宣纸底，不压木轴、跳分和格子
+      const capY = (LAYOUT.scrollY + LAYOUT.scrollH + 12 + LAYOUT.boardY) / 2 + 4;
       ctx.font = `13px ${BODY_STACK}`;
-      ctx.fillStyle = INK.redLo;
       ctx.globalAlpha = Math.min(1, this.tut.captionT * 2);
+      const tw = ctx.measureText(this.tut.caption).width + 20;
+      ctx.fillStyle = 'rgba(248,243,232,0.92)';
+      roundRect(ctx, LAYOUT.W / 2 - tw / 2, capY - 11, tw, 22, 11);
+      ctx.fill();
+      ctx.fillStyle = INK.redLo;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(this.tut.caption, LAYOUT.W / 2, LAYOUT.scrollY + LAYOUT.scrollH + 6);
+      ctx.fillText(this.tut.caption, LAYOUT.W / 2, capY);
       ctx.globalAlpha = 1;
       ctx.textAlign = 'start';
     }
