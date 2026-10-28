@@ -80,6 +80,8 @@ export class Game {
   private acc = 0;
   /** 真实流逝时间（不受等级计时开关影响），用于硬降防误触 */
   clock = 0;
+  /** 引导用：为 true 时停在出块前（ARE）不出下一块 */
+  spawnLocked = false;
   private gravAcc = 0;
   private lockTimer = 0;
   private lockResets = 0;
@@ -339,6 +341,7 @@ export class Game {
     this.clock += dt;
     this.advanceTime(dt);
     if (this.phase === 'are') {
+      if (this.spawnLocked) return;
       this.waitTimer -= dt;
       if (this.waitTimer <= 0) this.beforeSpawn();
       return;

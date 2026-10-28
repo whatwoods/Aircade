@@ -8,7 +8,7 @@ import { BoardView } from '../render/board.ts';
 import type { Layout } from '../render/layout.ts';
 import { C, fCn, fNum } from '../render/theme.ts';
 import { roundRect } from '../render/scenery.ts';
-import { UI } from '../render/ui.ts';
+import { UI, kinsokuCut } from '../render/ui.ts';
 import { audio } from '../audio/audio.ts';
 import { Spring } from '../util/spring.ts';
 import { Trauma } from '../util/trauma.ts';
@@ -153,6 +153,9 @@ export class PlayScene {
       for (const c of e.colors) { if (c === 1) b++; else if (c === 2) w++; }
       audio.lock(b >= w);
       this.vibrate(8);
+      // 第一次出现悬空棋子时解释规则（连结的细桥 + 一次性提示）
+      const cols = g.grid.cols, n = g.grid.cells.length;
+      if (e.cells.some(k => k + cols < n && !g.grid.cells[k + cols])) this.hint('float', '同块相连可悬空，消除的列才塌落');
     });
     g.on('step', e => {
       const s = e.step;
@@ -473,7 +476,7 @@ export class PlayScene {
       if (t.text.length > 9 && isCn) {
         // 两行
         const mid = Math.ceil(t.text.length / 2);
-        const cut = t.text.indexOf('，') > 0 ? t.text.indexOf('，') + 1 : mid;
+        const cut = t.text.indexOf('，') > 0 ? t.text.indexOf('，') + 1 : kinsokuCut(t.text, mid);
         ctx.font = fCn(600, 12);
         ctx.fillText(t.text.slice(0, cut), x + w / 2, y + h / 2 - 9 + dy);
         ctx.fillText(t.text.slice(cut), x + w / 2, y + h / 2 + 9 + dy);
@@ -602,14 +605,27 @@ function iconHold(c: CanvasRenderingContext2D): void {
   c.beginPath(); c.roundRect(-9, -7, 18, 14, 3); c.stroke();
   c.beginPath(); c.moveTo(0, -12); c.lineTo(0, -2); c.moveTo(-4, -6); c.lineTo(0, -2); c.lineTo(4, -6); c.stroke();
 }
+/** 旋转图标：dir=1 顺时针 ↻，dir=-1 逆时针 ↺。弧线缺口在顶部，箭头画在弧线终点、沿切线方向 */
 function iconRot(c: CanvasRenderingContext2D, dir: number): void {
+  const r = 9, cy = 1, gap = 0.62, span = Math.PI * 2 - gap * 2 + 0.25;
+  const a0 = -Math.PI / 2 + gap * dir;
+  const a1 = a0 + span * dir;
   c.beginPath();
-  if (dir > 0) c.arc(0, 1, 9, -Math.PI * 0.95, Math.PI * 0.45);
-  else c.arc(0, 1, 9, Math.PI * 0.55, Math.PI * 1.95);
+  c.arc(0, cy, r, a0, a1, dir < 0);
   c.stroke();
-  const a = dir > 0 ? -Math.PI * 0.95 : Math.PI * 1.95;
-  const hx = Math.cos(a) * 9, hy = 1 + Math.sin(a) * 9;
-  c.beginPath(); c.moveTo(hx - 4 * dir, hy - 3); c.lineTo(hx, hy); c.lineTo(hx + 4 * dir * 0.2, hy + 5); c.stroke();
+  // 终点与切线方向（画布 y 向下，角度增加 = 顺时针）
+  const ex = Math.cos(a1) * r, ey = cy + Math.sin(a1) * r;
+  const tx = -Math.sin(a1) * dir, ty = Math.cos(a1) * dir;
+  const L = 6.5, w = 0.62;
+  const bx = ex + tx * 2, by = ey + ty * 2;
+  c.beginPath();
+  c.moveTo(bx + tx * 2, by + ty * 2);
+  for (const s of [w, -w]) {
+    const cs = Math.cos(Math.PI - s), sn = Math.sin(Math.PI - s);
+    c.lineTo(bx + (tx * cs - ty * sn) * L, by + (tx * sn + ty * cs) * L);
+  }
+  c.closePath();
+  c.fill();
 }
 function iconInvert(c: CanvasRenderingContext2D): void {
   c.beginPath(); c.arc(0, 0, 12, 0, Math.PI * 2); c.stroke();

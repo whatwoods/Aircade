@@ -62,7 +62,7 @@ export function drawPanel(ctx: CanvasRenderingContext2D, x: number, y: number, w
   ctx.shadowColor = 'rgba(0,0,0,0.35)';
   ctx.shadowBlur = 24;
   ctx.shadowOffsetY = 8;
-  ctx.fillStyle = 'rgba(46,57,69,0.92)';
+  ctx.fillStyle = 'rgba(46,57,69,0.97)';
   roundRect(ctx, x, y, w, h, r);
   ctx.fill();
   ctx.restore();
@@ -136,4 +136,31 @@ export function drawToggle(ctx: CanvasRenderingContext2D, x: number, y: number, 
   ctx.beginPath();
   ctx.arc(x + h / 2 + (w - h) * on, y + h / 2, h / 2 - 3, 0, Math.PI * 2);
   ctx.fill();
+}
+
+/** 避头尾：断点 cut 之后不以闭合标点开头、之前不以开引号结尾 */
+const NO_START = '」』）)。，、；：！？…';
+const NO_END = '「『（(';
+export function kinsokuCut(s: string, cut: number): number {
+  let c = cut;
+  while (c < s.length && NO_START.includes(s[c])) c++;
+  while (c > 1 && NO_END.includes(s[c - 1])) c--;
+  return c <= 0 || c >= s.length ? cut : c;
+}
+
+/** 按宽度逐字折行（中文），带避头尾 */
+export function wrapText(ctx: CanvasRenderingContext2D, s: string, maxW: number): string[] {
+  const out: string[] = [];
+  let rest = s;
+  while (rest.length && ctx.measureText(rest).width > maxW) {
+    let n = 1;
+    while (n < rest.length && ctx.measureText(rest.slice(0, n + 1)).width <= maxW) n++;
+    // 避头：下一行不以闭合标点开头（允许挤进一个标点）；避尾：本行不以开引号结尾
+    if (n < rest.length && NO_START.includes(rest[n])) n++;
+    while (n > 1 && NO_END.includes(rest[n - 1])) n--;
+    out.push(rest.slice(0, n));
+    rest = rest.slice(n);
+  }
+  if (rest.length) out.push(rest);
+  return out;
 }

@@ -1,7 +1,7 @@
 // 暂停、结算、设置、操作说明（第 6.6–6.8 节）
 import { C, fCn, fNum } from '../render/theme.ts';
 import { roundRect } from '../render/scenery.ts';
-import { UI, drawButton, drawPanel, drawToggle } from '../render/ui.ts';
+import { UI, drawButton, drawPanel, drawToggle, wrapText } from '../render/ui.ts';
 import type { Layout } from '../render/layout.ts';
 import type { Settings } from '../util/storage.ts';
 import { clamp, easeOutBack, easeOutCubic, easeOutExpo } from '../util/ease.ts';
@@ -71,12 +71,25 @@ export class PauseOverlay {
       ui.add({ id: 'btn.resume', x: 0, y: 0, w: 390, h: L.H, enabled: true, onPress: () => { this.countdown = 1.2; } });
       const n = Math.max(1, Math.ceil((1.2 - this.countdown) / 0.4));
       const f = ((1.2 - this.countdown) % 0.4) / 0.4;
+      // 深色圆盘 + 冰蓝进度环 + 不透明粗体数字：在浅色石板和棋子上都清楚
+      const cx = 195, cy = L.board.y + L.board.h / 2;
       ctx.save();
-      ctx.translate(195, L.board.y + L.board.h / 2);
-      const s = 0.8 + 0.4 * easeOutBack(1 - f);
-      ctx.scale(s, s);
-      ctx.globalAlpha = 0.4 + 0.6 * f;
-      drawDigits(ctx, String(n), 0, 0, 96, 300, C.text1, 'center');
+      ctx.fillStyle = 'rgba(16,20,25,0.35)';
+      ctx.fillRect(0, 0, 390, L.H);
+      ctx.translate(cx, cy);
+      ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 20; ctx.shadowOffsetY = 6;
+      ctx.fillStyle = 'rgba(30,38,46,0.9)';
+      ctx.beginPath(); ctx.arc(0, 0, 62, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(0, 0, 56, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = C.accent; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(0, 0, 56, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.001, 1 - this.countdown / 1.2)); ctx.stroke();
+      const pop = easeOutBack(clamp((1 - f) / 0.35, 0, 1));
+      const sc = 0.7 + 0.3 * pop;
+      ctx.scale(sc, sc);
+      ctx.globalAlpha = clamp(f / 0.12, 0.3, 1);
+      drawDigits(ctx, String(n), 0, 2, 76, 600, C.text1, 'center');
       ctx.restore();
       return;
     }
@@ -223,10 +236,11 @@ export class SettingsOverlay {
     ctx.globalAlpha = a;
     // 背景挡板（点击空白不穿透）
     ui.add({ id: 'settings.backdrop', x: 0, y: 0, w: 390, h: L.H, enabled: true, onPress: () => {} });
-    ctx.fillStyle = 'rgba(16,20,25,0.55)';
+    // 压暗到足以让后面的标题页/棋盘退到背景里（子页面更深，避免「开始」按钮看起来可点）
+    ctx.fillStyle = this.page === 'main' ? 'rgba(16,20,25,0.68)' : 'rgba(16,20,25,0.8)';
     ctx.fillRect(0, 0, 390, L.H);
     const rowH = 52;
-    const ph = this.page === 'main' ? 72 + ROWS.length * rowH + 12 : this.page === 'help' ? 560 : 300;
+    const ph = this.page === 'main' ? 72 + ROWS.length * rowH + 12 : this.page === 'help' ? 586 : 340;
     const py = Math.max(L.topY + 12, (L.H - ph) / 2);
     ctx.translate(0, (1 - a) * 16);
     drawPanel(ctx, 16, py, 358, ph, 16);
@@ -325,8 +339,10 @@ export class SettingsOverlay {
     }
     ctx.textAlign = 'left';
     ctx.font = fCn(400, 12); ctx.fillStyle = C.text3;
-    ctx.fillText('同色五子横、竖、斜连成一线即消除；冰晶子当黑当白都算。', 36, y + 6);
-    ctx.fillText('一行填满时，达到 6 颗的那种颜色退场。', 36, y + 26);
+    let ty = y + 6;
+    for (const para of ['同色五子横、竖、斜连成一线即消除；冰晶子当黑当白都算。', '一行填满时，达到 6 颗的那种颜色退场。']) {
+      for (const ln of wrapText(ctx, para, 314)) { ctx.fillText(ln, 36, ty); ty += 20; }
+    }
   }
 
   private drawAbout(ctx: CanvasRenderingContext2D, py: number): void {
@@ -342,8 +358,10 @@ export class SettingsOverlay {
     let y = py + 90;
     for (const [s, sz, col] of lines) {
       ctx.font = sz >= 16 ? fCn(600, sz) : fCn(400, sz); ctx.fillStyle = col;
-      ctx.fillText(s, 36, y);
-      y += sz >= 16 ? 34 : 26;
+      // 面板 16..374，正文与标题同为 20px 内边距，按宽度折行
+      const ls = wrapText(ctx, s, 314);
+      ls.forEach((ln, i) => ctx.fillText(ln, 36, y + i * 20));
+      y += (ls.length - 1) * 20 + (sz >= 16 ? 34 : 26);
     }
   }
 }

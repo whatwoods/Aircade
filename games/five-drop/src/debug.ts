@@ -79,8 +79,8 @@ export function installDebug(app: App, sp: URLSearchParams): void {
     cell(c: number, r: number) { const b = app.L.board; return css(b.x + c * b.cell, b.y + r * b.cell, b.cell, b.cell); },
     setLevel(n: number): R { const e = live(); if (e) return e; app.play.game.setLevel(n); return { ok: true }; },
     setTime(sec: number): R { const e = live(); if (e) return e; const g = app.play.game; g.time = Math.max(0, sec); g.advanceTime(0); return { ok: true }; },
-    setBoard(rows: string[]): R { const e = live(); if (e) return e; app.play.game.grid.setAscii(rows); return { ok: true }; },
-    clearBoard(): R { const e = live(); if (e) return e; app.play.game.grid.clear(); return { ok: true }; },
+    setBoard(rows: string[]): R { const e = live(); if (e) return e; app.play.game.grid.setAscii(rows); app.play.view.clearBonds(); return { ok: true }; },
+    clearBoard(): R { const e = live(); if (e) return e; app.play.game.grid.clear(); app.play.view.clearBonds(); return { ok: true }; },
     setPiece(spec: Spec): R {
       const e = live(); if (e) return e;
       const g = app.play.game;
@@ -98,11 +98,12 @@ export function installDebug(app: App, sp: URLSearchParams): void {
     demo(name: string): R {
       const e = live(); if (e) return e;
       const g = app.play.game;
-      if (name === 'garbage') { g.grid.setAscii(['BW.WB.WBW']); app.pending = { t: 0.3, fn: () => { for (let i = 0; i < 3; i++) app.play.game.pushGarbage(); } }; return { ok: true }; }
+      if (name === 'garbage') { g.grid.setAscii(['BW.WB.WBW']); app.play.view.clearBonds(); app.pending = { t: 0.3, fn: () => { for (let i = 0; i < 3; i++) app.play.game.pushGarbage(); } }; return { ok: true }; }
       const d = DEMOS[name === 'chain' ? 'chain3' : name];
       if (!d) return { ok: false, reason: 'unknown demo' };
       if (g.phase !== 'play') return { ok: false, reason: `phase ${g.phase}` };
       g.grid.setAscii(d.board);
+      app.play.view.clearBonds();
       g.setActive(pieceFromSpec(d.piece));
       app.pending = { t: 0.45, fn: () => { api.place(d.col, d.piece.rot ?? 0, false); } };
       return { ok: true };
@@ -113,6 +114,7 @@ export function installDebug(app: App, sp: URLSearchParams): void {
       const e = live(); if (e) return e;
       const g = app.play.game;
       g.grid.clear();
+      app.play.view.clearBonds();
       for (let i = 0; i < 13; i++) g.pushGarbage();
       return { ok: true };
     },

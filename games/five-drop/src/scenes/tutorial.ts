@@ -4,6 +4,7 @@ import type { PieceSpec } from '../core/pieces.ts';
 import { parseColors } from '../core/pieces.ts';
 import { C, fCn } from '../render/theme.ts';
 import { roundRect } from '../render/scenery.ts';
+import { kinsokuCut } from '../render/ui.ts';
 import type { UI } from '../render/ui.ts';
 import type { Layout } from '../render/layout.ts';
 import { clamp, easeOutBack, easeOutCubic, easeInOutSine } from '../util/ease.ts';
@@ -77,6 +78,8 @@ export class Tutorial {
     P.hooks.onFive = (_n, dirs) => { this.gotFive = true; this.fiveDirs.push(...dirs); };
     P.hooks.onResolved = () => this.onResolved();
     P.start(1, { gravityOff: true, noLevelTimer: true, noGarbage: true, script: [s.piece, { shape: 'I3', colors: parseColors('WWW'), rot: 0 }] }, 0, g => g.grid.setAscii(s.board));
+    // 本步的方块锁定后不再出下一块，避免切换步骤前冒出一块可操作的填充方块
+    P.game.on('lock', () => { P.game.spawnLocked = true; });
     P.view.target = s.target;
     P.view.targetLine = s.line;
     P.highlight = s.invert ? 'btn.invert' : '';
@@ -267,7 +270,7 @@ function wrap(ctx: CanvasRenderingContext2D, s: string, maxW: number): string[] 
   if (ctx.measureText(s).width <= maxW) return [s];
   // 优先在标点处断行
   const cuts = [...s.matchAll(/[，。！？]/g)].map(m => (m.index ?? 0) + 1).filter(i => i < s.length);
-  let best = Math.ceil(s.length / 2), bd = 1e9;
+  let best = kinsokuCut(s, Math.ceil(s.length / 2)), bd = 1e9;
   for (const c of cuts) {
     const d = Math.abs(ctx.measureText(s.slice(0, c)).width - ctx.measureText(s.slice(c)).width);
     if (d < bd && ctx.measureText(s.slice(0, c)).width <= maxW && ctx.measureText(s.slice(c)).width <= maxW) { bd = d; best = c; }

@@ -28,6 +28,10 @@ export class BoardView {
   private delay = new Float32Array(this.cols * this.rows);
   private squash = new Float32Array(this.cols * this.rows);
   private grav = new Float32Array(this.cols * this.rows);
+  /** 同一块方块里相邻棋子的连结：bondR[i] = i 与右侧相连，bondD[i] = i 与下方相连。
+   *  让「悬空」的棋子看得出是被同块的邻居托着的；消除/塌落时断开。纯表现，不影响规则。 */
+  private bondR = new Uint8Array(this.cols * this.rows);
+  private bondD = new Uint8Array(this.cols * this.rows);
   private dying: Dying[] = Array.from({ length: 200 }, () => ({ on: false, x: 0, y: 0, c: 1 as Stone, t: 0, at: 0, mode: 0 as 0 | 1, cross: false }));
   // 当前方块视觉
   private pvx = 0; private pvy = 0;
@@ -69,7 +73,25 @@ export class BoardView {
   cx(c: number): number { return this.rect.x + c * this.rect.cell + this.rect.cell / 2; }
   cy(y: number): number { return this.rect.y + (y - this.hidden) * this.rect.cell + this.rect.cell / 2; }
 
+  /** 调试改盘面时调用：清空所有连结 */
+  clearBonds(): void { this.bondR.fill(0); this.bondD.fill(0); }
+  /** 断开某格四周的连结；fx=true 时在断口闪一下 */
+  private breakBonds(k: number, fx: boolean): void {
+    const cols = this.cols, x = k % cols, y = (k - x) / cols;
+    const hit = (a: number, arr: Uint8Array, mx: number, my: number) => {
+      if (a < 0 || !arr[a]) return;
+      arr[a] = 0;
+      if (fx) this.fx.flash(mx, my, 0.1);
+    };
+    const px = this.cx(x), py = this.cy(y), h = this.rect.cell / 2;
+    hit(k, this.bondR, px + h, py);
+    if (x > 0) hit(k - 1, this.bondR, px - h, py);
+    hit(k, this.bondD, px, py + h);
+    if (y > 0) hit(k - cols, this.bondD, px, py - h);
+  }
+
   reset(): void {
+    this.clearBonds();
     this.offY.fill(0); this.velY.fill(0); this.delay.fill(0); this.squash.fill(0);
     for (const d of this.dying) d.on = false;
     this.fx.clear();
@@ -108,6 +130,11 @@ export class BoardView {
     this.pieceRef = null;
   }
   onLock(p: Piece, cells: number[]): void {
+    const set = new Set(cells);
+    for (const k of cells) {
+      if ((k + 1) % this.cols !== 0 && set.has(k + 1)) this.bondR[k] = 1;
+      if (set.has(k + this.cols)) this.bondD[k] = 1;
+    }
     for (const k of cells) {
       const x = k % this.cols, y = (k - x) / this.cols;
       this.fx.flash(this.cx(x), this.cy(y), 0.14);
@@ -146,7 +173,11 @@ export class BoardView {
         d.at = at * comp + 0.04;
       } else d.at = (0.05 + 0.2 * (x / this.cols)) * comp;
       this.offY[k] = 0;
+      this.breakBonds(k, false);
     }
+    // 塌落的棋子与原来同块的邻居断开（断口闪一下），落到哪里都是「靠下方托住」
+    for (const m of s.moves) this.breakBonds(m.fromY * this.cols + m.x, true);
+    for (const m of s.moves) this.breakBonds(m.toY * this.cols + m.x, false);
     const mids: { mx: number; my: number }[] = [];
     if (s.kind === 'five') {
       for (const l of s.lines) {
@@ -182,7 +213,12 @@ export class BoardView {
     return mids;
   }
 
-  onGarbage(): void { this.garbageShift = this.rect.cell; this.garbageT = 0; }
+  onGarbage(): void {
+    // 与 Grid.pushRow 一致：整盘上移一行，底行是新杂色行（无连结）
+    const n = this.cols * this.rows, c = this.cols;
+    this.bondR.copyWithin(0, c, n); this.bondR.fill(0, n - c);
+    this.bondD.copyWithin(0, c, n); this.bondD.fill(0, n - 2 * c);
+    this.garbageShift = this.rect.cell; this.garbageT = 0; }
   onLevelUp(): void { this.sweepT = 0; }
 
   // ---------- 更新 ----------
@@ -309,6 +345,25 @@ export class BoardView {
     const grid = game.grid;
     const D = this.art.D;
     const gs = this.garbageShift;
+    // 连结：画在棋子下面，只在两颗子之间的缝里露出一截「颈」
+    ctx.fillStyle = 'rgba(127,219,255,0.42)';
+    const bw = Math.max(6, cell * 0.26), bh = bw / 2;
+    for (let y = 0; y < this.rows; y++) {
+      for (let x = 0; x < this.cols; x++) {
+        const i = y * this.cols + x;
+        if (!grid.cells[i]) continue;
+        const px = this.cx(x), py = this.cy(y) + this.offY[i] + gs;
+        if (py < R.y - cell) continue;
+        if (this.bondR[i] && grid.cells[i + 1]) {
+          const py2 = this.cy(y) + this.offY[i + 1] + gs;
+          ctx.fillRect(px, Math.min(py, py2) - bh, cell, bh * 2 + Math.abs(py2 - py));
+        }
+        if (this.bondD[i] && grid.cells[i + this.cols]) {
+          const py2 = this.cy(y + 1) + this.offY[i + this.cols] + gs;
+          ctx.fillRect(px - bh, py, bh * 2, py2 - py);
+        }
+      }
+    }
     for (let y = 0; y < this.rows; y++) {
       for (let x = 0; x < this.cols; x++) {
         const i = y * this.cols + x;
