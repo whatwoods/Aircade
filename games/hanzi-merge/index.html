@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#F2EBDD" />
+    <meta name="description" content="造字记 · HANZI MERGE —— 把部件拖到一起，按真实的造字法合成汉字：木+木成林，林+木成森。" />
+    <title>造字记 · Hanzi Merge</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='6' width='52' height='52' rx='8' fill='%23B8312A'/%3E%3Cpath d='M18 20h28M32 14v36M20 44l12-14 12 14' stroke='%23F8F3E8' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="preload" href="./src/assets/fonts/hanzi-logo.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./src/assets/fonts/hanzi-kai.woff2" as="font" type="font/woff2" crossorigin />
+    <style>
+      /* 首帧必需的最小样式（其余在 styles.css）：纸色、舞台定位 */
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #e2d7c0; }
+      #stage { position: absolute; left: 0; top: 0; width: 390px; height: 844px; transform-origin: 0 0; background: #f2ebdd; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <canvas id="bg" aria-hidden="true"></canvas>
+    <div id="stage">
+      <canvas id="game" aria-label="游戏画面：米字格棋盘"></canvas>
+      <div id="ui">
+        <!-- 标题页：静态 DOM，JS 加载前即可见、可点（字体未就绪时用系统楷体兜底） -->
+        <section id="title" class="screen show" aria-label="标题页">
+          <canvas id="title-demo" class="title-demo" width="160" height="160" aria-hidden="true"></canvas>
+          <h1 class="logo" aria-label="造字记"><span>造</span><span>字</span><span>记</span></h1>
+          <div class="title-seal kai" aria-hidden="true"><span>汉字</span><span>合成</span></div>
+          <div class="title-en">HANZI MERGE</div>
+          <button id="btn-start" class="btn primary big kai" type="button">开　始</button>
+          <div class="title-row">
+            <button id="btn-select" class="btn ghost kai" type="button">选帖</button>
+            <button id="btn-endless" class="btn ghost kai" type="button">书斋</button>
+            <button id="btn-atlas" class="btn ghost kai" type="button">图鉴</button>
+          </div>
+          <button id="btn-settings" class="btn icon corner" type="button" aria-label="设置">
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3.2 1.6" /><circle cx="12" cy="12" r="3" fill="currentColor" /></svg>
+          </button>
+          <div id="title-foot" class="title-foot"></div>
+        </section>
+      </div>
+    </div>
+    <script>
+      // 首帧前把舞台缩放到位（render/stage.ts 之后接管）；JS 包未就绪时记录点击「开始」
+      (function () {
+        var vw = window.innerWidth, vh = window.innerHeight;
+        var s = Math.min(vw / 390, vh / 844);
+        var l = Math.round((vw - 390 * s) / 2), t = Math.round((vh - 844 * s) / 2);
+        document.getElementById('stage').style.transform = 'translate(' + l + 'px,' + t + 'px) scale(' + s + ')';
+        document.getElementById('btn-start').addEventListener('click', function () { window.__hmEarlyStart = true; }, { once: true });
+      })();
+    </script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

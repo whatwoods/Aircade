@@ -5,14 +5,14 @@
   "description": "造字记 · Hanzi Merge — 汉字 × 合成",
   "type": "module",
   "scripts": {
-    "font": "node tools/build-font.ts",
-    "predev": "node tools/build-font.ts",
+    "font": "node --disable-warning=ExperimentalWarning tools/build-font.ts",
+    "predev": "node --disable-warning=ExperimentalWarning tools/build-font.ts",
     "dev": "vite",
-    "prebuild": "node tools/build-font.ts --check",
-    "build": "tsc && vite build && node tools/check-dist.ts",
+    "prebuild": "node --disable-warning=ExperimentalWarning tools/build-font.ts --check",
+    "build": "tsc && vite build && node --disable-warning=ExperimentalWarning tools/check-dist.ts",
     "preview": "vite preview",
-    "verify": "node tools/verify-data.ts",
-    "sim": "node tools/sim.ts"
+    "verify": "node --disable-warning=ExperimentalWarning tools/verify-data.ts",
+    "sim": "node --disable-warning=ExperimentalWarning tools/sim.ts"
   },
   "devDependencies": {
     "@fontsource/ma-shan-zheng": "5.3.1",

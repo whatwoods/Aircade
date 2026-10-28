@@ -25,13 +25,16 @@ export const CONFIG = {
   lock: { delayMs: 500, maxResets: 15, areMs: 100, hardDropGuardMs: 150 },
   level: { secondsPerLevel: 45, max: 15 },
   garbage: {
-    fromLevel: 7,
-    intervalByLevel: { 7: 14, 8: 12, 9: 11, 10: 10, 11: 9, 12: 8, 13: 7 } as Record<number, number>,
+    fromLevel: 4,
+    /** 每多少块推入一行（可为小数，按累积器结算） */
+    intervalByLevel: { 4: 4.0, 5: 3.0, 6: 2.6, 7: 2.5, 8: 2.5, 9: 2.4, 10: 2.3, 11: 2.2, 12: 2.0, 13: 1.8, 14: 1.6, 15: 1.45 } as Record<number, number>,
     warnPieces: 2,
+    gaps: 2,
     maxSameRun: 2,
     retries: 20,
   },
-  fullRow: { mode: 'majority' as FullRowMode },
+  /** 满行：多数色达到 minMajority 才退场（模拟器结论，见文档第 11 节） */
+  fullRow: { mode: 'majority' as FullRowMode, minMajority: 6 },
   score: {
     lineBase: 100,
     crossStep: 0.5,

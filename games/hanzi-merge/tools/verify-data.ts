@@ -1,7 +1,7 @@
 /**
  * 字库校对脚本。用法（Node ≥ 22.18，直接跑 TS）：
- *   node tools/verify-data.ts                      # 只做结构检查（唯一性、可达、冲突、三部件可达）
- *   SW=<sw.json> IDS=<ids.txt> node tools/verify-data.ts   # 追加：说文原文核对 + IDS 构形核对 + 拼音核对
+ *   node tools/verify-data.ts                      # 结构检查 + 说文核对（默认用 tools/ref/shuowen-subset.json）
+ *   SW=<sw.json> IDS=<ids.txt> node tools/verify-data.ts   # 用完整说文数据 + IDS 构形核对 + 拼音核对
  * sw.json：由 shuowenjiezi/shuowen 数据整理成 {字头: 说文原文}；ids.txt：cjkvi-ids。
  * 这两份参考数据只在校对时使用，不进入产物。
  */
@@ -86,13 +86,16 @@ for (const x of [...RECIPES, ...BASES]) {
 }
 
 // 5–7. 外部参考核对
+const SUBSET = new URL('./ref/shuowen-subset.json', import.meta.url);
 const SW = process.env.SW;
 const IDS = process.env.IDS;
-if (SW) {
+if (SW || fs.existsSync(SUBSET)) {
   console.log('[5] 说文原文核对');
   const OpenCC = await import('opencc-js');
   const conv = OpenCC.Converter({ from: 't', to: 'cn' });
-  const sw: Record<string, string> = JSON.parse(fs.readFileSync(SW, 'utf8'));
+  const sw: Record<string, string> = SW
+    ? JSON.parse(fs.readFileSync(SW, 'utf8'))
+    : (JSON.parse(fs.readFileSync(SUBSET, 'utf8')) as { entries: Record<string, string> }).entries;
   const norm = (s: string) => conv(s).replace(/[、，。]/g, '');
   for (const r of RECIPES) {
     if (r.src !== '说文') continue;

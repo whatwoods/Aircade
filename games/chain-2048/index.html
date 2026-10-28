@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0B231C" />
+    <meta name="description" content="翡翠连珠 · CHAIN 2048 —— 祖玛 × 2048：发射数字玉珠，相同数字相撞合成翻倍，凑出金印封印链条。" />
+    <title>翡翠连珠 · Chain 2048</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%231F8255' stroke='%23E3B24C' stroke-width='5'/%3E%3Ctext x='32' y='42' font-family='Arial' font-weight='900' font-size='26' text-anchor='middle' fill='%23F2FFF6'%3E2%3C/text%3E%3C/svg%3E"
+    />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0b231c; }
+      #stage { position: absolute; left: 0; top: 0; width: 390px; height: 844px; transform-origin: 0 0; background: #17392d; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <canvas id="bg" aria-hidden="true"></canvas>
+    <div id="stage">
+      <canvas id="field" aria-label="游戏画面：石槽轨道上的数字玉珠链"></canvas>
+
+      <!-- HUD -->
+      <div id="hud" class="hud" aria-live="off">
+        <div class="hud-top">
+          <button id="btn-pause" class="stone-btn sq" data-ui type="button" aria-label="暂停">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="#E3B24C" /><rect x="14" y="5" width="4" height="14" rx="1" fill="#E3B24C" /></svg>
+          </button>
+          <div id="lives" class="lives" aria-label="剩余玉佩"><i class="pei"></i><i class="pei"></i></div>
+          <div id="stage-label" class="stage-label">神殿 I · 1 / 3</div>
+          <div id="score" class="score">0</div>
+          <div id="streak" class="streak">连击 ×1.1</div>
+          <div id="seal-badge" class="seal-badge" aria-label="本关金印"><span id="seal-val">64</span></div>
+          <div id="quota" class="quota"></div>
+          <div id="progress" class="progress"><div id="progress-fill" class="progress-fill"></div><i id="progress-head" class="progress-head"></i></div>
+        </div>
+        <div class="hud-bottom">
+          <button id="btn-swap" class="stone-btn round" data-ui type="button" aria-label="交换当前球与下一个">
+            <canvas id="swap-ball" width="56" height="56"></canvas>
+            <svg class="swap-arrows" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 9h11l-3-3M19 15H8l3 3" fill="none" stroke="#FFE7A3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          </button>
+          <div id="hint" class="hint"></div>
+          <button id="btn-wild" class="stone-btn round wild" data-ui type="button" aria-label="装填翡翠灵珠">
+            <i class="wild-glow"></i><i class="wild-gem"></i><span class="wild-q">?</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="banner" class="banner"><div class="b-main"></div><div class="b-sub"></div></div>
+      <div id="tut-card" class="tut-card"></div>
+      <button id="btn-skip-tut" class="text-btn skip-tut" data-ui type="button">跳过引导 »</button>
+      <div id="hand" class="hand" aria-hidden="true">
+        <svg viewBox="0 0 48 56" width="48" height="56"><path d="M18 4c3 0 5 2 5 5v15l2-1c3-1 6 1 7 3l1 1c3-1 6 1 6 4v1c3 0 5 2 5 5v6c0 7-6 13-13 13h-6c-5 0-9-3-11-7L6 36c-1-3 0-5 2-6 2-1 5 0 6 2l1 2V9c0-3 2-5 3-5z" fill="rgba(247,239,216,0.85)" stroke="#0B231C" stroke-width="2" /></svg>
+      </div>
+      <div id="shards" class="shards" aria-hidden="true"></div>
+
+      <!-- 小结卡片 -->
+      <section id="summary" class="summary panel" aria-label="关卡小结">
+        <div class="sum-title">第 1 关 完成</div>
+        <div class="sum-row"><span>本关得分</span><b id="sum-score">0</b></div>
+        <div class="sum-row"><span>距离奖励</span><b id="sum-clear">0</b></div>
+        <div class="sum-row"><span>退潮奖励</span><b id="sum-cash">0</b></div>
+        <div class="sum-row"><span>最长连锁</span><b id="sum-long">0</b></div>
+        <div class="sum-tap">点击继续</div>
+      </section>
+
+      <!-- 标题页：静态 DOM，脚本加载完立即可点 -->
+      <section id="title" class="screen show" aria-label="标题页">
+        <div class="logo-wrap">
+          <h1 class="logo">翡翠连珠</h1>
+          <div class="logo-en">CHAIN 2048</div>
+        </div>
+        <div class="title-tag">同数字相撞，合成翻倍 · 凑出金印，封印链条</div>
+        <button id="btn-start" class="stone-btn primary start" data-ui type="button"><span>开始</span></button>
+        <div class="title-row">
+          <button id="btn-title-settings" class="stone-btn secondary" data-ui type="button">设置</button>
+          <button id="btn-howto" class="stone-btn secondary" data-ui type="button">玩法</button>
+        </div>
+        <div id="title-best" class="title-best">最高分 0</div>
+      </section>
+
+      <!-- 暂停 -->
+      <section id="pause" class="overlay" aria-label="暂停">
+        <div class="panel pause-panel">
+          <h2>暂停</h2>
+          <div id="pause-info" class="pause-info"></div>
+          <div class="codex-label">数字图鉴</div>
+          <canvas id="codex" class="codex" width="300" height="84"></canvas>
+          <button id="btn-resume" class="stone-btn primary w260" data-ui type="button">继续</button>
+          <button id="btn-restart" class="stone-btn secondary w260 h48" data-ui type="button">重新开始</button>
+          <div class="pair">
+            <button id="btn-pause-settings" class="stone-btn secondary w125" data-ui type="button">设置</button>
+            <button id="btn-home" class="stone-btn secondary w125" data-ui type="button">回到标题</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 设置 -->
+      <section id="settings" class="overlay" aria-label="设置">
+        <div class="panel settings-panel">
+          <h2>设置</h2>
+          <div class="set-row"><span>音效</span><button id="set-sfx" class="toggle" data-ui type="button" role="switch" aria-checked="true"><i></i></button></div>
+          <div class="set-row"><span>音乐</span><button id="set-music" class="toggle" data-ui type="button" role="switch" aria-checked="true"><i></i></button></div>
+          <div class="set-row"><span>屏幕震动</span>
+            <div class="seg" id="set-shake"><button data-ui data-v="2" type="button">开</button><button data-ui data-v="1" type="button">弱</button><button data-ui data-v="0" type="button">关</button></div>
+          </div>
+          <div class="set-row"><span>瞄准放大镜</span><button id="set-loupe" class="toggle" data-ui type="button" role="switch" aria-checked="true"><i></i></button></div>
+          <button id="btn-retut" class="stone-btn secondary w260 h48" data-ui type="button">重看新手引导</button>
+          <button id="btn-clear" class="stone-btn secondary w260 h48 danger" data-ui type="button">清除纪录</button>
+          <button id="btn-set-done" class="stone-btn primary w260" data-ui type="button">完成</button>
+        </div>
+      </section>
+
+      <!-- 结算 -->
+      <section id="results" class="overlay" aria-label="结算">
+        <div class="panel results-panel">
+          <div class="res-en">GAME OVER</div>
+          <div class="res-cn">远征结束</div>
+          <div class="res-score-wrap"><div id="res-score" class="res-score">0</div><div id="res-stamp" class="stamp">新纪录</div></div>
+          <div id="res-best" class="res-best">最高分 0</div>
+          <div class="res-stats">
+            <div><span>最远关卡</span><b id="res-stage">—</b></div>
+            <div><span>最长连锁</span><b id="res-long">0</b></div>
+            <div><span>金印</span><b id="res-seals">0</b></div>
+          </div>
+          <div class="res-stats small">
+            <div><span>合成次数</span><b id="res-merges">0</b></div>
+            <div><span>用时</span><b id="res-time">0:00</b></div>
+            <div id="res-seed-wrap"><span>种子</span><b id="res-seed">—</b></div>
+          </div>
+          <button id="btn-again" class="stone-btn primary w260" data-ui type="button">再来一局</button>
+          <button id="btn-res-home" class="stone-btn secondary w260 h48" data-ui type="button">回到标题</button>
+        </div>
+      </section>
+
+      <div id="vines" class="vines" data-ui aria-hidden="true"><canvas id="vines-l"></canvas><canvas id="vines-r"></canvas><div class="vine-sun"></div></div>
+    </div>
+    <div id="debug" class="debug" aria-hidden="true"></div>
+    <div id="sa-probe" aria-hidden="true" style="position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
