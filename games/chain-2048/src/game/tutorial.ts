@@ -228,6 +228,7 @@ export class Tutorial {
         s.seals = credit;
         s.bus.emit('sealCount', { seals: credit, quota: s.cfg.quota });
         this.ui.card(t4Text(s.cfg.quota - credit, credit > 0), true);
+        this.ui.done();
         this.ui.flashMouth();
         break;
       }

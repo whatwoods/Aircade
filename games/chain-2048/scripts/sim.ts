@@ -1,6 +1,6 @@
 /**
  * npm run sim —— 用真实轨道几何的机器人批量闯关，打印难度曲线并对照 docs §3.13 的门槛。
- * 用法：node scripts/sim.ts [runs=20] [bots=human,casual,careful,greedy,spam] [maxStage=20]
+ * 用法：node scripts/sim.ts [runs=20] [bots=human,casual,careful,greedy,spam] [maxStage=20] [seed0=1000]
  */
 import { CONFIG } from '../src/config.ts';
 import type { BotKind } from '../src/game/bots.ts';
@@ -12,10 +12,11 @@ function main() {
   const runs = Number(process.argv[2] ?? 20);
   const bots = (process.argv[3] ?? 'human,casual,careful,greedy,spam').split(',') as BotKind[];
   const maxStage = Number(process.argv[4] ?? 20);
+  const seed0 = Number(process.argv[5] ?? 1000);
   const out: Record<string, ReturnType<typeof report>> = {};
   for (const k of bots) {
     const t = Date.now();
-    const r = report(k, runs, maxStage);
+    const r = report(k, runs, maxStage, seed0);
     out[k] = r;
     const mins = r.runs.map((x) => x.minutes), stops = r.runs.map((x) => x.stop);
     console.log(`\nbot=${k} runs=${runs} lives=${CONFIG.run.lives}  run: median ${r.medMin.toFixed(1)} min (${Math.min(...mins).toFixed(1)}–${Math.max(...mins).toFixed(1)}), stopStage median ${r.medStop} (${Math.min(...stops)}–${Math.max(...stops)})  [${((Date.now() - t) / 1000).toFixed(1)}s]`);

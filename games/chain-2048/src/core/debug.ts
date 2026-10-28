@@ -216,7 +216,7 @@ export function installDebug(app: App): void {
       return { ok: true };
     },
     simulate(o: { bot?: BotKind; runs?: number; seed?: number; fromStage?: number; toStage?: number; lives?: number } = {}) {
-      const r = report(o.bot ?? 'careful', o.runs ?? 5, o.toStage ?? 20, o.seed ?? 1000, o.lives ?? CONFIG.run.lives, o.fromStage ?? 1);
+      const r = report(o.bot ?? 'human', o.runs ?? 5, o.toStage ?? 20, o.seed ?? 1000, o.lives ?? CONFIG.run.lives, o.fromStage ?? 1);
       const stages: Record<number, unknown> = {};
       for (const [n, st] of r.stats) stages[n] = { tries: st.tries, clearRate: st.clears / st.tries, time: st.time, maxP: st.maxP, danger: st.danger, mergesPerShot: st.merges / Math.max(1, st.shots), cascades: st.casc };
       return { bot: r.kind, runs: r.runs, medianMinutes: r.medMin, medianStop: r.medStop, stages };

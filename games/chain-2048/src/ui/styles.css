@@ -732,9 +732,10 @@ button:focus-visible {
 }
 
 .tut-card.low {
-  left: 70px;
+  left: 78px;
   top: 760px;
-  width: 250px;
+  width: 234px;
+  padding: 7px 8px;
   min-height: 56px;
   font-size: 13px;
   line-height: 18px;
