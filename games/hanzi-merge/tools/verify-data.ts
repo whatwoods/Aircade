@@ -184,9 +184,11 @@ if (SW || fs.existsSync(SUBSET)) {
   const norm = (s: string) => conv(s).replace(/[、，。]/g, '');
   for (const r of RECIPES) {
     if (r.src !== '说文') continue;
-    const head = r.sw ?? r.trad ?? r.c;
-    const text = sw[head] ?? sw[r.c];
-    if (!text) { err(`${r.c}（${head}）说文无此字头`); continue; }
+    // 说文字头候选：sw（篆文隶定字头）；否则 繁体、今字（从 的说文字头是「从」本身，「從」是另一个字头）
+    const heads = r.sw ? [r.sw] : [...new Set([r.trad ?? r.c, r.c])];
+    const head = heads.find((x) => sw[x] && r.check && norm(sw[x]).includes(norm(r.check))) ?? heads.find((x) => sw[x]) ?? heads[0];
+    const text = sw[head];
+    if (!text) { err(`${r.c}（${heads.join('/')}）说文无此字头`); continue; }
     if (!r.check || !norm(text).includes(norm(r.check))) err(`${r.c} 说文核对失败：期望「${r.check}」，原文「${conv(text).slice(0, 60)}」`);
     // 卡片引文逐句核对：「《说文》：」之后的句子若不在原文中，列出供人工确认（可能是解说句）
     const m = r.basis.match(/《说文》[^：]*：(.*)$/);
@@ -234,7 +236,53 @@ if (IDS) {
   };
   const canon = (x: string) => VAR[x] ?? x;
   const MOON_FLESH = new Set(['肚', '肥', '肰']);
+  // 6a. vv 严格核对：第一层 IDS 的结构符与构件必须和 vv 逐字一致（这是偏旁变体的真值来源）
+  /** IDS 构件 → 本游戏的显示字形（字体无独立码位的字头按压扁本字显示；CJKVI 不区分 牛/牜） */
+  const SHOW_EQ: Record<string, string> = { 龵: '手', 𥫗: '竹', '⺮': '竹', 𦍌: '羊', '⺶': '羊', '⺷': '羊', 𠂒: '牛', 牜: '牛', '④': '鸟' };
+  /** 结构符的已知近似（逐条写明理由） */
+  const IDC_APPROX: Record<string, string> = { 岛: '⿹' /* 楷书鸟省去下部、山嵌入右下；游戏按上下结构排布 */ };
+  const IDC_ARITY: Record<string, number> = { '⿲': 3, '⿳': 3 };
+  /** 解析前缀式 IDS，返回 [结构符, 子项字符串[]] */
+  const parse = (seq: string): [string, string[]] | null => {
+    const cs = [...seq];
+    let i = 0;
+    const node = (): string => {
+      const c = cs[i++];
+      if (!c) return '';
+      if (!IDC.test(c)) return c;
+      let out = c;
+      for (let k = 0; k < (IDC_ARITY[c] ?? 2); k++) out += node();
+      return out;
+    };
+    const top = cs[i++];
+    if (!top || !IDC.test(top)) return null;
+    const kids: string[] = [];
+    for (let k = 0; k < (IDC_ARITY[top] ?? 2); k++) kids.push(node());
+    return [top, kids];
+  };
+  const eq = (x: string) => SHOW_EQ[x] ?? x;
+  let strictN = 0;
   for (const r of RECIPES) {
+    if (!r.vv) continue;
+    strictN++;
+    const p = parse(ids.get(r.c) ?? '');
+    if (!p) { err(`${r.c} IDS 缺失，无法核对 vv`); continue; }
+    let [idc, kids] = p;
+    // 品字：⿱A B，B = ⿰CD（或 B 本身的 IDS 为 ⿰CD）→ A C D
+    if (r.s === '品' && idc === '⿱' && kids.length === 2) {
+      const sub = kids[1].length > 1 ? parse(kids[1]) : parse(ids.get(kids[1]) ?? '');
+      if (sub && sub[0] === '⿰') kids = [kids[0], ...sub[1]];
+    }
+    const wantIdc = r.s === '品' ? '⿱' : r.s;
+    if (idc !== wantIdc && IDC_APPROX[r.c] !== idc) err(`${r.c} 结构 ${r.s} 与 IDS「${ids.get(r.c)}」的 ${idc} 不符`);
+    const vv = [...r.vv];
+    if (kids.length !== vv.length || kids.some((k, i) => eq(k) !== eq(vv[i])))
+      err(`${r.c} vv「${r.vv}」与真实字形 IDS「${ids.get(r.c)}」第一层构件 ${kids.join('')} 不符`);
+  }
+  console.log(`  · vv 严格核对 ${strictN} 条`);
+  // 6b. 其余配方：部件可在三层以内的拆分中找到即可（宽松，人工确认）
+  for (const r of RECIPES) {
+    if (r.vv) continue;
     const want = key(r.parts.map(canon));
     const fs2 = frontiers(r.c, 3).slice(1).map((f) => key(f.map((x) => (x === '月' && MOON_FLESH.has(r.c) ? '肉' : canon(x)))));
     if (!fs2.includes(want)) warn(`${r.c} IDS「${ids.get(r.c) ?? '?'}」与配方 ${r.parts.join('+')} 不一致（需人工确认）`);
