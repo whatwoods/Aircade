@@ -69,9 +69,7 @@ export interface LevelStats {
   bot: BotKind;
   clear: number;
   inkP10: number;
-  inkP20: number;
   inkP50: number;
-  inkP65: number;
   inkP80: number;
   inkP90: number;
   actions: number;
@@ -88,7 +86,7 @@ export function statLevel(def: LevelDef, bot: BotKind, seeds: number): LevelStat
   const avg = (f: (r: RunResult) => number) => rs.reduce((a, r) => a + f(r), 0) / rs.length;
   return {
     id: def.id, bot, clear: wins.length / rs.length,
-    inkP10: pct(ink, 10), inkP20: pct(ink, 20), inkP50: pct(ink, 50), inkP65: pct(ink, 65), inkP80: pct(ink, 80), inkP90: pct(ink, 90),
+    inkP10: pct(ink, 10), inkP50: pct(ink, 50), inkP80: pct(ink, 80), inkP90: pct(ink, 90),
     actions: avg((r) => r.actions), occP50: pct(rs.map((r) => r.maxOcc), 50), discards: avg((r) => r.discards),
     seconds: pct(rs.map((r) => r.seconds), 50),
   };

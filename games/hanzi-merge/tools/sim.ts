@@ -79,7 +79,7 @@ for (const base of levels) {
 // 验收
 const fails: string[] = [];
 let md = `# 造字记 模拟器报告\n\n种子数 ${seeds}；机器人：新手 / 认真 / 上限。时长 = 认真机器人预估中位数（操作数 × ${CONFIG.sim.secPerActionDiligent}s + 新字卡 × ${CONFIG.sim.secPerCard}s）。\n\n`;
-md += '| 帖 | 卷 | 墨 | 最少部件 | 新手通关 | 认真通关 | 上限通关 | 认真剩墨 P20/P50/P65 | 峰值占用 P50 认真/新手 | 认真洗笔 | 时长 | star2 | star3 | 检查 |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n';
+md += '| 帖 | 卷 | 墨 | 最少部件 | 新手通关 | 认真通关 | 上限通关 | 认真剩墨 P50/P80 | 峰值占用 P50 认真/新手 | 认真洗笔 | 时长 | star2 | star3 | 检查 |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n';
 let prevNov = -1;
 let prevChapter = 0;
 for (const { def, nov, dil, ora } of rows) {
@@ -100,7 +100,7 @@ for (const { def, nov, dil, ora } of rows) {
   prevNov = nov.clear;
   prevChapter = def.chapter;
   if (bad.length) fails.push(`L${def.id}: ${bad.join('、')}`);
-  md += `| ${bad.length ? '✗ ' : ''}L${def.id} | ${def.chapter} | ${def.ink} | ${minPieces(def)} | ${(nov.clear * 100).toFixed(0)}% | ${(dil.clear * 100).toFixed(0)}% | ${(ora.clear * 100).toFixed(0)}% | ${dil.inkP20}/${dil.inkP50}/${dil.inkP65} | ${(dil.occP50 * 100).toFixed(0)}% / ${(nov.occP50 * 100).toFixed(0)}% | ${dil.discards.toFixed(1)} | ${dil.seconds.toFixed(0)}s | ${def.star2} | ${def.star3} | ${bad.join('、') || '✓'} |\n`;
+  md += `| ${bad.length ? '✗ ' : ''}L${def.id} | ${def.chapter} | ${def.ink} | ${minPieces(def)} | ${(nov.clear * 100).toFixed(0)}% | ${(dil.clear * 100).toFixed(0)}% | ${(ora.clear * 100).toFixed(0)}% | ${dil.inkP50}/${dil.inkP80} | ${(dil.occP50 * 100).toFixed(0)}% / ${(nov.occP50 * 100).toFixed(0)}% | ${dil.discards.toFixed(1)} | ${dil.seconds.toFixed(0)}s | ${def.star2} | ${def.star3} | ${bad.join('、') || '✓'} |\n`;
 }
 
 if (!only) {

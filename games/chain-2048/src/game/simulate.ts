@@ -6,7 +6,7 @@ import { Rng } from '../core/rng.ts';
 import { Bot, type BotKind } from './bots.ts';
 import { Session } from './session.ts';
 
-export interface StageStat { tries: number; clears: number; time: number[]; maxP: number[]; danger: number[]; shots: number; merges: number; casc: number[] }
+export interface StageStat { tries: number; clears: number; time: number[]; maxP: number[]; danger: number[]; shots: number; merges: number; casc: number[]; firstSeal: number[]; len20: number[]; lenEnd: number[] }
 export interface RunResult { minutes: number; stop: number }
 
 export function runOne(kind: BotKind, seed: number, stats: Map<number, StageStat>, maxStage = 20, lives: number = CONFIG.run.lives, fromStage = 1): RunResult {
@@ -17,20 +17,25 @@ export function runOne(kind: BotKind, seed: number, stats: Map<number, StageStat
   let cur: StageStat | null = null;
   let t0 = 0, maxP = 0, dangerT = 0, shots0 = 0, merges0 = 0;
   let total = 0;
+  let sealT = -1, len20 = -1, len40 = -1;
+  const visLen = () => { let n = 0; for (const b of s.chain.balls) if (b.s > 0) n++; return n; };
   const begin = () => {
     let st = stats.get(s.stage);
-    if (!st) { st = { tries: 0, clears: 0, time: [], maxP: [], danger: [], shots: 0, merges: 0, casc: [] }; stats.set(s.stage, st); }
-    cur = st; st.tries++; t0 = total; maxP = 0; dangerT = 0; shots0 = s.stats.shots; merges0 = s.stats.merges;
+    if (!st) { st = { tries: 0, clears: 0, time: [], maxP: [], danger: [], shots: 0, merges: 0, casc: [], firstSeal: [], len20: [], lenEnd: [] }; stats.set(s.stage, st); }
+    cur = st; st.tries++; t0 = total; maxP = 0; dangerT = 0; shots0 = s.stats.shots; merges0 = s.stats.merges; sealT = -1; len20 = -1; len40 = -1;
   };
   const end = (clear: boolean) => {
     if (!cur) return;
     if (clear) { cur.clears++; cur.time.push(total - t0); }
     cur.maxP.push(Math.min(1, maxP)); cur.danger.push(dangerT / Math.max(1, total - t0));
+    cur.firstSeal.push(sealT >= 0 ? sealT : total - t0 + 999);
+    if (len40 >= 0) { cur.len20.push(len20); cur.lenEnd.push(len40); }
     cur.shots += s.stats.shots - shots0; cur.merges += s.stats.merges - merges0;
   };
   s.bus.on('stageStart', () => begin());
   s.bus.on('stageClear', () => end(true));
   s.bus.on('failStart', () => end(false));
+  s.bus.on('sealCount', () => { if (cur && sealT < 0) sealT = total - t0; });
   s.bus.on('cascade', (e) => { if (cur && e.steps > 0) cur.casc.push(e.steps); });
   lives = Math.max(1, lives);
   s.newRun(fromStage);
@@ -44,6 +49,8 @@ export function runOne(kind: BotKind, seed: number, stats: Map<number, StageStat
       const p = s.chain.headProgress();
       if (p > maxP) maxP = p;
       if (p >= CONFIG.danger.warn) dangerT += dt;
+      if (len20 < 0 && total - t0 >= 20) len20 = visLen();
+      if (len40 < 0 && total - t0 >= 40) len40 = visLen();
     }
   }
   return { minutes: total / 60, stop: s.stage };

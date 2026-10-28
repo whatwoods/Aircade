@@ -55,6 +55,7 @@ export interface ChainEvents {
   swallowed: { ball: Ball };
   cashed: { ball: Ball };
   levelGone: { level: number };
+  pulled: { s: number; ds: number };
 }
 
 export type ChainListener = <K extends keyof ChainEvents>(k: K, p: ChainEvents[K]) => void;
@@ -458,6 +459,7 @@ export class Chain {
       this.levelCounts[oldLevel]! -= 2;
     }
     if (res.level < 24) this.levelCounts[res.level]!++;
+    this.pullBack(res);
     res.cid = cid;
     res.step = step;
     res.pop = 1;
@@ -472,6 +474,28 @@ export class Chain {
     } else {
       this.schedule(res, this.stepDelay(step));
     }
+  }
+
+  /**
+   * 合成吸回（阶段 3）：合成所在段及其后方的整条链再后退 pullBalls 格，
+   * 让「合成 = 链条变短」看得见；退进闸门的珠子回收（出生器之后会重新吐珠）。
+   */
+  private pullBack(res: Ball): void {
+    const ds = CONFIG.merge.pullBalls * this.D;
+    if (ds <= 0 || this.mode !== 'live') return;
+    const i = this.balls.indexOf(res);
+    if (i < 0) return;
+    const st = this.segStart(i);
+    this.shift(st, this.balls.length - 1, -ds, CONFIG.merge.pullRate);
+    let removed = false;
+    while (this.balls.length > 1) {
+      const t = this.balls[this.balls.length - 1]!;
+      if (t.s > -this.D * 0.5 || t.check >= 0 || t.sealT > 0 || t === res) break;
+      this.balls.pop();
+      removed = true;
+    }
+    if (removed) this.recount();
+    this.emit('pulled', { s: res.s, ds });
   }
 
   private processSeals(dt: number): void {
