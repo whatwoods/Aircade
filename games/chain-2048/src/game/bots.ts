@@ -6,7 +6,7 @@ import type { Rng } from '../core/rng.ts';
 import type { Session } from './session.ts';
 import type { Hit } from './shooter.ts';
 
-export type BotKind = 'novice' | 'careful' | 'expert' | 'greedy' | 'spam';
+export type BotKind = 'human' | 'casual' | 'novice' | 'careful' | 'expert' | 'greedy' | 'spam';
 
 interface BotSpec {
   interval: number;
@@ -17,10 +17,16 @@ interface BotSpec {
   errDeg: number;
   swap: boolean;
   wild: boolean;
+  /** 灵珠只在能封印或链头 ≥0.75 时使用（真人通常舍不得用） */
+  wildLimited?: boolean;
   lookNext: boolean;
 }
 
 export const BOTS: Record<BotKind, BotSpec> = {
+  // 真人基准（阶段 3 主门槛）：约 2 s 一发，会看连锁，不交换，灵珠省着用
+  human: { interval: 2.0, shallow: false, partial: 0, errDeg: 1.5, swap: false, wild: true, wildLimited: true, lookNext: false },
+  // 普通玩家：约 2.4 s 一发，只认「能立刻合成」
+  casual: { interval: 2.4, shallow: true, partial: 0.3, errDeg: 2, swap: false, wild: false, lookNext: false },
   novice: { interval: 1.6, shallow: true, partial: 0.6, errDeg: 2.5, swap: false, wild: false, lookNext: false },
   careful: { interval: 1.25, shallow: false, partial: 0, errDeg: 1, swap: true, wild: true, lookNext: false },
   expert: { interval: 1.0, shallow: false, partial: 0, errDeg: 0.5, swap: true, wild: true, lookNext: true },
@@ -160,7 +166,10 @@ export class Bot {
       for (const o of opts) {
         const lv = o === 0 ? am.current : am.next;
         let v = this.evaluate(s, c, lv, o === 2);
-        if (o === 2) v -= 2.5; // 灵珠留给大连锁
+        if (o === 2) {
+          v -= 2.5; // 灵珠留给大连锁
+          if (sp.wildLimited && v < 4 && s.chain.headProgress() < 0.75) continue;
+        }
         if (this.kind === 'greedy') v = v > 0 ? 10 - c.t / 1000 : 0;
         if (!best || v > best.v + 1e-9) best = { v, c, opt: o };
       }

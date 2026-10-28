@@ -51,6 +51,13 @@ interface Tag {
 const tmp = { x: 0, y: 0 };
 const tmp2 = { x: 0, y: 0 };
 
+/** 角度取模到 (−π, π]，任意大小都是 O(1) */
+export function wrapAngle(a: number): number {
+  if (!Number.isFinite(a)) return 0;
+  const t = Math.PI * 2;
+  return ((((a + Math.PI) % t) + t) % t) - Math.PI;
+}
+
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
   private g: CanvasRenderingContext2D;
@@ -194,12 +201,20 @@ export class Renderer {
       this.danger = follow(this.danger, Math.min(1, target), 3, dt);
       // 图腾跟随瞄准角（弹簧）
       const want = aim.active || aim.hover ? aim.angle : this.totemAngle;
-      let d = want - this.totemAngle;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
       const w = 28;
-      this.totemAngV += (w * w * d - 2 * 0.8 * w * this.totemAngV) * dt;
-      this.totemAngle += this.totemAngV * dt;
+      // 自适应子步（每步 dt·ω ≤ 0.4，稳定域内），取模归一化，非有限值兜底
+      const n = Math.min(16, Math.max(1, Math.ceil(dt * w * 2.5)));
+      const h = dt / n;
+      for (let i = 0; i < n; i++) {
+        const d = wrapAngle(want - this.totemAngle);
+        this.totemAngV += (w * w * d - 2 * 0.8 * w * this.totemAngV) * h;
+        this.totemAngle += this.totemAngV * h;
+      }
+      this.totemAngle = wrapAngle(this.totemAngle);
+      if (!Number.isFinite(this.totemAngle) || !Number.isFinite(this.totemAngV)) {
+        this.totemAngle = Number.isFinite(want) ? want : -Math.PI / 2;
+        this.totemAngV = 0;
+      }
     }
     // 光尘
     for (let i = 0; i < 60; i++) {

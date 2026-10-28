@@ -55,7 +55,10 @@ class Music {
       this.lpTarget = lp;
       audio.musicLP.frequency.setTargetAtTime(lp, c.currentTime, 0.4);
     }
-    while (this.nextT < c.currentTime + 0.15) {
+    // 后台/挂起后时钟跳跃：不补播，直接对齐（也避免长循环）
+    if (!(this.nextT > c.currentTime - 0.5)) this.nextT = c.currentTime + 0.05;
+    let guard = 0;
+    while (this.nextT < c.currentTime + 0.15 && guard++ < 16) {
       this.schedule(this.nextT, this.stepN, d);
       this.nextT += EIGHTH;
       this.stepN++;
