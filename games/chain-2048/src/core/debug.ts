@@ -4,7 +4,8 @@ import { CONFIG } from '../config';
 import type { BotKind } from '../game/bots';
 import { report } from '../game/simulate';
 import { MUZZLE } from '../game/shooter';
-import { simulateLevels } from '../game/bots';
+import { Bot, simulateLevels } from '../game/bots';
+import { Rng } from './rng';
 import { load, remove } from './storage';
 import { toClient } from './stage';
 import { templeName } from '../ui/hud';
@@ -211,7 +212,7 @@ export function installDebug(app: App): void {
       return { ok: true };
     },
     autoplay(bot: BotKind | false = 'careful') {
-      app.setAutoplay(bot);
+      app.setAutoplay(bot ? new Bot(bot, new Rng(app.seed ^ 0x5bd1)) : null);
       return { ok: true };
     },
     simulate(o: { bot?: BotKind; runs?: number; seed?: number; fromStage?: number; toStage?: number; lives?: number } = {}) {

@@ -15,6 +15,10 @@ class AudioSys {
 
   /** 在用户手势里调用 */
   unlock(): void {
+    // 没有过用户手势（如调试参数自动开局）时不创建，避免浏览器「AudioContext was not allowed to start」警告；
+    // 第一次 pointerdown/keydown 时再创建（见 app.bindGlobal）
+    const ua = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation;
+    if (!this.ctx && ua && !ua.hasBeenActive) return;
     if (!this.ctx) {
       try {
         const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;

@@ -1,6 +1,6 @@
 /**
  * npm run sim —— 用真实轨道几何的机器人批量闯关，打印难度曲线并对照 docs §3.13 的门槛。
- * 用法：node scripts/sim.ts [runs=20] [bots=novice,careful,greedy,spam] [maxStage=20]
+ * 用法：node scripts/sim.ts [runs=20] [bots=human,casual,careful,greedy,spam] [maxStage=20]
  */
 import { CONFIG } from '../src/config.ts';
 import type { BotKind } from '../src/game/bots.ts';
@@ -28,7 +28,8 @@ function main() {
   const checks: string[] = [];
   const ok = (c: boolean, s: string) => checks.push(`[${c ? 'ok' : 'FAIL'}] ${s}`);
   const clr = (r: ReturnType<typeof report>, n: number) => { const st = r.stats.get(n); return st ? st.clears / st.tries : 0; };
-  const step = (r: ReturnType<typeof report>, last = 12) => { let worst = 0, at = 0; for (let n = 1; n < last; n++) { const st = r.stats.get(n + 1); if (!st || st.tries < 6) continue; const d = clr(r, n) - clr(r, n + 1); if (d > worst) { worst = d; at = n; } } return { worst, at }; };
+  // 只看「至少 1/4 的局能走到」的关卡：止步关之后的样本既少、也不代表该人群
+  const step = (r: ReturnType<typeof report>, last = 12) => { let worst = 0, at = 0; for (let n = 1; n < last; n++) { const st = r.stats.get(n + 1); if (!st || st.tries < Math.max(6, r.runs.length / 4)) continue; const d = clr(r, n) - clr(r, n + 1); if (d > worst) { worst = d; at = n; } } return { worst, at }; };
   if (out.human) {
     const h = out.human;
     ok(h.medStop >= 10 && h.medStop <= 13, `human stop stage ${h.medStop} in 10–13`);

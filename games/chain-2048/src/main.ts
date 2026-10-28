@@ -3,7 +3,6 @@ import './ui/styles.css';
 import bsd800 from '@fontsource/big-shoulders-display/files/big-shoulders-display-latin-800-normal.woff2?url';
 import bungee400 from '@fontsource/bungee/files/bungee-latin-400-normal.woff2?url';
 import { App } from './app';
-import { installDebug } from './core/debug';
 import { layoutStage, stageInfo } from './core/stage';
 import { bakeBalls } from './render/ballArt';
 
@@ -44,4 +43,5 @@ window.addEventListener('orientationchange', relayout);
 
 app.boot();
 layoutStage(stageEl);
-if (app.debug) installDebug(app);
+// 调试工具（含模拟器与机器人）按需加载，不进首包
+if (app.debug) void import('./core/debug').then((m) => m.installDebug(app));

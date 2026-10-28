@@ -87,7 +87,14 @@ for (const { def, nov, dil, ora } of rows) {
   const [lo, hi] = noviceBand(def);
   if (ora.clear < 0.995) bad.push('上限未全通');
   if (dil.clear < CONFIG.sim.diligentMinClear) bad.push('认真<97%');
-  if (nov.clear < lo - 0.03 || nov.clear > hi + 0.03) bad.push('新手越界');
+  // 卷首喘息帖（第 2 卷起每卷第一帖）只设下限：它本来就该比卷内其他帖宽松
+  const opener = def.chapter > 1 && (def.id - 1) % 5 === 0;
+  if (nov.clear < lo - 0.03 || (!opener && nov.clear > hi + 0.03)) bad.push('新手越界');
+  // 卷首喘息：新手通关率是本卷最高，且认真剩墨 P50 ≥ 墨的 15%（不再是全卷最紧的一帖）
+  if (opener) {
+    const rest = rows.filter((x) => x.def.chapter === def.chapter && x.def.id !== def.id);
+    if (rest.some((x) => x.nov.clear > nov.clear) || dil.inkP50 < def.ink * 0.15) bad.push('卷首不宽松');
+  }
   if (prevNov >= 0 && prevNov - nov.clear > 0.2) bad.push('成墙');
   if (def.chapter >= 3 && dil.inkP50 > def.ink * 0.3 + 0.5) bad.push('剩墨过多');
   // 每卷第一帖新手通关率 ≥ 上一卷最后一帖（喘息帖）

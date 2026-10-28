@@ -62,7 +62,7 @@ export const CONFIG = {
     holdBeforeBurst: 0.35,
   },
   push: {
-    introSpeed: 260,
+    introSpeed: 400,
     introTo: 0.28,
     rubber: 3.5,
     rubberTo: 0.55,

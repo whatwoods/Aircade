@@ -84,7 +84,7 @@ export class RackView {
     ctx.restore();
     // 标签「墨」+ 墨滴图标 + 大号数字（P1-4：一眼看出这是墨量）
     glyphs.label(ctx, '墨', b.x + b.w / 2, b.y - 9, 11, INK.light, 0.5, 1);
-    const ny = 746 - this.inkBump * 4;
+    const ny = b.y + b.h + 18 - this.inkBump * 4;
     const dx = b.x + 9;
     ctx.fillStyle = low ? INK.red : INK.ink2;
     ctx.beginPath();

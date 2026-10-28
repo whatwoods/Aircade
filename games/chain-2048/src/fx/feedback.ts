@@ -24,6 +24,7 @@ export class Feedback {
   private beatT = 0;
   private lastMerge = { x: 195, y: 400 };
   private cashN = 0;
+  private pullT = -9;
   private swallowN = 0;
   private pos = { x: 0, y: 0 };
   private gate = { x: 0, y: 0 };
@@ -146,6 +147,18 @@ export class Feedback {
       r.particles.sparks(p.x, p.y, '#E2463A', 3, 60, 0.3);
       if (this.swallowN++ % 3 === 0) sfx.thud(0.15);
     });
+    b.on('pulled', (e) => {
+      // 合成吸回：闸门处的珠子被吸回石拱（「合成 = 链条变短」可见）
+      const g = this.gate;
+      const now = this.s.chain.time;
+      if (now - this.pullT > 0.1) {
+        this.pullT = now;
+        r.particles.dust(g.x, g.y, 4);
+        r.pullGlow = 1;
+        sfx.suck();
+      }
+      r.pullGlow = Math.min(1.4, r.pullGlow + e.ds / 120);
+    });
     b.on('cashed', () => {
       const g = this.gate;
       r.particles.sparks(g.x, g.y, '#FFE7A3', 2, 50, 0.3);
@@ -213,7 +226,7 @@ export class Feedback {
       this.onRunOver?.();
     });
     b.on('emptyBonus', (e) => {
-      r.tag(`清空链条 +${e.pts}`, 195, 380, '#FFE7A3', 18);
+      this.hud.banner('清空链条', `+${e.pts}`, 1.0);
     });
     b.on('danger', (e) => {
       if (e.level >= 1) this.onTip?.(4);

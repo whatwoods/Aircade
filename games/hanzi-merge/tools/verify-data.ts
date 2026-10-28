@@ -137,9 +137,10 @@ console.log('[4d] 繁体 / 说文字头');
   const toTw = OpenCC.Converter({ from: 'cn', to: 'tw' });
   const toHk = OpenCC.Converter({ from: 'cn', to: 'hk' });
   /** OpenCC 不转但确有繁体的、或繁体有多个对应的，逐条写明 */
-  const TRAD_OK: Record<string, string> = { 钟: '鐘' };
-  /** 简繁同形或一简对多繁、不宜标注的 */
-  const NO_TRAD: Record<string, string> = { 采: '「采」本身就是传统字形（採 为后起分化字）' };
+  const TRAD_OK: Record<string, string> = {
+    钟: '鐘',
+    采: '採', // 「摘取」义繁体作「採」；OpenCC 因「神采」等义保留「采」
+  };
   for (const r of RECIPES) {
     const cands = new Set([toT(r.c), toTw(r.c), toHk(r.c)].filter((x) => x !== r.c));
     if (r.trad) {
@@ -147,7 +148,7 @@ console.log('[4d] 繁体 / 说文字头');
       if ([...r.trad].length !== 1 || cp < 0x4e00 || cp > 0x9fff) err(`${r.c} 繁体「${r.trad}」不是基本区单字`);
       if (r.trad === r.c) err(`${r.c} 繁体与简体相同`);
       if (!cands.has(r.trad) && TRAD_OK[r.c] !== r.trad) err(`${r.c} 繁体「${r.trad}」与 OpenCC（${[...cands].join('/') || '无'}）不符`);
-    } else if (cands.size && !NO_TRAD[r.c]) err(`${r.c} 有繁体 ${[...cands].join('/')} 但未标注 trad`);
+    } else if (cands.size) err(`${r.c} 有繁体 ${[...cands].join('/')} 但未标注 trad`);
     if (r.sw !== undefined && (r.sw === r.c || r.sw === r.trad)) err(`${r.c} sw「${r.sw}」与今字/繁体相同，不必填写`);
   }
 }

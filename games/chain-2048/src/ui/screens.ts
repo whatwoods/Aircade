@@ -130,7 +130,7 @@ export class Screens {
   showTitle(on: boolean, best: number, bestStage: number): void {
     this.title.classList.toggle('show', on);
     if (on) {
-      $('title-best').textContent = best > 0 ? `最高分 ${fmt(best)} · 最远 ${shortStage(Math.max(1, bestStage))}` : '射出数字珠，相同数字合成翻倍';
+      $('title-best').textContent = best > 0 ? `最高分 ${fmt(best)} · 最远 ${shortStage(Math.max(1, bestStage))}` : '首次游玩有约 30 秒的上手引导';
       window.setTimeout(() => $('btn-start').focus({ preventScroll: true }), 50);
     }
   }

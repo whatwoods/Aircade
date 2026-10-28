@@ -48,7 +48,7 @@ function handPath(): Path2D {
   return p;
 }
 /** 拖错动画：摇两下 / 飞回（秒） */
-const FAIL_WOBBLE = 0.3;
+const FAIL_WOBBLE = 0.42;
 const FAIL_BACK = 0.2;
 const NUM = '一二三四五六七八九十';
 
@@ -956,9 +956,10 @@ export class Play {
     this.rack.drawPause(ctx);
     this.rack.drawHeader(ctx, this.title);
     this.scrolls.draw(ctx, t);
+    this.bg.drawGrid(ctx);
     if (this.tut && this.tut.captionT > 0) {
-      // 放在卷轴下木轴与盘面第一行之间的空隙里，衬一条宣纸底，不压木轴、跳分和格子
-      const capY = (LAYOUT.scrollY + LAYOUT.scrollH + 12 + LAYOUT.boardY) / 2 + 4;
+      // 放在卷轴下木轴与盘面第一行之间的窄缝里（画在格线之后），衬一条宣纸底
+      const capY = (LAYOUT.scrollY + LAYOUT.scrollH + LAYOUT.boardY) / 2 + 1;
       ctx.font = `13px ${BODY_STACK}`;
       ctx.globalAlpha = Math.min(1, this.tut.captionT * 2);
       const tw = ctx.measureText(this.tut.caption).width + 20;
@@ -972,7 +973,6 @@ export class Play {
       ctx.globalAlpha = 1;
       ctx.textAlign = 'start';
     }
-    this.bg.drawGrid(ctx);
     // 引导：亮格
     if (this.tut && this.tut.step === 1) {
       const p = cellXY(CONFIG.board.focus);
@@ -1081,7 +1081,7 @@ export class Play {
       let sc = BS;
       if (f.t < FAIL_WOBBLE) {
         const u = f.t / FAIL_WOBBLE;
-        x += Math.sin(u * Math.PI * 4) * 8 * (1 - u);
+        x += Math.sin(u * Math.PI * 4) * 10 * (1 - u);
       } else {
         const k = easeInOutQuad(clamp((f.t - FAIL_WOBBLE) / FAIL_BACK));
         x = lerp(f.x, f.bx, k);

@@ -1,6 +1,5 @@
 /** DOM HUD（docs §6.5）：只在变化时写；数值变化全部缓动。另含提示条、横幅队列、引导卡片与手势。 */
 import { follow } from '../core/tween';
-import { ballSprites, getBakeScale } from '../render/ballArt';
 import { label } from '../render/palette';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -49,7 +48,6 @@ export class Hud {
   private tutEl = $('tut-card');
   private handEl = $('hand');
   private wildBtn = $<HTMLButtonElement>('btn-wild');
-  private swapCanvas = $<HTMLCanvasElement>('swap-ball');
   // 状态缓存
   private shown = -1;
   score = 0;
@@ -61,7 +59,6 @@ export class Hud {
   private lastSeal = '';
   private lastQuota = '';
   private lastLives = -1;
-  private lastNext = -1;
   private lastWild = '';
   private record = false;
   best = 0;
@@ -130,7 +127,7 @@ export class Hud {
     if (this.hintT > 0) {
       this.hintT -= dt;
       if (this.hintT <= 0) this.hintEl.classList.remove('show');
-    } else if (this.hintQ.length && this.hintT <= -0.3) {
+    } else if (this.hintQ.length && this.hintT <= -0.3 && !(this.tutEl.classList.contains('low') && this.tutEl.classList.contains('show'))) {
       this.hintEl.textContent = this.hintQ.shift()!;
       this.hintEl.classList.add('show');
       this.hintT = 2.5;
@@ -212,10 +209,7 @@ export class Hud {
   }
 
   setAmmo(next: number, wild: number, armed: boolean, enabled: boolean): void {
-    if (next !== this.lastNext) {
-      this.lastNext = next;
-      this.drawMini(next);
-    }
+    void next; // 下一个只画在图腾眼窝里（阶段 3：交换按钮不再重复画球）
     const key = `${wild}|${armed}|${enabled}`;
     if (key !== this.lastWild) {
       this.lastWild = key;
@@ -223,30 +217,6 @@ export class Hud {
       this.wildBtn.classList.toggle('armed', armed);
       this.wildBtn.disabled = wild <= 0 || !enabled;
     }
-  }
-
-  redrawMini(): void {
-    if (this.lastNext > 0) this.drawMini(this.lastNext);
-  }
-
-  private drawMini(level: number): void {
-    const c = this.swapCanvas;
-    const k = Math.max(1, Math.min(2, getBakeScale() / 1.5));
-    const px = Math.round(40 * k);
-    if (c.width !== px) {
-      c.width = px;
-      c.height = px;
-    }
-    const g = c.getContext('2d');
-    if (!g) return;
-    g.clearRect(0, 0, px, px);
-    const sp = ballSprites(level);
-    // 精灵是 56 逻辑 px（含光晕边），珠径 40
-    const s = (px / 40) * 56 * 0.9;
-    const o = (px - s) / 2;
-    g.drawImage(sp.body, o, o, s, s);
-    g.drawImage(sp.shade, o, o, s, s);
-    g.drawImage(sp.num, o, o, s, s);
   }
 
   hint(text: string): void {
@@ -285,10 +255,15 @@ export class Hud {
     this.bannerT = b.dur;
   }
 
-  tutCard(html: string | null, dim = false): void {
+  tutCard(html: string | null, dim = false, low = false): void {
     if (html === null) {
       this.tutEl.classList.remove('show', 'dim');
       return;
+    }
+    this.tutEl.classList.toggle('low', low);
+    if (low) {
+      this.hintEl.classList.remove('show');
+      this.hintT = Math.min(this.hintT, 0);
     }
     const wrapped = `<span>${html}</span>`;
     if (this.tutEl.innerHTML !== wrapped) this.tutEl.innerHTML = wrapped;
@@ -317,9 +292,16 @@ export class Hud {
     this.handEl.style.opacity = '0';
   }
 
+  /** 玩家正在瞄准时隐藏引导手势（不画进放大镜、不挡瞄准） */
+  handSuppressed = false;
+
   private updateHand(dt: number): void {
     const h = this.hand;
     if (h.mode === 'off') return;
+    if (this.handSuppressed) {
+      this.handEl.style.opacity = '0';
+      return;
+    }
     h.t += dt;
     const T = h.mode === 'drag' ? 2.0 : 1.2;
     const k = (h.t % T) / T;

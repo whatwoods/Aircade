@@ -306,7 +306,7 @@ export function serpentEyes(t: Track): Array<{ x: number; y: number }> {
 
 function drawGate(g: CanvasRenderingContext2D, t: Track): void {
   // 闸门石拱：覆盖 s ∈ [0, gateLen]，放在第一段可见轨道上
-  const s0 = Math.max(0, firstVisibleS(t));
+  const s0 = t.visStart;
   const s1 = s0 + t.gateLen;
   const p0 = t.posAt(s0), p1 = t.posAt(s1);
   const a = Math.atan2(p1.y - p0.y, p1.x - p0.x);
@@ -355,17 +355,8 @@ function drawGate(g: CanvasRenderingContext2D, t: Track): void {
   g.restore();
 }
 
-function firstVisibleS(t: Track): number {
-  for (let s = 0; s < t.length; s += 2) {
-    const p = t.posAt(s);
-    if (p.x > 8 && p.x < SW - 8 && p.y > 8) return s;
-  }
-  return 0;
-}
-
 export function gateCenter(t: Track): { x: number; y: number } {
-  const s0 = Math.max(0, firstVisibleS(t));
-  const p = t.posAt(s0 + t.gateLen / 2);
+  const p = t.posAt(t.visStart + t.gateLen / 2);
   return { x: p.x, y: p.y };
 }
 

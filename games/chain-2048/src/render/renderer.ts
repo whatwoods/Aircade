@@ -38,15 +38,9 @@ interface Ghost {
   dur: number;
 }
 
-interface Tag {
-  alive: boolean;
-  text: string;
-  x: number;
-  y: number;
-  life: number;
-  color: string;
-  size: number;
-}
+/** 图腾眼窝里「下一个」的缩放与眼窝半径：4 位数也 ≥12.8 px（docs §11.7） */
+const NEXT_K = 0.8;
+const NEXT_R = 21;
 
 const tmp = { x: 0, y: 0 };
 const tmp2 = { x: 0, y: 0 };
@@ -67,7 +61,6 @@ export class Renderer {
   readonly particles = new Particles();
   readonly popups = new Popups();
   private ghosts: Ghost[] = [];
-  private tags: Tag[] = [];
   private rayCanvas: HTMLCanvasElement | null = null;
   private motes = new Float32Array(60 * 4);
   private flies = new Float32Array(8 * 4);
@@ -103,6 +96,8 @@ export class Renderer {
   loupe = true;
   /** 收官时闸门落下 */
   gateDrop = 0;
+  /** 合成吸回提示（链尾后方的回缩箭头），衰减 */
+  pullGlow = 0;
   /** 引导：高亮的珠子 id */
   hintId = -1;
   hintTotem = false;
@@ -115,7 +110,6 @@ export class Renderer {
     this.canvas = canvas;
     this.g = canvas.getContext('2d')!;
     for (let i = 0; i < 12; i++) this.ghosts.push({ alive: false, level: 1, s0: 0, targetId: 0, t: 0, dur: 0.11 });
-    for (let i = 0; i < 4; i++) this.tags.push({ alive: false, text: '', x: 0, y: 0, life: 0, color: '#fff', size: 16 });
     const r = new Rng(9);
     for (let i = 0; i < 60; i++) {
       this.motes[i * 4] = r.next() * 390;
@@ -162,8 +156,8 @@ export class Renderer {
   }
 
   tag(text: string, x: number, y: number, color = C.goldHi, size = 16): void {
-    const t = this.tags.find((q) => !q.alive) ?? this.tags[0]!;
-    Object.assign(t, { alive: true, text, x, y, life: 0, color, size });
+    // 统一走跳字池的避让与同屏上限（docs §5.5）
+    this.popups.label(text, x, y, color, size);
   }
 
   recoilKick(): void {
@@ -192,9 +186,9 @@ export class Renderer {
     this.recoil = Math.max(0, this.recoil - dt * 8);
     this.freezeGlow = Math.max(0, this.freezeGlow - dt);
     this.mouthFlash = Math.max(0, this.mouthFlash - dt);
+    this.pullGlow = Math.max(0, this.pullGlow - dt * 1.6);
     this.sealReadyPulse += dt;
     for (const gh of this.ghosts) if (gh.alive && (gh.t += dt) >= gh.dur) gh.alive = false;
-    for (const t of this.tags) if (t.alive && (t.life += dt) >= 1.3) t.alive = false;
     if (s) {
       const p = s.phase === 'live' ? s.chain.headProgress() : 0;
       const target = p < CONFIG.danger.warn ? 0 : (p - CONFIG.danger.warn) / (1 - CONFIG.danger.warn);
@@ -265,7 +259,6 @@ export class Renderer {
     this.particles.draw(g, glowSprite());
     this.drawMotes(g);
     this.popups.draw(g);
-    this.drawTags(g);
     if (s) this.drawBadge(g, s);
     if (s && aim.active && aim.touch && aim.valid && !paused && this.loupe) this.drawLoupe(g, s, aim);
     if (this.showcase) this.drawShowcase([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
@@ -350,6 +343,7 @@ export class Renderer {
     const ch = s.chain;
     const tr = s.track;
     const L = tr.length;
+    if (this.pullGlow > 0.02) this.drawPull(g, s);
     // 危险红光：从蛇口往回到链头
     if (this.danger > 0.01 && ch.balls.length) {
       const head = Math.min(L, ch.balls[0]!.s + ch.balls[0]!.rOff);
@@ -473,7 +467,8 @@ export class Renderer {
       const sv = b.s + b.rOff;
       const inT = tr.inTunnel(sv);
       if (tunnelPass !== inT) continue;
-      if (sv < -BALL_R * 2) continue;
+      // 闸门石拱中线之前的珠子不画：读作「从拱门里滚出来」（docs §4.4）
+      if (sv < tr.visStart + tr.gateLen * 0.5) continue;
       const p = this.ballPos(s, b, tmp);
       let x = p.x, y = p.y;
       if (i === 0 && this.danger > 0.6 && s.phase === 'live') {
@@ -675,18 +670,31 @@ export class Renderer {
     g.stroke();
     // 翡翠眼窝（下一个）
     const breathe = 0.5 + 0.5 * Math.sin(this.time * 1.6);
-    const eg = g.createRadialGradient(cx - 4, cy - 5, 1, cx, cy, 18);
+    const eg = g.createRadialGradient(cx - 4, cy - 5, 1, cx, cy, NEXT_R);
     eg.addColorStop(0, `rgba(190,255,220,${(0.75 + 0.2 * breathe).toFixed(3)})`);
     eg.addColorStop(0.5, '#2E9E68');
     eg.addColorStop(1, '#0E3F2A');
     g.fillStyle = eg;
     g.beginPath();
-    g.arc(cx, cy, 18, 0, Math.PI * 2);
+    g.arc(cx, cy, NEXT_R, 0, Math.PI * 2);
     g.fill();
     g.strokeStyle = C.gold;
     g.lineWidth = 1.5;
     g.stroke();
     const am = s.ammo;
+    // 「下个」小字：放在瞄准方向的反侧，永远不被蛇首挡住
+    if (s.phase !== 'over' && this.swapT >= 1) {
+      const la = a + Math.PI;
+      const lx = cx + Math.cos(la) * 31, ly = cy + Math.sin(la) * 31;
+      g.font = `700 12px ${FONT_CN}`;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.lineWidth = 3;
+      g.strokeStyle = 'rgba(11,35,28,0.85)';
+      g.strokeText('下个', lx, ly);
+      g.fillStyle = C.uiText;
+      g.fillText('下个', lx, ly);
+    }
     // 交换动画：两颗球沿内弧对换
     const sw = this.swapT;
     const e = sw < 1 ? sw * sw * (3 - 2 * sw) : 1;
@@ -704,7 +712,7 @@ export class Renderer {
     }
     // 下一个（缩小）
     if (s.phase !== 'over') {
-      const ns = (sw < 1 ? 0.62 + 0.38 * (1 - e) : 0.62) * rerollScale(2);
+      const ns = (sw < 1 ? NEXT_K + (1 - NEXT_K) * (1 - e) : NEXT_K) * rerollScale(2);
       g.save();
       g.translate(nextPos.x, nextPos.y);
       g.scale(Math.max(0.05, ns), ns);
@@ -712,9 +720,18 @@ export class Renderer {
       g.restore();
       // 当前（在蛇口）
       const load = this.loadT < 1 ? 0.3 + 0.7 * (1 - Math.pow(1 - this.loadT, 3)) : 1;
-      const cs = (sw < 1 ? 0.62 + 0.38 * e : 1) * load * rerollScale(1);
+      const cs = (sw < 1 ? NEXT_K + (1 - NEXT_K) * e : 1) * load * rerollScale(1);
       if (am.armed && am.wild > 0) this.drawWild(g, mx, my, 1);
       else {
+        // 当前球：金色呼吸环，明确「这颗会射出去」
+        if (sw >= 1 && load >= 1) {
+          const pr = 0.5 + 0.5 * Math.sin(this.time * 4);
+          g.strokeStyle = `rgba(255,231,163,${(0.55 + 0.35 * pr).toFixed(3)})`;
+          g.lineWidth = 2.5;
+          g.beginPath();
+          g.arc(curPos.x, curPos.y, 23.5 + pr * 1.5, 0, Math.PI * 2);
+          g.stroke();
+        }
         g.save();
         g.translate(curPos.x, curPos.y);
         g.scale(Math.max(0.05, cs), cs);
@@ -800,13 +817,32 @@ export class Renderer {
     if (h.id < 0) return;
     if (Math.hypot(h.x - aim.fx, h.y - aim.fy) > CONFIG.input.loupeTrigger) return;
     const R = CONFIG.input.loupeRadius, Z = CONFIG.input.loupeZoom;
-    let lx = aim.fx, ly = aim.fy - CONFIG.input.loupeOffset;
-    if (aim.fy < 220) {
-      lx = aim.fx + (aim.fx < 195 ? 110 : -110);
-      ly = aim.fy;
+    // 候选落点：上方 → 远离中线的一侧 → 另一侧 → 下方；不得压住图腾（含蛇首与当前球）和目标珠
+    const off = CONFIG.input.loupeOffset;
+    const side = aim.fx < 195 ? 1 : -1;
+    const cands = aim.fy < 220
+      ? [[side * 110, 0], [-side * 110, 0], [0, off]]
+      : [[0, -off], [side * 120, -30], [-side * 120, -30], [side * 120, 30], [-side * 120, 30], [0, off]];
+    let lx = 0, ly = 0, best = -Infinity;
+    for (const [dx, dy] of cands) {
+      const cx = Math.max(R + 6, Math.min(390 - R - 6, aim.fx + dx!));
+      const cy = Math.max(R + 100, Math.min(760 - R, aim.fy + dy!));
+      const dT = Math.hypot(cx - s.totemX, cy - s.totemY) - (R + 70);
+      const dH = Math.hypot(cx - h.x, cy - h.y) - (R + 22);
+      const dF = Math.hypot(cx - aim.fx, cy - aim.fy) - (R + 24);
+      const score = Math.min(dT, dH, dF);
+      if (score >= 0) {
+        lx = cx;
+        ly = cy;
+        best = score;
+        break;
+      }
+      if (score > best) {
+        best = score;
+        lx = cx;
+        ly = cy;
+      }
     }
-    lx = Math.max(R + 6, Math.min(390 - R - 6, lx));
-    ly = Math.max(R + 100, Math.min(760 - R, ly));
     g.save();
     g.beginPath();
     g.arc(lx, ly, R, 0, Math.PI * 2);
@@ -837,24 +873,39 @@ export class Renderer {
     g.stroke();
   }
 
-  private drawTags(g: CanvasRenderingContext2D): void {
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    for (const t of this.tags) {
-      if (!t.alive) continue;
-      const k = t.life / 1.3;
-      const a = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
-      const sc = k < 0.12 ? 0.6 + (k / 0.12) * 0.5 : 1.1 - Math.min(0.1, (k - 0.12) * 0.5);
-      g.globalAlpha = a;
-      g.font = `900 ${Math.round(t.size * sc)}px ${FONT_CN}`;
-      g.lineWidth = 4;
-      g.lineJoin = 'round';
-      g.strokeStyle = 'rgba(11,35,28,0.85)';
-      g.strokeText(t.text, t.x, t.y - k * 20);
-      g.fillStyle = t.color;
-      g.fillText(t.text, t.x, t.y - k * 20);
+  /** 合成吸回：链尾后方 3 个向闸门的箭头，沿轨道流动 */
+  private drawPull(g: CanvasRenderingContext2D, s: Session): void {
+    const ch = s.chain;
+    const tr = s.track;
+    let tail = -1;
+    for (let i = ch.balls.length - 1; i >= 0; i--) {
+      const b = ch.balls[i]!;
+      if (b.s + b.rOff > 10) {
+        tail = b.s + b.rOff;
+        break;
+      }
     }
-    g.globalAlpha = 1;
+    if (tail < 0) return;
+    const a = Math.min(1, this.pullGlow);
+    const flow = (this.time * 90) % 26;
+    g.save();
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.lineWidth = 3.5;
+    for (let k = 0; k < 3; k++) {
+      const ss = tail - 30 - k * 26 - flow;
+      if (ss < 4 || tr.inTunnel(ss)) continue;
+      const p = tr.posAt(ss);
+      const ang = tr.angleAt(ss) + Math.PI; // 指向闸门（s 减小方向）
+      const fade = a * (1 - k * 0.28);
+      g.strokeStyle = `rgba(168,230,200,${fade.toFixed(3)})`;
+      g.beginPath();
+      g.moveTo(p.x + Math.cos(ang + 2.4) * 9, p.y + Math.sin(ang + 2.4) * 9);
+      g.lineTo(p.x + Math.cos(ang) * 4, p.y + Math.sin(ang) * 4);
+      g.lineTo(p.x + Math.cos(ang - 2.4) * 9, p.y + Math.sin(ang - 2.4) * 9);
+      g.stroke();
+    }
+    g.restore();
   }
 
   bumpBadge(n: number): void {

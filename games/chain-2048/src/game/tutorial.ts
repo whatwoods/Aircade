@@ -4,7 +4,8 @@
 import type { Session } from './session.ts';
 
 export interface TutorialUI {
-  card(html: string | null): void;
+  /** low = 放到底部提示条位置（链条滚入时不挡顶部轨道） */
+  card(html: string | null, low?: boolean): void;
   handDrag(x0: number, y0: number, x1: number, y1: number): void;
   handTap(x: number, y: number): void;
   handOff(): void;
@@ -42,15 +43,20 @@ const LAYOUT: Record<'T1' | 'T2' | 'T3', Layout> = {
 };
 
 const TEXT = {
-  T1: '按住瞄准，松手发射：把 <b>2</b> 射到 <b>2</b> 旁边',
-  miss: '差一点！幽灵珠旁出现 <b>＝</b> 时再松手',
-  T1f: '相同数字 → 合成翻倍，链条缩短一格',
-  T2: '数字相同会接着合成——打出连锁！',
-  T2f: '凑出 <b>64</b> = 金印！封印即消除，还会把链条震退',
-  T3: '手里的 <b>4</b> 没有搭档：点一下<b>图腾</b>换球',
-  T3b: '好！现在把 <b>2</b> 射到 <b>2</b> 旁边',
-  T4: '链条会一直推进，链头进入<b>金蛇口</b>就失败。再封印 <b>1</b> 枚就过关！',
+  T1: '按住瞄准，松手发射<br>把 <b>2</b> 射到 <b>2</b> 旁边',
+  miss: '差一点！<br>幽灵珠旁出现 <b>＝</b> 再松手',
+  T1f: '相同数字 → 合成翻倍<br>链条被吸回、变短',
+  T2: '合成后又相同，会接着合成<br>——打出连锁！',
+  T2f: '凑出 <b>64</b> = 金印！<br>封印即消除，还会震退链条',
+  T3: '手里的 <b>4</b> 没有搭档<br>点一下<b>图腾</b>换球',
+  T3b: '好！现在把 <b>2</b><br>射到 <b>2</b> 旁边',
 };
+
+/** T4 文案：按实际剩余配额生成（docs §6.3；阶段 3 修正硬编码） */
+export function t4Text(left: number, credited: boolean): string {
+  const head = '链头进入<b>金蛇口</b>就失败';
+  return credited ? `${head}<br>引导的金印已计入，再封印 <b>${left}</b> 枚过关` : `${head}<br>封印 <b>${left}</b> 枚金印就过关！`;
+}
 
 export class Tutorial {
   step: Step = 'off';
@@ -63,6 +69,8 @@ export class Tutorial {
   private merged = false;
   private sealed = false;
   private offs: Array<() => void> = [];
+  /** 走完了 T1–T3（而非跳过） */
+  private completed = false;
 
   constructor(s: Session, ui: TutorialUI) {
     this.s = s;
@@ -82,6 +90,8 @@ export class Tutorial {
     this.stop();
     const s = this.s;
     s.newRun(1);
+    s.tutorial = true;
+    this.completed = false;
     s.phase = 'live';
     s.failEnabled = false;
     s.ammo.locked = true;
@@ -128,11 +138,13 @@ export class Tutorial {
     this.step = 'off';
     this.s.failEnabled = true;
     this.s.ammo.locked = false;
+    this.s.tutorial = false;
   }
 
   /** 跳过：直接进入 T4 的正式第 1 关 */
   skip(): void {
     if (!this.active) return;
+    this.completed = false;
     this.enter('T4');
     this.finish();
   }
@@ -209,10 +221,13 @@ export class Tutorial {
         this.ui.handOff();
         s.ammo.locked = false;
         s.failEnabled = true;
+        s.tutorial = false;
         s.startStage(1, false);
-        s.seals = 1;
-        s.bus.emit('sealCount', { seals: 1, quota: s.cfg.quota });
-        this.ui.card(TEXT.T4);
+        // 完成引导：T2 的金印计入 1 枚；跳过引导不送（docs §11.7）
+        const credit = this.completed ? 1 : 0;
+        s.seals = credit;
+        s.bus.emit('sealCount', { seals: credit, quota: s.cfg.quota });
+        this.ui.card(t4Text(s.cfg.quota - credit, credit > 0), true);
         this.ui.flashMouth();
         break;
       }
@@ -228,7 +243,10 @@ export class Tutorial {
     if (okShot) {
       if (st === 'T1') this.enter('T1f');
       else if (st === 'T2') this.later('T2f', 0.4);
-      else this.enter('T4');
+      else {
+        this.completed = true;
+        this.enter('T4');
+      }
       return;
     }
     this.fails++;

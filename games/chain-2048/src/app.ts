@@ -8,11 +8,9 @@ import { music } from './audio/music';
 import * as sfx from './audio/sfx';
 import { Input } from './core/input';
 import { Loop } from './core/loop';
-import { Rng } from './core/rng';
 import { layoutStage, onResize, stageInfo } from './core/stage';
 import { clearRecords, load, loadJson, loadNumber, save, saveJson, settings, type Stats } from './core/storage';
 import { Feedback } from './fx/feedback';
-import { Bot, type BotKind } from './game/bots';
 import { Session } from './game/session';
 import type { Hit } from './game/shooter';
 import { Tutorial } from './game/tutorial';
@@ -60,7 +58,8 @@ export class App {
   readonly desk: DesktopBg;
   readonly input: Input;
   readonly debug = param('debug') === '1';
-  bot: Bot | null = null;
+  /** 自动游玩（仅 ?debug=1 经由 __game.autoplay 注入；机器人代码不进主包） */
+  bot: { update(s: Session, dt: number): void } | null = null;
   best = loadNumber('best', 0);
   bestStage = loadNumber('bestStage', 0);
   stats: Stats = loadJson<Stats>('stats', { runs: 0, longestCascade: 0, totalSeals: 0, total2048: 0 });
@@ -113,7 +112,7 @@ export class App {
       if (this.scene === 'title') sfx.chime(step, level, 0.14);
     };
     this.tutorial = new Tutorial(this.session, {
-      card: (h) => this.hud.tutCard(h, this.aim.active),
+      card: (h, low) => this.hud.tutCard(h, this.aim.active, low),
       handDrag: (a, b, c, d) => this.hud.handDrag(a, b, c, d),
       handTap: (x, y) => this.hud.handTap(x, y),
       handOff: () => this.hud.handOff(),
@@ -233,7 +232,6 @@ export class App {
 
   fontsReady(): void {
     rebakeNumbers();
-    this.hud.redrawMini();
   }
 
   playable(): boolean {
@@ -241,6 +239,9 @@ export class App {
   }
 
   private bindGlobal(): void {
+    const gesture = (): void => audio.unlock();
+    window.addEventListener('pointerdown', gesture, { capture: true });
+    window.addEventListener('keydown', gesture, { capture: true });
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
       if (this.scene === 'title') {
@@ -293,7 +294,6 @@ export class App {
     this.renderer.resize(sc, stageInfo.dpr);
     this.transition.paint(sc * stageInfo.dpr);
     this.desk.resize();
-    this.hud.redrawMini();
     // safe-area（CSS px → 逻辑 px）
     const probe = document.getElementById('sa-probe');
     if (probe) {
@@ -466,8 +466,8 @@ export class App {
     return s.fire(a);
   }
 
-  setAutoplay(kind: BotKind | false): void {
-    this.bot = kind ? new Bot(kind, new Rng(this.seed ^ 0x5bd1)) : null;
+  setAutoplay(bot: { update(s: Session, dt: number): void } | null): void {
+    this.bot = bot;
   }
 
   private tip(id: number): void {
@@ -523,6 +523,7 @@ export class App {
       if (!this.paused) {
         this.renderer.update(dt, s, this.aim);
         this.feedback.update(dt);
+        this.hud.handSuppressed = this.aim.active;
         this.hud.update(dt, s.score, s.phase === 'live' || s.phase === 'clearing' ? s.chain.headProgress() : 0, s.dangerLevel >= 2 && s.phase === 'live');
         this.hud.setAmmo(s.ammo.next, s.ammo.wild, s.ammo.armed, true);
         this.hud.dimTut(this.aim.active);

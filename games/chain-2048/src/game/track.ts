@@ -24,6 +24,10 @@ export class Track {
   readonly def: TrackDef;
   readonly length: number;
   readonly gateLen = 64;
+  /** 第一处进入画面的弧长（闸门石拱从这里开始） */
+  readonly visStart: number;
+  /** 闸门石拱出口：之前的珠子被石拱遮住、不可击中 */
+  readonly gateEnd: number;
   readonly xs: Float32Array;
   readonly ys: Float32Array;
   readonly ang: Float32Array;
@@ -74,6 +78,16 @@ export class Track {
       }
     }
     this.bridgeCircles = new Float32Array(circ);
+    let vs = 0;
+    for (let q = 0; q < total; q += 2) {
+      const p = this.posAt(q);
+      if (p.x > 8 && p.x < 382 && p.y > 8) {
+        vs = q;
+        break;
+      }
+    }
+    this.visStart = vs;
+    this.gateEnd = vs + this.gateLen;
   }
 
   private tmp: Vec2 = { x: 0, y: 0 };
@@ -118,7 +132,7 @@ export class Track {
 
   /** 可被击中：在闸门外、蛇口前、不在石桥下 */
   hittable(s: number): boolean {
-    return s >= this.gateLen && s <= this.length && !this.inTunnel(s);
+    return s >= this.gateEnd && s <= this.length && !this.inTunnel(s);
   }
 }
 

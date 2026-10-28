@@ -78,6 +78,8 @@ export class Session {
   /** 引导控制 */
   fireEnabled = true;
   failEnabled = true;
+  /** 引导中（屏蔽空场奖励等对新手无意义的信息） */
+  tutorial = false;
   /** 无渲染模拟：小结/重打不等待 */
   autoAdvance = false;
   dangerLevel: 0 | 1 | 2 = 0;
@@ -138,8 +140,11 @@ export class Session {
 
   canFire(): boolean {
     if (!this.fireEnabled) return false;
-    if (this.phase !== 'live' && this.phase !== 'clearing') return false;
-    if (this.phase === 'live' && this.chain.mode === 'intro') return false;
+    // 滚入后段（链头过 70% 滚入点）即可发射：重开到可操作 ≤2 s（docs §6.7）
+    const introOk = this.chain.headProgress() >= CONFIG.push.introTo * 0.7;
+    if (this.phase === 'intro' && !introOk) return false;
+    if (this.phase !== 'live' && this.phase !== 'clearing' && this.phase !== 'intro') return false;
+    if (this.phase === 'live' && this.chain.mode === 'intro' && !introOk) return false;
     if (this.phase === 'clearing') return false;
     let n = 0;
     for (const p of this.projectiles) if (p.alive) n++;
@@ -264,7 +269,7 @@ export class Session {
         if (this.cfg.sealLevel >= 11) this.stats.seal2048++;
         this.bus.emit('sealCount', { seals: this.seals, quota: this.cfg.quota });
         if (this.phase === 'live' && this.seals >= this.cfg.quota) this.reachQuota();
-        if (this.phase === 'live' && this.chain.balls.length === 0) {
+        if (this.phase === 'live' && this.chain.balls.length === 0 && !this.tutorial) {
           this.addScore(CONFIG.score.emptyBonus, -1, 0, 'bonus');
           this.bus.emit('emptyBonus', { pts: CONFIG.score.emptyBonus });
         }
