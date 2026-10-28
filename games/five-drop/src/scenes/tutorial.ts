@@ -185,7 +185,8 @@ export class Tutorial {
     const fail = this.failT < 1.6 && this.failText && this.doneT < 0 && this.endT < 0;
     ctx.fillStyle = C.text1;
     ctx.font = fCn(600, 15);
-    const lines = wrap(ctx, text, 300);
+    // 右侧给完成勾号（x 332–360）留位：正文最宽到 x≈322
+    const lines = wrap(ctx, text, 270);
     lines.forEach((ln, i) => ctx.fillText(ln, 52, y + 32 + (i - (lines.length - 1) / 2) * 21));
     if (fail) {
       ctx.globalAlpha = ca * clamp((1.6 - this.failT) / 0.3, 0, 1);

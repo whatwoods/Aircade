@@ -33,7 +33,8 @@ export interface FxHooks {
 
 /** 时间轴（秒）：[飞入结束, 拼合结束, 显字结束, 落印结束] */
 const T_NORMAL = [0.18, 0.24, 0.56, 0.64];
-const T_FIRST = [0.26, 0.36, 0.9, 1.1];
+/** 首次发现：大字在 0.36–1.18 s 显出，放大停留约 0.3 s 后才落印 */
+const T_FIRST = [0.26, 0.36, 1.18, 1.4];
 
 interface PartAnim {
   base: string;
@@ -316,7 +317,8 @@ export class MergeFx {
 
   /** 交付中的字是否还在飞（卷轴用：飞到前描红保持空心） */
   delivering(uid: number): boolean {
-    for (const d of this.delivers) if (d.on && d.uid === uid && !d.arrived) return true;
+    // uid = -1：任何一个交付还在飞
+    for (const d of this.delivers) if (d.on && (uid === -1 || d.uid === uid) && !d.arrived) return true;
     return false;
   }
 
@@ -369,13 +371,22 @@ export class MergeFx {
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    // ③ 水痕（清墨圈扩散到 1.6 倍格宽）
+    // ③ 水痕：清墨晕扩散到 2 倍格宽（首次 / 三部件 2.6 倍），外圈一道淡墨水线越出格子
     if (!m.pending && t >= T[1]) {
-      const u = seg(t, T[1], T[2] + 0.1);
-      const R = LAYOUT.cell * (0.6 + 1.0 * easeOutCubic(u)) * (m.tri ? 1.3 : 1);
-      ctx.globalAlpha = 0.3 * (1 - u);
+      const span = m.first ? 0.75 : 0.5;
+      const u = seg(t, T[1], T[1] + span);
+      const big = m.first || m.tri ? 1.3 : 1;
+      const e = easeOutCubic(u);
+      const R = 66 * (0.6 + 1.4 * e) * big;
+      ctx.globalAlpha = 0.42 * (1 - u);
       const b = this.blooms[(m.mask + 2) % this.blooms.length];
       ctx.drawImage(b, m.cx - R / 2, m.cy - R / 2, R, R);
+      ctx.globalAlpha = 0.5 * (1 - u) * (1 - u);
+      ctx.strokeStyle = INK.light;
+      ctx.lineWidth = 1.2 + 2.2 * (1 - u);
+      ctx.beginPath();
+      ctx.arc(m.cx, m.cy, 66 * (0.45 + 0.6 * e) * big, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.globalAlpha = 1;
     }
     // 结果字的框（墨迹包围盒）
@@ -465,10 +476,16 @@ export class MergeFx {
       const u = seg(t, T[1], T[2]);
       const p = easeOutCubic(u);
       let sc = 1;
-      if (m.first) sc = u < 0.55 ? 1.35 : lerp(1.35, 1, easeInOutQuad(seg(u, 0.55, 1)));
+      let lift = 0;
+      // 首次发现：放大到 1.5 倍、略抬起，停留后再落回格子
+      if (m.first) {
+        const back = easeInOutQuad(seg(u, 0.72, 1));
+        sc = lerp(lerp(1, 1.5, easeOutBack(clamp(u / 0.3))), 1, back);
+        lift = -10 * (1 - back) * clamp(u / 0.3);
+      }
       const c = glyphs.get(resCh, GLYPH_CHAR, INK.ink);
       const box = (c.width / glyphs.dpr) * sc;
-      this.reveal.bloomReveal(ctx, c, m.cx, gy, box, box, Math.min(1, p * (m.tri ? 1.1 : 1)), m.mask);
+      this.reveal.bloomReveal(ctx, c, m.cx, gy + lift, box, box, Math.min(1, p * (m.tri ? 1.1 : 1)), m.mask);
       // 拼音与造字法角标在显字后半淡入
       if (r && this.pinyin) glyphs.label(ctx, r.py, m.cx, m.cy + 23, 11, INK.light, 0.5, seg(u, 0.5, 1));
     }

@@ -26,6 +26,8 @@ export class RackView {
   bowlRipple = 0;
   /** 拖拽中悬停洗笔池 */
   bowlHot = 0;
+  /** 拖拽进行中（笔洗高亮，提示可以丢到这里） */
+  bowlArmed = 0;
   rejectShake = 0;
   private o = defaultOpts();
   private bowlC: HTMLCanvasElement | null = null;
@@ -80,10 +82,18 @@ export class RackView {
       ctx.drawImage(this.stickC, x + 3, y + 3, w - 6, h - 6);
     }
     ctx.restore();
-    // 数字「墨 17」
-    const ny = 744 - this.inkBump * 4;
-    glyphs.draw(ctx, '墨', b.x + 14, ny, 15, INK.ink2, 1);
-    glyphs.number(ctx, Math.round(this.inkShown), b.x + 26, ny, 15, low ? INK.red : INK.ink2, 0, 1);
+    // 标签「墨」+ 墨滴图标 + 大号数字（P1-4：一眼看出这是墨量）
+    glyphs.label(ctx, '墨', b.x + b.w / 2, b.y - 9, 11, INK.light, 0.5, 1);
+    const ny = 746 - this.inkBump * 4;
+    const dx = b.x + 9;
+    ctx.fillStyle = low ? INK.red : INK.ink2;
+    ctx.beginPath();
+    ctx.moveTo(dx, ny - 9);
+    ctx.bezierCurveTo(dx + 2, ny - 4, dx + 6, ny - 1, dx + 6, ny + 3);
+    ctx.arc(dx, ny + 3, 6, 0, Math.PI);
+    ctx.bezierCurveTo(dx - 6, ny - 1, dx - 2, ny - 4, dx, ny - 9);
+    ctx.fill();
+    glyphs.number(ctx, Math.round(this.inkShown), b.x + 19, ny + 1, 21, low ? INK.red : INK.ink, 0, 1);
   }
 
   private makeStick(): HTMLCanvasElement {
@@ -123,6 +133,20 @@ export class RackView {
     o.pinyin = false;
     o.method = false;
     o.time = time;
+    // 预告区：小字「下」+ 指向当前部件的淡色箭头（部件从右往左依次上笔架）
+    if (rack.length > 1) {
+      const n0 = LAYOUT.rackNext[0];
+      glyphs.label(ctx, '下', n0.x + n0.w / 2, n0.y - 7, 11, INK.wash, 0.5, gray ? 0.4 : 0.9);
+      const ax = (c.x + c.w + n0.x) / 2;
+      const ay = n0.y + n0.h / 2;
+      ctx.strokeStyle = 'rgba(169,159,146,0.8)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(ax + 3, ay - 5);
+      ctx.lineTo(ax - 2, ay);
+      ctx.lineTo(ax + 3, ay + 5);
+      ctx.stroke();
+    }
     const k = easeOutCubic(this.shift);
     const slots = SLOTS;
     const shake = this.rejectShake > 0 ? Math.sin(this.rejectShake * Math.PI * 4) * 5 * this.rejectShake : 0;
@@ -165,6 +189,18 @@ export class RackView {
     ctx.globalAlpha = canDiscard ? 1 : 0.55;
     ctx.drawImage(this.bowlC, b.x - 6, b.y - 6, b.w + 12, b.h + 12);
     ctx.globalAlpha = 1;
+    if (this.bowlArmed > 0 && canDiscard) {
+      ctx.strokeStyle = 'rgba(95,127,106,0.55)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, b.w / 2 + 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // 标签「洗笔」：拖拽时变石绿
+    const armed = this.bowlArmed > 0 && canDiscard;
+    glyphs.label(ctx, '洗笔', cx, b.y + b.h + 12, 11, armed ? INK.jade : INK.light, 0.5, canDiscard ? 1 : 0.55);
     if (this.bowlHot > 0) {
       ctx.strokeStyle = `rgba(95,127,106,${0.5 * this.bowlHot})`;
       ctx.lineWidth = 3;

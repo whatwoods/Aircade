@@ -37,7 +37,7 @@ export const CONFIG = {
   },
   fx: {
     mergeMs: 640,
-    discoveryMs: 1100,
+    discoveryMs: 1400,
     deliverMs: 700,
     trauma: { light: 0.04, medium: 0.16, heavy: 0.3 },
     hitstop: { medium: 40, heavy: 80 },

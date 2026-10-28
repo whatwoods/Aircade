@@ -19,11 +19,37 @@ import { Popups } from './render/popups.ts';
 import { RackView } from './render/rack.ts';
 import { Scrolls } from './render/scrolls.ts';
 import { Shake } from './render/shake.ts';
-import { GLYPH_BASE, defaultOpts, drawCard, drawFace, drawTile, roundRect } from './render/tiles.ts';
+import { GLYPH_BASE, TILE, defaultOpts, drawCard, drawFace, drawTile, roundRect } from './render/tiles.ts';
 import type { PointerHandler } from './input/pointer.ts';
 import { markTip, save, saveAtlas, saveEndless, saveProgress, saveStats, setTutorialDone } from './save.ts';
 
 const CELLS = CONFIG.board.cols * CONFIG.board.rows;
+let HAND: Path2D | null = null;
+/** 引导用的手形剪影（指尖在原点，食指朝上），只建一次 */
+function handPath(): Path2D {
+  if (HAND) return HAND;
+  const p = new Path2D();
+  p.moveTo(-4, 24);
+  p.lineTo(-4, 4);
+  p.arc(0, 4, 4, Math.PI, 0);
+  p.lineTo(4, 19);
+  p.arc(8, 20, 4, Math.PI, 0);
+  p.arc(16, 22, 4, Math.PI, 0);
+  p.arc(23, 25, 3.5, Math.PI, 0);
+  p.lineTo(26.5, 36);
+  p.quadraticCurveTo(26, 46, 14, 47);
+  p.lineTo(4, 47);
+  p.quadraticCurveTo(-5, 46, -8, 38);
+  p.lineTo(-13, 30);
+  p.quadraticCurveTo(-15, 25, -9, 25.5);
+  p.lineTo(-4, 30);
+  p.closePath();
+  HAND = p;
+  return p;
+}
+/** 拖错动画：摇两下 / 飞回（秒） */
+const FAIL_WOBBLE = 0.3;
+const FAIL_BACK = 0.2;
 const NUM = '一二三四五六七八九十';
 
 export function levelTitle(def: LevelDef): string {
@@ -60,7 +86,7 @@ export interface PlayHost {
 
 interface TileAnim {
   id: number;
-  kind: 'drop' | 'slide' | 'bounce';
+  kind: 'drop' | 'slide' | 'swapB' | 'bounce';
   t: number;
   dur: number;
   fx: number;
@@ -114,6 +140,10 @@ export class Play {
   private discards: Discard[] = [];
   private drag: { from: Source; tile: Tile; startX: number; startY: number } | null = null;
   private hover = -1;
+  /** 拖拽悬停在不能合成的牌上（画灰色 ✕） */
+  private badHover = -1;
+  /** 拖错：拖拽物在落点左右摇两下再飞回（§7.2） */
+  private fail = { on: false, t: 0, tile: { id: -1, kind: 'base', ch: '' } as Tile, x: 0, y: 0, bx: 0, by: 0, bs: 1, cell: -1, fromRack: true };
   private hoverZone: Zone = 'center';
   private glow = new Uint8Array(CELLS);
   private overBowl = false;
@@ -230,6 +260,10 @@ export class Play {
     this.cardOpen = false;
     this.drag = null;
     this.hover = -1;
+    this.badHover = -1;
+    this.fail.on = false;
+    this.cardQueue = '';
+    this.heldScore = 0;
     this.inkLowNotified = false;
     this.fx.clear();
     this.particles.clear();
@@ -286,8 +320,9 @@ export class Play {
           this.audio.wood(0.18);
           break;
         case 'swapped':
-          this.anim(e.a.id, 'slide', 0.2, ax ?? cx(e.ca), ay ?? cy(e.ca));
-          this.anim(e.b.id, 'slide', 0.2, cx(e.cb), cy(e.cb));
+          // 交换：两张牌沿相反方向的弧线互换（§7.2），落点那张从上方绕、原位那张从下方绕
+          this.anim(e.a.id, 'slide', 0.3, ax ?? cx(e.ca), ay ?? cy(e.ca));
+          this.anim(e.b.id, 'swapB', 0.3, cx(e.cb), cy(e.cb));
           this.audio.wood(0.2);
           setTimeout(() => this.audio.wood(0.16), 90);
           if (!this.lastSwapHint) {
@@ -361,6 +396,9 @@ export class Play {
         case 'rack':
           this.rack.shift = 0;
           break;
+        case 'score':
+          if (this.fx.busy()) this.heldScore += e.delta;
+          break;
         case 'undo':
           this.onUndo();
           break;
@@ -421,14 +459,16 @@ export class Play {
     const T = CONFIG.fx;
     if (k === 'fly') this.audio.paper(0.16);
     else if (k === 'join' || k === 'pendingJoin') {
-      if (this.comboT > 0) this.comboStep = Math.min(4, this.comboStep + 1);
+      if (this.comboT > 0) this.comboStep = Math.min(5, this.comboStep + 1);
       else this.comboStep = 0;
       this.comboT = 3;
-      const step = Math.min(9, m.depth + this.comboStep);
+      // 连续合成：每次上行两个五声音级（约一个大三度），并叠一个高八度泛音，音高上行清楚可辨
+      const step = Math.min(12, m.depth + this.comboStep * 2);
       this.audio.wood(0.22, true);
       if (k === 'pendingJoin') this.audio.pluck(pentaFreq(step) * 1.5, 0.3);
       else {
         this.audio.pluck(pentaFreq(step), 0.42);
+        if (this.comboStep > 0) this.audio.pluck(pentaFreq(step + 5), 0.16 + 0.03 * this.comboStep, false, undefined, 0.05);
         if (m.tri) {
           this.audio.pluck(pentaFreq(step + 2), 0.3, false, undefined, 0.09);
           this.audio.pluck(pentaFreq(step + 4), 0.3, false, undefined, 0.18);
@@ -460,8 +500,17 @@ export class Play {
       return;
     }
     const note = this.tut && ch === '森' ? '以后每认识一个新字，都会收进图鉴' : '';
-    this.openCard(ch, note);
+    // 新字卡等「成」印落下、字飞进卷轴之后再弹（P1-3：不切断高潮）
+    this.cardQueue = ch;
+    this.cardNote = note;
+    this.cardWait = 0;
   }
+
+  private cardQueue = '';
+  private cardNote = '';
+  private cardWait = 0;
+  /** 合成 / 交付动画未结束前不计入显示分数（分数在落印、交付时才滚动） */
+  private heldScore = 0;
 
   /** ?card=brief（自动化测试） */
   cardForcedBrief = false;
@@ -555,19 +604,22 @@ export class Play {
         const multi = r.kind === 'char' && r.candidates.length > 1;
         const ch = r.kind === 'char' ? r.recipe.c : '';
         const p = cellXY(c);
-        let bx = p.x + 33;
-        let by = p.y - 76 + 33;
+        const hc = LAYOUT.cell / 2;
+        let bx = p.x + hc;
+        let by = p.y - 76 + hc - (LAYOUT.cell - 66) / 2;
         if (c < CONFIG.board.cols) {
           // 第 0 行上方是卷轴：气泡放到左侧或右侧
-          by = p.y + 33;
-          bx = p.x + 33 + (p.x < LAYOUT.W / 2 ? 92 : -92);
+          by = p.y + hc;
+          bx = p.x + hc + (p.x < LAYOUT.W / 2 ? hc + 60 : -hc - 60);
         }
         this.popups.setPreview(ch, bx, by, multi ? arrowOf(zone) : '');
         this.popups.preview.big = r.kind === 'pending';
         if (changed) this.audio.ding();
       }
+      this.badHover = -1;
     } else {
       this.hover = -1;
+      this.badHover = c >= 0 && c !== d.from && this.s.board[c] && !this.fx.locked(c) ? c : -1;
       this.popups.hidePreview();
     }
   }
@@ -596,8 +648,35 @@ export class Play {
       return;
     }
     const zone = zoneAt(x, y, c);
+    const target = s.board[c];
+    if (d.from === 'rack' && target && s.ink > 0 && resolveMerge(d.tile, target, zone).kind === 'none') {
+      this.failDrop(d.tile, c, x, y);
+      return;
+    }
     const ev = this.act({ t: 'drop', from: d.from, cell: c, zone }, x, y);
     if (!ev.length) this.bounceBack(d, x, y);
+  }
+
+  /** 笔架部件拖到组不成字的牌上：落点摇两下 + 闷弦 + 灰 ✕ + 简短原因，再飞回笔架 */
+  private failDrop(tile: Tile, cell: number, x: number, y: number): void {
+    const f = this.fail;
+    f.on = true;
+    f.t = 0;
+    f.tile.id = -1;
+    f.tile.kind = tile.kind;
+    f.tile.ch = tile.ch;
+    f.x = x;
+    f.y = y;
+    f.bx = LAYOUT.rackCur.x + LAYOUT.rackCur.w / 2;
+    f.by = LAYOUT.rackCur.y + LAYOUT.rackCur.h / 2;
+    f.bs = LAYOUT.rackCur.w / TILE;
+    f.cell = cell;
+    f.fromRack = true;
+    this.audio.pluck(pentaFreq(-3), 0.32, true);
+    this.audio.wood(0.14, true);
+    const t = this.s.board[cell];
+    if (!save.tips.has('nomerge') && !this.tut) this.tipOnce('nomerge', `这两个部件组不成字：「${tile.ch}」+「${t?.kind === 'pending' ? '未成' : t?.ch ?? ''}」`, 3000);
+    else this.popups.float('组不成字', cx(cell), cy(cell) - LAYOUT.cell * 0.6, INK.wash, 14);
   }
 
   private bounceBack(d: { from: Source; tile: Tile }, x: number, y: number): void {
@@ -637,7 +716,7 @@ export class Play {
     const c = cellAt(x, y);
     if (c >= 0 && this.s.board[c]) {
       const t = this.s.board[c]!;
-      if (t.kind !== 'pending') this.popups.showInfo(t.ch, cx(c), c < 5 ? cy(c) + 70 : cy(c) - 70);
+      if (t.kind !== 'pending') this.popups.showInfo(t.ch, cx(c), c < CONFIG.board.cols ? cy(c) + 70 : cy(c) - 70);
       this.audio.ding();
       return;
     }
@@ -726,12 +805,27 @@ export class Play {
     this.fx.update(dt);
     this.scrolls.update(dt);
     this.particles.update(rdt * this.timeScale);
-    this.rack.update(rdt, this.s.ink, this.s.score);
+    if (!this.fx.busy()) this.heldScore = 0;
+    this.rack.update(rdt, this.s.ink, this.s.score - this.heldScore);
+    if (this.cardQueue) {
+      this.cardWait += rdt;
+      // 交付飞行结束（或最多等 2 s）后再弹卡
+      if (!this.fx.delivering(-1) || this.cardWait > 2) {
+        const ch = this.cardQueue;
+        this.cardQueue = '';
+        if (!this.over || this.newChars.includes(ch)) this.openCard(ch, this.cardNote);
+      }
+    }
     this.rack.bowlHot = this.drag && this.overBowl ? 1 : 0;
+    this.rack.bowlArmed = this.drag ? 1 : 0;
     for (const a of this.anims) {
       if (a.id === -1) continue;
       a.t += dt;
       if (a.t >= a.dur) a.id = -1;
+    }
+    if (this.fail.on) {
+      this.fail.t += rdt;
+      if (this.fail.t >= FAIL_WOBBLE + FAIL_BACK) this.fail.on = false;
     }
     for (const d of this.discards) {
       if (!d.on) continue;
@@ -768,7 +862,7 @@ export class Play {
     }
     // 结束 → 结算
     if (this.over && !this.resultShown && !this.pendingResult) {
-      const idle = !this.fx.busy() && !this.cardOpen && !this.scrolls.views.some((v) => v && v.phase !== 'open');
+      const idle = !this.fx.busy() && !this.cardOpen && !this.cardQueue && !this.scrolls.views.some((v) => v && v.phase !== 'open');
       if (this.wonAt >= 0 && idle && this.time - this.wonAt > 0.4) this.finish(true);
       if (this.lostAt >= 0 && this.time - this.lostAt > 1.4) this.finish(false);
     }
@@ -893,7 +987,9 @@ export class Play {
         } else {
           const e = a.kind === 'bounce' ? easeOutCubic(u) : easeInOutQuad(u);
           x = lerp(a.fx, x, e);
-          y = lerp(a.fy, y, e) - (a.kind === 'slide' ? Math.sin(u * Math.PI) * 8 : 0);
+          const arc = a.kind === 'slide' ? -16 : a.kind === 'swapB' ? 16 : 0;
+          y = lerp(a.fy, y, e) + Math.sin(u * Math.PI) * arc;
+          if (a.kind === 'swapB' || (a.kind === 'slide' && a.dur > 0.25)) sc = 1 + 0.08 * Math.sin(u * Math.PI);
         }
       }
       const g = d ? this.glow[i] : 0;
@@ -922,6 +1018,25 @@ export class Play {
     o.alpha = 1;
     o.scale = 1;
     o.fade = 0;
+    // 不能合成的目标：淡灰 ✕（拖拽悬停时，或拖错后 0.45 s）
+    const xc = d && this.badHover >= 0 ? this.badHover : this.fail.on && this.fail.t < FAIL_WOBBLE + 0.15 ? this.fail.cell : -1;
+    if (xc >= 0) {
+      const X = cx(xc);
+      const Y = cy(xc);
+      const r = LAYOUT.cell * 0.22;
+      ctx.strokeStyle = INK.light;
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(X - r, Y - r);
+      ctx.lineTo(X + r, Y + r);
+      ctx.moveTo(X + r, Y - r);
+      ctx.lineTo(X - r, Y + r);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.lineCap = 'butt';
+    }
     // 方位箭头（同部件多结果）
     if (d && this.hover >= 0 && this.popups.arrow) {
       const hx = cx(this.hover);
@@ -940,7 +1055,7 @@ export class Play {
     // 底部 HUD
     const gray = s.ink <= 0;
     this.rack.drawInk(ctx, s.ink, t);
-    this.rack.drawRack(ctx, s.rack, !!(d && d.from === 'rack'), gray, t);
+    this.rack.drawRack(ctx, s.rack, !!(d && d.from === 'rack') || this.fail.on, gray, t);
     this.rack.drawBowl(ctx, s.ink > 0);
     this.rack.drawUndo(ctx, s.undoLeft, this.game.canUndo() && !this.over);
     // 洗笔中的牌
@@ -958,13 +1073,38 @@ export class Play {
     this.particles.draw(ctx, 'air');
     this.fx.drawDeliver(ctx);
     if (this.tut) this.drawFinger(ctx, t);
-    // 拖拽物
+    // 拖错：落点左右摇两下，再飞回笔架
+    if (this.fail.on) {
+      const f = this.fail;
+      let x = f.x;
+      let y = f.y;
+      let sc = BS;
+      if (f.t < FAIL_WOBBLE) {
+        const u = f.t / FAIL_WOBBLE;
+        x += Math.sin(u * Math.PI * 4) * 8 * (1 - u);
+      } else {
+        const k = easeInOutQuad(clamp((f.t - FAIL_WOBBLE) / FAIL_BACK));
+        x = lerp(f.x, f.bx, k);
+        y = lerp(f.y, f.by, k) - Math.sin(k * Math.PI) * 24;
+        sc = lerp(BS, f.bs, k);
+      }
+      o.scale = sc;
+      o.alpha = 0.92;
+      drawCard(ctx, x, y, sc, 0.92, 0.6);
+      drawFace(ctx, f.tile, x, y, o);
+      o.scale = 1;
+      o.alpha = 1;
+    }
+    // 拖拽物：悬停在可合成的目标上时缩小、半透明，让下面的目标牌（石绿光晕、朱描边）露出来
     if (d) {
       const P = this.dragPos;
-      o.scale = d.from === 'rack' ? 1.08 : 1.08;
+      const over = this.hover >= 0 ? 1 : this.badHover >= 0 ? 0.5 : 0;
+      const gs = BS * lerp(1.08, 0.8, over);
+      const ga = lerp(0.96, 0.55, over);
+      o.scale = gs;
       o.lift = 1;
-      o.alpha = 0.96;
-      drawCard(ctx, P.x, P.y, 1.08, 0.96, 1);
+      o.alpha = ga;
+      drawCard(ctx, P.x, P.y, gs, ga, 1);
       drawFace(ctx, d.tile, P.x, P.y, o);
       o.lift = 0;
       o.scale = 1;
@@ -1010,22 +1150,52 @@ export class Play {
       }
     } else if (tu.step === 3) return;
     if (this.drag) return;
+    // 拖动轨迹：上拱的虚线弧 + 箭头；手形剪影带着一张淡「木」牌沿弧线走
+    const qx = (x0 + x1) / 2;
+    const qy = Math.min(y0, y1) - 40;
+    ctx.save();
+    ctx.strokeStyle = INK.red;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([6, 5]);
+    ctx.lineDashOffset = -t * 22;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.quadraticCurveTo(qx, qy, x1, y1);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // 箭头（沿终点切线）
+    const ang = Math.atan2(y1 - qy, x1 - qx);
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(x1 - Math.cos(ang - 0.45) * 11, y1 - Math.sin(ang - 0.45) * 11);
+    ctx.lineTo(x1, y1);
+    ctx.lineTo(x1 - Math.cos(ang + 0.45) * 11, y1 - Math.sin(ang + 0.45) * 11);
+    ctx.stroke();
+    ctx.restore();
     const period = 1.8;
     const u = (t % period) / period;
     const m = easeInOutQuad(seg(u, 0.15, 0.75));
     const a = u < 0.1 ? u / 0.1 : u > 0.85 ? Math.max(0, (1 - u) / 0.15) : 1;
-    const x = lerp(x0, x1, m);
-    const y = lerp(y0, y1, m);
-    ctx.globalAlpha = 0.55 * a;
-    glyphs.draw(ctx, '木', x, y - 0, GLYPH_BASE, INK.light, 0.5);
-    ctx.fillStyle = 'rgba(46,40,34,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(x + 10, y + 16, 9, 12, -0.4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(46,40,34,0.5)';
-    ctx.beginPath();
-    ctx.ellipse(x + 6, y + 8, 4.5, 6, -0.4, 0, Math.PI * 2);
-    ctx.fill();
+    const im = 1 - m;
+    const x = im * im * x0 + 2 * im * m * qx + m * m * x1;
+    const y = im * im * y0 + 2 * im * m * qy + m * m * y1;
+    drawCard(ctx, x, y, BS * 0.9, 0.5 * a, 1);
+    glyphs.draw(ctx, '木', x, y, GLYPH_BASE * BS * 0.9, INK.light, 0.6 * a);
+    const press = u > 0.12 && u < 0.78 ? 1 : 0.85;
+    ctx.save();
+    ctx.translate(x + 6, y + 10);
+    ctx.rotate(-0.35);
+    ctx.scale(press, press);
+    ctx.globalAlpha = 0.92 * a;
+    ctx.fillStyle = '#FBF8F1';
+    ctx.strokeStyle = INK.ink2;
+    ctx.lineWidth = 1.6;
+    ctx.lineJoin = 'round';
+    const hand = handPath();
+    ctx.fill(hand);
+    ctx.stroke(hand);
+    ctx.restore();
     ctx.globalAlpha = 1;
   }
 
