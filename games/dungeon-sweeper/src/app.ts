@@ -979,7 +979,7 @@ export class App implements Stage, InputHandler {
       this.dragon.disturb(L, this.clock.real);
       this.sfx.disturb();
     }
-    this.screens.showBubble(s.text, s.action === 'button', true);
+    this.screens.showBubble(this.tutCopy(s.text), s.action === 'button', true);
     this.sfx.radialHover(6);
   }
 
@@ -1135,7 +1135,7 @@ export class App implements Stage, InputHandler {
     const real = this.clock.real;
     const kind = g.b.kind[c];
     if (this.tut.active && !this.tut.allowLongPress(c)) {
-      if (!this.tut.waiting) this.screens.shakeBubble(this.tut.cur?.wrong);
+      if (!this.tut.waiting) this.screens.shakeBubble(this.tutWrongGesture());
       return;
     }
     if (kind === Kind.Lair) {
@@ -1184,6 +1184,18 @@ export class App implements Stage, InputHandler {
     this.board.radialCell = -1;
   }
 
+  /** 引导中操作方式不对时的提示（标记步骤要长按，点按会被拦下） */
+  private tutWrongGesture(): string | undefined {
+    const s = this.tut.cur;
+    const t = s?.wrongGesture ?? s?.wrong;
+    return t && this.tutCopy(t);
+  }
+
+  /** 引导文案按输入方式落字：触屏「长按」，鼠标「右键」 */
+  private tutCopy(t: string): string {
+    return t.replace('{hold}', this.input.usesMouse ? '右键' : '长按');
+  }
+
   applyMark(cell: number, m: number): void {
     this.userActed = true;
     const g = this.game;
@@ -1211,7 +1223,7 @@ export class App implements Stage, InputHandler {
     if (real < this.lockUntil) return;
     if (this.tut.active && !this.tut.allowTap(c)) {
       if (!this.tut.waiting) {
-        this.screens.shakeBubble(this.tut.cur?.wrong);
+        this.screens.shakeBubble(this.tutWrongGesture());
         this.sfx.boop();
       }
       return;

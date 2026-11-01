@@ -384,6 +384,9 @@ body {
   letter-spacing: 0.06em;
   white-space: nowrap;
 }
+.plaque.empty {
+  visibility: hidden;
+}
 .plaque::before,
 .plaque::after {
   content: '';

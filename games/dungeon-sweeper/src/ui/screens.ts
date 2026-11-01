@@ -208,10 +208,10 @@ export class Screens {
         <button class="link" data-act="howto" id="btn-howto">玩法</button>
       </div>`;
     this.menu.appendChild(this.plaque);
-    if (rec.plays > 0) {
-      this.plaque.classList.remove('hidden');
-      this.plaque.innerHTML = `<span>最高分 <b>${fmtInt(rec.best)}</b> · 屠龙 <b>${rec.wins}</b> 次${rec.bestTime ? ` · 最快 <b>${fmtTime(rec.bestTime)}</b>` : ''}</span>`;
-    } else this.plaque.classList.add('hidden');
+    // 没有记录时只隐身、不收起：菜单从底部排，收起会让切换难度时按钮上下跳
+    this.plaque.classList.remove('hidden');
+    this.plaque.classList.toggle('empty', rec.plays === 0);
+    this.plaque.innerHTML = `<span>最高分 <b>${fmtInt(rec.best)}</b> · 屠龙 <b>${rec.wins}</b> 次${rec.bestTime ? ` · 最快 <b>${fmtTime(rec.bestTime)}</b>` : ''}</span>`;
   }
   hideTitle(): void {
     this.title.classList.add('out');

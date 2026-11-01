@@ -32,6 +32,8 @@ export class Input {
   moved = false;
   longFired = false;
   enabled = true;
+  /** 玩家用的是鼠标还是触屏：取最近一次按下的指针类型；还没按过时按设备能力猜 */
+  usesMouse = typeof matchMedia === 'function' && matchMedia('(hover: hover) and (pointer: fine)').matches;
 
   constructor(el: HTMLElement, h: InputHandler) {
     this.el = el;
@@ -98,6 +100,7 @@ export class Input {
     if (!this.enabled) return;
     const [x, y] = this.pos(e);
     const mouse = e.pointerType === 'mouse';
+    this.usesMouse = mouse;
     if (mouse && e.button === 2) {
       this.h.onContext(x, y);
       return;

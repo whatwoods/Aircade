@@ -5,6 +5,7 @@ export type TutAction = 'tap' | 'mark' | 'auto' | 'button';
 
 export interface TutStep {
   id: string;
+  /** 文案里的 {hold} 按玩家的输入方式换成「长按」或「右键」 */
   text: string;
   /** 高亮格 */
   cells: number[];
@@ -21,6 +22,8 @@ export interface TutStep {
   ms: number;
   /** 本步提示文案（操作错误时） */
   wrong?: string;
+  /** mark 步骤里点错了操作（点按，或长按了别的格）时的提示；缺省用 wrong */
+  wrongGesture?: string;
   /** 在暗砖上显示的等级标签（教学「数字 = 等级之和」） */
   labels?: { cell: number; level: number }[];
   /** 在数字格上方显示的算式 */
@@ -30,7 +33,7 @@ export interface TutStep {
 export const TUTORIAL_STEPS: TutStep[] = [
   {
     id: '0',
-    text: '数字 = 周围 8 格怪物的「等级之和」：这\u2060里 3\u00a0=\u00a01\u00a0+\u00a02',
+    text: '数字是周围怪物的等级相加：这\u2060里 1\u00a0级\u00a0+\u00a02\u00a0级\u00a0=\u00a03',
     cells: [idx(2, 10), idx(2, 9), idx(1, 10)],
     arrow: -1,
     hud: [],
@@ -46,7 +49,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
   },
   {
     id: '1',
-    text: '「1」旁只剩这一块暗砖——里面是 1 级怪。点它！',
+    text: '「1」周围只剩这块暗砖，它就是 1 级怪。点它！',
     cells: [idx(3, 10), idx(2, 9)],
     arrow: idx(2, 9),
     hud: [],
@@ -58,7 +61,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
   },
   {
     id: '1b',
-    text: '打怪扣等量生命、得等量经验。数字也跟着减少！',
+    text: '打几级怪就掉几血、得几经验。数字归零会自动翻开周围。',
     cells: [],
     arrow: -1,
     hud: [],
@@ -69,7 +72,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
   },
   {
     id: '2',
-    text: '「2」说明这里的怪最多 2 级。你有 4 血，放心点！',
+    text: '血不够会被打死！这里最多 2 级怪，你有 4 血，放心点。',
     cells: [idx(5, 10), idx(6, 11)],
     arrow: idx(6, 11),
     hud: [],
@@ -81,7 +84,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
   },
   {
     id: '2b',
-    text: '经验满了会升级：生命回满，上限 +1。',
+    text: '升级了！血回满，血上限 +1。',
     cells: [],
     arrow: -1,
     hud: ['badge', 'hp'],
@@ -92,7 +95,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
   },
   {
     id: '3',
-    text: '这块必是 3 级怪。长按它（电脑：右键），标「3」。',
+    text: '只剩它，必是 3 级怪。先别打，{hold}它标「3」。',
     cells: [idx(7, 10), idx(8, 9)],
     arrow: idx(8, 9),
     hud: [],
@@ -100,11 +103,12 @@ export const TUTORIAL_STEPS: TutStep[] = [
     target: idx(8, 9),
     mark: 3,
     ms: 0,
-    wrong: '选 3 试试',
+    wrong: '这里必是 3 级怪，在轮盘里选「3」',
+    wrongGesture: '别直接点！{hold}这块砖，在弹出的轮盘里选「3」',
   },
   {
     id: '3b',
-    text: '标记只是笔记，帮你记住推理。',
+    text: '标记只是备忘，不会翻开格子。',
     cells: [],
     arrow: -1,
     hud: [],
@@ -115,7 +119,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
   },
   {
     id: '4',
-    text: '击败中央的 13 级巨龙！生命 ≥ 14 才能挑战。',
+    text: '血上限到 14，就能去打中央的 13 级巨龙！',
     cells: [],
     arrow: -1,
     hud: ['lair', 'hp'],
