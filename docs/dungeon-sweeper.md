@@ -789,7 +789,6 @@ games/dungeon-sweeper/
    │  ├─ rng.ts            # mulberry32、派生子种子、shuffle/pick/weighted
    │  ├─ loop.ts           # RAF 主循环：dt 限幅 50ms、世界时间缩放（hitstop/慢动作）
    │  ├─ tween.ts          # 池化 tween（上限 256）、缓动表
-   │  ├─ pool.ts           # 通用对象池
    │  ├─ noise.ts          # 1D 值噪声表（闪烁、震屏）
    │  ├─ input.ts          # 指针：tap / 长按 / 滑选 / 右键 / 悬停 / 键盘 → 语义输入事件
    │  ├─ storage.ts        # localStorage 包装（前缀、try/catch、JSON、版本号）
