@@ -1,0 +1,21 @@
+{
+  "name": "five-drop",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "五子落 FIVE DROP —— 俄罗斯方块 × 五子棋",
+  "scripts": {
+    "dev": "vite --port 5106 --strictPort --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 5106 --strictPort --host",
+    "sim": "node scripts/sim.ts",
+    "rules": "node scripts/rules-test.ts"
+  },
+  "dependencies": {
+    "@fontsource/inter": "5.3.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "8.3.5"
+  }
+}

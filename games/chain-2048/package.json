@@ -1,0 +1,22 @@
+{
+  "name": "chain-2048",
+  "private": true,
+  "version": "1.0.0",
+  "description": "翡翠连珠 · CHAIN 2048 — 祖玛 × 2048",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "sim": "node scripts/sim.ts"
+  },
+  "dependencies": {
+    "@fontsource/big-shoulders-display": "5.3.0",
+    "@fontsource/bungee": "5.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "typescript": "6.0.3",
+    "vite": "8.3.5"
+  }
+}

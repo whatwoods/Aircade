@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#05030B" />
+<meta name="color-scheme" content="dark" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="description" content="BRICK SURVIVOR · 霓虹破阵 — 拖动 · 反弹 · 进化。打砖块 × 割草肉鸽。" />
+<title>BRICK SURVIVOR · 霓虹破阵</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2305030B'/%3E%3Crect x='8' y='12' width='22' height='11' rx='2' fill='none' stroke='%238A5CFF' stroke-width='3'/%3E%3Crect x='34' y='12' width='22' height='11' rx='2' fill='none' stroke='%232EE6FF' stroke-width='3'/%3E%3Cpath d='M32 34 L42 50 H22 Z' fill='%23fff' stroke='%23FF2FD0' stroke-width='2'/%3E%3Ccircle cx='46' cy='34' r='4' fill='%23FF7A1A'/%3E%3C/svg%3E" />
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#05030B;color:#EDE9FF}
+  body{position:fixed;inset:0;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  #stage{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 38%,#1b0f3a 0,#0c0720 45%,#05030B 80%)}
+  #world{position:fixed;left:0;top:0;width:390px;height:844px;transform-origin:0 0;pointer-events:none}
+  #world>*{position:absolute}
+  #title .logo{position:absolute;left:0;right:0;top:160px;text-align:center;transform:skewX(-6deg);font-weight:900}
+  #title .logo-brick{font-size:54px;line-height:64px;color:#fff}
+  #title .logo-surv{font-size:40px;line-height:44px;color:#fff}
+  #title .ch{opacity:.08}
+  #title button{background:none;border:0;color:inherit;font:inherit}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world">
+    <section id="title" class="ui-block">
+      <div class="logo" aria-label="BRICK SURVIVOR">
+        <div class="logo-word logo-brick"><span class="ch" style="--i:0">B</span><span class="ch" style="--i:1">R</span><span class="ch" style="--i:2">I</span><span class="ch" style="--i:3">C</span><span class="ch" style="--i:4">K</span></div><br />
+        <div class="logo-word logo-surv"><span class="ch" style="--i:5">S</span><span class="ch" style="--i:6">U</span><span class="ch" style="--i:7">R</span><span class="ch" style="--i:8">V</span><span class="ch" style="--i:9">I</span><span class="ch" style="--i:10">V</span><span class="ch" style="--i:11">O</span><span class="ch" style="--i:12">R</span></div>
+      </div>
+      <div class="logo-cn">霓虹破阵</div>
+      <div class="logo-tag">拖动 · 反弹 · 进化</div>
+      <div class="best chamfer rise" id="best-badge"><span>首次出击</span></div>
+      <button class="start chamfer ui rise" data-testid="btn-start" id="btn-start" aria-label="开始游戏"><span class="t">开始游戏</span><span class="spin"></span></button>
+      <div class="row rise">
+        <button class="icon-btn chamfer ui press" data-testid="btn-settings" id="btn-settings" aria-label="设置"></button>
+        <button class="icon-btn chamfer ui press" data-testid="btn-tutorial" id="btn-tutorial" aria-label="重看引导"></button>
+        <button class="icon-btn chamfer ui press" data-testid="btn-sound" id="btn-sound" aria-label="声音开关"></button>
+      </div>
+      <div class="foot" id="title-foot">AIRCADE · v1.0</div>
+    </section>
+  </div>
+</div>
+<script>
+  // place the world column before the bundle loads (same fit rule as core/viewport.ts)
+  (function () {
+    var w = document.getElementById('world');
+    var s = Math.min(innerWidth / 390, innerHeight / 844);
+    w.style.transform = 'translate(' + (innerWidth - 390 * s) / 2 + 'px,' + (innerHeight - 844 * s) / 2 + 'px) scale(' + s + ')';
+    document.body.dataset.scene = 'boot';
+  })();
+</script>
+<script type="module" src="./src/main.ts"></script>
+</body>
+</html>

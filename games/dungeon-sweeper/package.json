@@ -1,0 +1,20 @@
+{
+  "name": "dungeon-sweeper",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "地牢扫雷 · Dungeon Sweeper — 扫雷 × 地牢冒险",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource-variable/cinzel": "5.3.0",
+    "@fontsource/cinzel-decorative": "5.3.0"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "vite": "~8.3.4"
+  }
+}
