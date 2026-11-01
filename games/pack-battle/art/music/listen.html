@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BGM 试听</title>
+<style>
+  body { margin: 0; padding: 16px; background: #4a2e1a; background-image: radial-gradient(circle at 30% 20%, #7a5232, #3e2614 80%); color: #f3e6c8; font: 15px/1.4 system-ui, sans-serif; }
+  h2 { margin: 24px 0 8px; font-size: 18px; }
+  .row { display: flex; gap: 10px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+  .tag { min-width: 22px; font-weight: 700; }
+  audio { width: min(100%, 420px); }
+  button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid #c9a46a; background: #6b4424; color: #f3e6c8; cursor: pointer; }
+</style>
+</head>
+<body>
+<h2>战斗 · 新稿（更紧张）</h2>
+<div class="row"><span class="tag">C</span><audio controls loop src="battle-c.mp3"></audio></div>
+<div class="row"><span class="tag">D</span><audio controls loop src="battle-d.mp3"></audio></div>
+
+<h2>循环接缝（剪好的循环版）</h2>
+<div class="row"><span class="tag">整理 A</span><audio controls loop src="loops/arrange-a.m4a"></audio><button data-seam>听接缝</button></div>
+<div class="row"><span class="tag">首领 A</span><audio controls loop src="loops/boss-a.m4a"></audio><button data-seam>听接缝</button></div>
+<div class="row"><span class="tag">战斗 C</span><audio controls loop src="loops/battle-c.m4a"></audio><button data-seam>听接缝</button></div>
+<div class="row"><span class="tag">战斗 D</span><audio controls loop src="loops/battle-d.m4a"></audio><button data-seam>听接缝</button></div>
+<script>
+  const all = [...document.querySelectorAll('audio')];
+  // 同时只放一首
+  all.forEach((a) => a.addEventListener('play', () => all.forEach((b) => b !== a && b.pause())));
+  // 跳到结尾前 6 秒播放，循环回开头时就能听到接缝
+  document.querySelectorAll('[data-seam]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const a = btn.previousElementSibling;
+      a.currentTime = Math.max(0, a.duration - 6);
+      a.play();
+    });
+  });
+</script>
+</body>
+</html>

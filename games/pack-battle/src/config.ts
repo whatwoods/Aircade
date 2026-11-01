@@ -141,6 +141,11 @@ export const INPUT = {
   refreshDebounceMs: 250,
 };
 
+export const AUDIO = {
+  /** 音乐文件（Lyria 生成，母带响度约 −16dB RMS）进音乐总线前的增益，跟程序化音乐的响度对齐 */
+  musicFileLevel: 0.6,
+};
+
 export const FX = {
   shakeMax: 10,
   shakeRotDeg: 1.2,

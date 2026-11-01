@@ -1,4 +1,5 @@
 // ?debug=1：FPS 浮层（DOM）+ window.__game 测试 / 审查接口（坐标一律为 CSS 像素）
+import { musicInfo } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
 import { BAG, DIFFICULTY, ENEMIES, ITEMS, ROUNDS, SCORE } from '../config.ts';
 import { save } from '../core/storage.ts';
@@ -169,6 +170,8 @@ export function installDebug(): void {
         maxHp: playerMaxHp(r.round), undo: !!g.undo, outcome: g.outcome,
       };
     }),
+    /** 背景音乐：当前曲式、播的是文件还是程序化、哪些文件已解码 */
+    music: safe(() => musicInfo()),
     ui: safe(() => (sm.cur ? sm.cur.ui().map((u) => ({ ...u, ...rectCss(u.x, u.y, u.w, u.h) })) : [])),
     cell: safe((c: number, r: number) => {
       const g = game();

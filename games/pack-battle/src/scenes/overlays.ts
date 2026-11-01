@@ -263,8 +263,7 @@ export class SettingsPanel extends Panel {
     }
     this.tut.draw(ctx, time, real);
     this.closeB.draw(ctx, time, real);
-    text(ctx, '行囊对决 PACK BATTLE · v' + __APP_VERSION__, 195, r.y + r.h - 64, { size: 12, weight: 700, color: C.inkSoft });
-    text(ctx, '全部美术与音效均为程序生成', 195, r.y + r.h - 44, { size: 12, weight: 700, color: C.inkSoft });
+    text(ctx, '行囊对决 PACK BATTLE · v' + __APP_VERSION__, 195, r.y + r.h - 52, { size: 12, weight: 700, color: C.inkSoft });
   }
   els(): UiEl[] {
     return [...this.toggles.map((t) => t.el()), ...super.els()];
