@@ -1,0 +1,33 @@
+Creating task at /vendors/midjourney/v1/tob/diffusion...
+Task created: f8b9976c-8a04-4ff2-a4af-df9d5ccf161f
+[0.0s] Task f8b9976c... status: processing
+[20.7s] Task f8b9976c... status: processing
+[44.6s] Task f8b9976c... status: processing
+[68.4s] Task f8b9976c... status: processing
+[91.4s] Task f8b9976c... status: completed
+{
+  "task_id": "f8b9976c-8a04-4ff2-a4af-df9d5ccf161f",
+  "status": "completed",
+  "api_path": "/vendors/midjourney/v1/tob/diffusion",
+  "images": [
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/f8b9976c-8a04-4ff2-a4af-df9d5ccf161f/outputs/result_00.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/f8b9976c-8a04-4ff2-a4af-df9d5ccf161f/outputs/result_01.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/f8b9976c-8a04-4ff2-a4af-df9d5ccf161f/outputs/result_02.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/f8b9976c-8a04-4ff2-a4af-df9d5ccf161f/outputs/result_03.png"
+  ],
+  "data": {
+    "task_info": {
+      "id": "f8b9976c-8a04-4ff2-a4af-df9d5ccf161f",
+      "status": "completed",
+      "created_at": "2026-11-01T11:51:50.456615+00:00",
+      "updated_at": "2026-11-01T11:53:02.391982+00:00"
+    },
+    "images": [
+      "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/f8b9976c-8a04-4ff2-a4af-df9d5ccf161f/outputs/result_00.png",
+      "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/f8b9976c-8a04-4ff2-a4af-df9d5ccf161f/outputs/result_01.png",
+      "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/f8b9976c-8a04-4ff2-a4af-df9d5ccf161f/outputs/result_02.png",
+      "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/f8b9976c-8a04-4ff2-a4af-df9d5ccf161f/outputs/result_03.png"
+    ],
+    "seed": 4242
+  }
+}

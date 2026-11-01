@@ -2,7 +2,8 @@
 import { BAG, ITEMS } from '../../config.ts';
 import { shapeOf, type Cell } from '../../game/shapes.ts';
 import type { FrameStyle, Placed, Tag } from '../../game/types.ts';
-import { C, TAG_COLOR, bagFrame, type BagFrameOpts } from '../kit.ts';
+import { isOpen } from '../../game/grid.ts';
+import { C, TAG_COLOR, bagFrame, drawGoldCoin, labelOnDark, type BagFrameOpts } from '../kit.ts';
 import type { BagRect } from '../layout.ts';
 import { outlineOf } from '../sprites.ts';
 import { drawSprite } from '../text.ts';
@@ -225,6 +226,71 @@ export function drawMiniBag(ctx: CanvasRenderingContext2D, x: number, y: number,
     const s = shapeOf(it.id, it.rot);
     ctx.fillStyle = TAG_COLOR[ITEMS[it.id].tag];
     for (const [cx, cy] of s.cells) ctx.fillRect(x + (it.x + cx) * cell + 0.5, y + (it.y + cy) * cell + 0.5, cell - 1, cell - 1);
+  }
+  ctx.restore();
+}
+
+/** 锁着的格子：深色缝死的皮面；可解锁的格子画"+"；pick = 已点一下、等确认的格（显示价格） */
+export function drawLockedCells(
+  ctx: CanvasRenderingContext2D, g: BagRect, open: number, can: readonly Cell[], pick: Cell | null, price: number, afford: boolean, time: number,
+): void {
+  const cell = g.cell;
+  ctx.save();
+  for (let y = 0; y < BAG.rows; y++) {
+    for (let x = 0; x < BAG.cols; x++) {
+      if (isOpen(open, BAG.cols, x, y)) continue;
+      const px = g.gx + x * cell;
+      const py = g.gy + y * cell;
+      ctx.fillStyle = 'rgba(28,14,6,0.62)';
+      ctx.fillRect(px, py, cell, cell);
+      // 交叉缝线
+      ctx.strokeStyle = 'rgba(214,180,120,0.22)';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(px + cell * 0.22, py + cell * 0.22);
+      ctx.lineTo(px + cell * 0.78, py + cell * 0.78);
+      ctx.moveTo(px + cell * 0.78, py + cell * 0.22);
+      ctx.lineTo(px + cell * 0.22, py + cell * 0.78);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  for (const [x, y] of can) {
+    const px = g.gx + x * cell;
+    const py = g.gy + y * cell;
+    const on = !!pick && pick[0] === x && pick[1] === y;
+    const k = 0.5 + 0.5 * Math.sin(time * 4 + x + y * 0.7);
+    ctx.fillStyle = 'rgba(28,14,6,0.62)';
+    ctx.fillRect(px, py, cell, cell);
+    ctx.strokeStyle = on ? C.goldLight : rgba(C.goldLight, 0.3 + 0.2 * k);
+    ctx.lineWidth = on ? 2.2 : 1.6;
+    ctx.setLineDash([5, 4]);
+    ctx.lineDashOffset = on ? -time * 20 : 0;
+    ctx.strokeRect(px + 3, py + 3, cell - 6, cell - 6);
+    ctx.setLineDash([]);
+    if (on) {
+      if (price === 0) labelOnDark(ctx, '免费', px + cell / 2, py + cell / 2 + 1, 15, 900);
+      else {
+        drawGoldCoin(ctx, px + cell / 2 - 9, py + cell / 2, 8);
+        labelOnDark(ctx, String(price), px + cell / 2 + 7, py + cell / 2 + 1, 18, 900);
+      }
+      if (!afford) {
+        ctx.fillStyle = rgba(C.bad, 0.25);
+        ctx.fillRect(px + 3, py + 3, cell - 6, cell - 6);
+      }
+    } else {
+      ctx.strokeStyle = rgba(C.goldLight, 0.45 + 0.25 * k);
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = 'round';
+      const r = cell * 0.13;
+      ctx.beginPath();
+      ctx.moveTo(px + cell / 2 - r, py + cell / 2);
+      ctx.lineTo(px + cell / 2 + r, py + cell / 2);
+      ctx.moveTo(px + cell / 2, py + cell / 2 - r);
+      ctx.lineTo(px + cell / 2, py + cell / 2 + r);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }

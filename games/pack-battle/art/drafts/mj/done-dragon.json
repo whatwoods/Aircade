@@ -1,0 +1,12 @@
+[0.0s] Task db5a1f41... status: completed
+{
+  "task_id": "db5a1f41-3e32-4d6e-a57a-a1bb8d9cf5fb",
+  "status": "completed",
+  "api_path": "/vendors/midjourney/v1/tob/diffusion",
+  "results": [
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/db5a1f41-3e32-4d6e-a57a-a1bb8d9cf5fb/outputs/result_00.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/db5a1f41-3e32-4d6e-a57a-a1bb8d9cf5fb/outputs/result_01.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/db5a1f41-3e32-4d6e-a57a-a1bb8d9cf5fb/outputs/result_02.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/db5a1f41-3e32-4d6e-a57a-a1bb8d9cf5fb/outputs/result_03.png"
+  ]
+}

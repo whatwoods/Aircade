@@ -2,7 +2,7 @@
 import { ITEMS, RARITY_NAMES } from '../../config.ts';
 import { Spring } from '../../core/spring.ts';
 import { shapeOf } from '../../game/shapes.ts';
-import type { ItemId, ShopSlot } from '../../game/types.ts';
+import type { ItemId, Lv, ShopSlot } from '../../game/types.ts';
 import { inkStroke, rectPts, type Pts } from '../ink.ts';
 import { C, RARITY_COLOR, RARITY_TINT, cached, drawGoldCoin, drawPaper, pat } from '../kit.ts';
 import type { ArrangeLayout } from '../layout.ts';
@@ -17,6 +17,7 @@ interface CardState {
   flip: number;
   shownId: ItemId | null;
   shownPrice: number;
+  shownLv: Lv;
   /** 被拿起（拖拽中）时隐藏卡上的装备 */
   lifted: boolean;
   shake: number;
@@ -26,7 +27,7 @@ export interface ShopDrawOpts {
   gold: number;
   sell: number;
   sellFull: boolean;
-  mergeable: (id: ItemId) => boolean;
+  mergeable: (id: ItemId, lv: Lv) => boolean;
   /** 0..1 摊位滑出 */
   out: number;
   locked: boolean;
@@ -42,7 +43,7 @@ export class ShopView {
 
   constructor(n: number) {
     for (let i = 0; i < n; i++) {
-      this.cards.push({ swing: regSpring(new Spring(6, 0.15, 0)), flip: 1, shownId: null, shownPrice: 0, lifted: false, shake: 0 });
+      this.cards.push({ swing: regSpring(new Spring(6, 0.15, 0)), flip: 1, shownId: null, shownPrice: 0, shownLv: 1, lifted: false, shake: 0 });
     }
   }
 
@@ -52,6 +53,7 @@ export class ShopView {
       const c = this.cards[i];
       c.shownId = s.id;
       c.shownPrice = s.price;
+      c.shownLv = s.lv ?? 1;
       c.flip = 1;
       c.lifted = false;
     });
@@ -94,12 +96,14 @@ export class ShopView {
         if (prev < 0.5 && c.flip >= 0.5) {
           c.shownId = shop[i]?.id ?? null;
           c.shownPrice = shop[i]?.price ?? 0;
+          c.shownLv = shop[i]?.lv ?? 1;
         }
       } else {
         const s = shop[i];
-        if (s && (s.id !== c.shownId || s.price !== c.shownPrice)) {
+        if (s && (s.id !== c.shownId || s.price !== c.shownPrice || (s.lv ?? 1) !== c.shownLv)) {
           c.shownId = s.id;
           c.shownPrice = s.price;
+          c.shownLv = s.lv ?? 1;
         }
       }
     }
@@ -241,7 +245,7 @@ export class ShopView {
       const s = shapeOf(id, 0);
       const areaH = r.h - 50;
       const cell = cardCell(s.w, s.h, areaH);
-      drawItemAt(ctx, id, 1, 0, 0, 8 + areaH / 2, cell, 'tile', true);
+      drawItemAt(ctx, id, c.shownLv, 0, 0, 8 + areaH / 2, cell, 'tile', true);
     } else {
       ctx.strokeStyle = rgba(C.ink, 0.25);
       ctx.setLineDash([4, 3]);
@@ -260,7 +264,7 @@ export class ShopView {
       ctx.fillRect(-r.w / 2 + 3, 4, r.w - 6, r.h - 32);
     }
     // 可合成
-    if (o.mergeable(id) && !c.lifted) {
+    if (o.mergeable(id, c.shownLv) && !c.lifted) {
       ctx.save();
       ctx.translate(r.w / 2 - 12, 10);
       ctx.rotate(0.22);

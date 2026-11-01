@@ -1,4 +1,7 @@
-// 程序化音乐：Karplus-Strong 拨弦 + 手鼓 / 铃鼓 / 太鼓 + 低音持续音，三套曲式，lookahead 调度 + 交叉淡化
+// 背景音乐：优先播 src/assets/music/<mode>.m4a（Lyria 生成、剪成无缝循环）；
+// 文件没有或还没解码完时，用程序化音乐顶上（Karplus-Strong 拨弦 + 手鼓 / 铃鼓 / 太鼓 + 低音持续音，lookahead 调度）。
+// 两种来源都走同一套 600ms 交叉淡化。
+import { AUDIO } from '../config.ts';
 import { au, whenReady } from './audio.ts';
 import { plucks } from './sfx.ts';
 
@@ -52,6 +55,29 @@ interface Track {
   /** 开始淡出的时间（−1 = 正在播放） */
   fadeAt: number;
   drone: AudioScheduledSourceNode[];
+  /** 播的是音乐文件（不走拨弦调度） */
+  file: boolean;
+}
+
+const FILE_URLS = import.meta.glob('../assets/music/*.m4a', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const fileBufs = new Map<string, AudioBuffer>();
+
+/** 解锁音频后按 整理 → 战斗 → 首领 的顺序逐个下载解码；解完的若正在播程序化版本就换掉 */
+async function loadFiles(): Promise<void> {
+  const ctx = au.ctx;
+  if (!ctx) return;
+  for (const mode of ['arrange', 'battle', 'boss'] as const) {
+    const url = Object.entries(FILE_URLS).find(([p]) => p.endsWith('/' + mode + '.m4a'))?.[1];
+    if (!url) continue;
+    try {
+      const data = await (await fetch(url)).arrayBuffer();
+      const buf = await ctx.decodeAudioData(data);
+      fileBufs.set(mode, buf);
+      if (want === mode && tracks.some((t) => t.mode === mode && t.fadeAt < 0 && !t.file)) setMusic(mode, true);
+    } catch {
+      /* 解码失败就一直用程序化音乐 */
+    }
+  }
 }
 
 const tracks: Track[] = [];
@@ -103,6 +129,7 @@ function buildPlucks(): void {
 
 whenReady(() => {
   buildPlucks();
+  void loadFiles();
   if (want) setMusic(want, true);
 });
 
@@ -112,8 +139,19 @@ function makeTrack(mode: Exclude<MusicMode, null>): Track {
   g.gain.value = 0;
   g.connect(au.music);
   const bpm = mode === 'arrange' ? 84 : mode === 'battle' ? 112 : 100;
-  const t: Track = { mode, gain: g, bpm, step: 0, next: ctx.currentTime + 0.08, bar: 0, fadeAt: -1, drone: [] };
-  if (mode === 'boss') startDrone(t);
+  const buf = fileBufs.get(mode);
+  const t: Track = { mode, gain: g, bpm, step: 0, next: ctx.currentTime + 0.08, bar: 0, fadeAt: -1, drone: [], file: !!buf };
+  if (buf) {
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const lv = ctx.createGain();
+    lv.gain.value = AUDIO.musicFileLevel;
+    src.connect(lv);
+    lv.connect(g);
+    src.start(ctx.currentTime + 0.02);
+    t.drone.push(src);
+  } else if (mode === 'boss') startDrone(t);
   return t;
 }
 
@@ -254,11 +292,25 @@ export function setMusic(mode: MusicMode, force = false): void {
     }
   }
   if (!mode) return;
-  if (tracks.some((t) => t.mode === mode && t.fadeAt < 0)) return;
+  const playing = tracks.find((t) => t.mode === mode && t.fadeAt < 0);
+  // 同一曲式：已在播就不动；只有"程序化 → 文件"刚解码好时才换
+  if (playing && (playing.file || !fileBufs.has(mode))) return;
+  if (playing) {
+    playing.fadeAt = now;
+    playing.gain.gain.cancelScheduledValues(now);
+    playing.gain.gain.setValueAtTime(playing.gain.gain.value, now);
+    playing.gain.gain.linearRampToValueAtTime(0, now + 0.6);
+  }
   const t = makeTrack(mode);
   t.gain.gain.setValueAtTime(0, now);
   t.gain.gain.linearRampToValueAtTime(1, now + 0.6);
   tracks.push(t);
+}
+
+/** 调试：正在播的曲式和来源，以及已解码的音乐文件 */
+export function musicInfo(): { mode: MusicMode; source: 'file' | 'procedural' | null; loaded: string[] } {
+  const t = tracks.find((x) => x.fadeAt < 0);
+  return { mode: want, source: t ? (t.file ? 'file' : 'procedural') : null, loaded: [...fileBufs.keys()] };
 }
 
 export function musicMode(): MusicMode {
@@ -286,6 +338,7 @@ export function updateMusic(): void {
     }
     if (t.next < now - 0.25) t.next = now + 0.02; // 从后台回来时跳过积压
     const stepDur = 60 / t.bpm / 4;
+    if (t.file) continue;
     while (t.next < now + 0.1) {
       if (t.fadeAt < 0 || t.next < t.fadeAt + 0.6) scheduleStep(t, t.next);
       t.next += stepDur;

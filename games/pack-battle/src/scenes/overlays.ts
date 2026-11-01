@@ -2,16 +2,17 @@
 import { applyVolumes } from '../audio/audio.ts';
 import { setMusic, musicMode } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
-import { BATTLE, ENEMIES, ITEMS, RARITY_NAMES, ROUNDS, TAG_NAMES } from '../config.ts';
+import { AFFIX_DEFS, BATTLE, DIFFICULTY, ENEMIES, EVENT_DEFS, ITEMS, RARITY_NAMES, ROUNDS, TAG_NAMES } from '../config.ts';
 import { saveSettings, settings } from '../core/storage.ts';
 import { ease } from '../core/tween.ts';
 import { enemyBag } from '../game/enemies.ts';
+import { rowTotal, type ReportRow, type SideReport } from '../game/report.ts';
 import { shapeOf } from '../game/shapes.ts';
-import type { Derived, EnemyDef, ItemId, Lv, Placed } from '../game/types.ts';
-import { C, RARITY_COLOR, TAG_COLOR, drawGoldCoin } from '../render/kit.ts';
+import type { Derived, EnemyDef, EventId, ItemId, Lv, Placed } from '../game/types.ts';
+import { C, RARITY_COLOR, TAG_COLOR, drawGoldCoin, drawSeal } from '../render/kit.ts';
 import type { Rect } from '../render/layout.ts';
 import { drawEnemyBadge } from '../render/portraits.ts';
-import { drawItem } from '../render/sprites.ts';
+import { drawItem, drawItemAt } from '../render/sprites.ts';
 import { HAND, measure, text, wrap } from '../render/text.ts';
 import { rgba } from '../render/textures.ts';
 import { Button, Toggle, drawPanel, titleText, type UiEl } from '../render/ui/widgets.ts';
@@ -262,8 +263,7 @@ export class SettingsPanel extends Panel {
     }
     this.tut.draw(ctx, time, real);
     this.closeB.draw(ctx, time, real);
-    text(ctx, '行囊对决 PACK BATTLE · v1.0', 195, r.y + r.h - 64, { size: 12, weight: 700, color: C.inkSoft });
-    text(ctx, '全部美术与音效均为程序生成', 195, r.y + r.h - 44, { size: 12, weight: 700, color: C.inkSoft });
+    text(ctx, '行囊对决 PACK BATTLE · v' + __APP_VERSION__, 195, r.y + r.h - 52, { size: 12, weight: 700, color: C.inkSoft });
   }
   els(): UiEl[] {
     return [...this.toggles.map((t) => t.el()), ...super.els()];
@@ -274,11 +274,12 @@ export class SettingsPanel extends Panel {
 
 const RULES = [
   '从摊位把装备拖进行囊，松手即买。',
-  '相邻（共享一条边）的装备互相加成，发光连线就是加成。',
+  '相邻（共享边）的装备互相加成，连线就是加成。',
   '轻点装备旋转；同名同级的叠上去，合成升级。',
   '开战后自动战斗：冷却环转满一圈，装备就出手。',
   '输了失去 1 颗心，可以调整后再战同一个对手。',
-  '击败第 10 轮的古龙即通关。',
+  '点锁住的格子花金币扩背包；每赢一轮，从两个事件里选一个。',
+  '击败第 10 轮的古龙即通关，之后可以进无尽模式。',
 ];
 
 export class RulesPanel extends Panel {
@@ -310,10 +311,132 @@ export class RulesPanel extends Panel {
       ctx.fill();
       text(ctx, String(i + 1), 64, y + 2, { size: 15, family: HAND, color: '#fff3e0' });
       const lines = wrap(ctx, s, 240, 15, 700);
-      lines.forEach((l, j) => text(ctx, l, 84, y + j * 22, { size: 15, weight: 700, align: 'left' }));
-      y += Math.max(1, lines.length) * 22 + 22;
+      lines.forEach((l, j) => text(ctx, l, 84, y + j * 21, { size: 15, weight: 700, align: 'left' }));
+      y += Math.max(1, lines.length) * 21 + 14;
     });
     text(ctx, '拖拽中：第二根手指轻点 / R / 右键 / 滚轮 = 旋转', 195, r.y + r.h - 40, { size: 11, weight: 700, color: C.inkSoft });
+    this.closeB.draw(ctx, time, real);
+  }
+}
+
+// ---------- 战报 ----------
+
+const REPORT_PARTS: { key: 'dmg' | 'broke' | 'poison' | 'shield' | 'heal' | 'block'; label: string; color: string }[] = [
+  { key: 'dmg', label: '伤害', color: C.hp },
+  { key: 'broke', label: '破盾', color: '#d98a6a' },
+  { key: 'poison', label: '中毒', color: C.poison },
+  { key: 'shield', label: '护盾', color: C.shield },
+  { key: 'heal', label: '回复', color: C.heal },
+  { key: 'block', label: '减伤', color: C.shieldLight },
+];
+const REPORT_MAX_ROWS = 12;
+
+/** 一场战斗里每件装备做了多少事：伤害 / 破盾 / 中毒 / 护盾 / 回复，按贡献排序 */
+export class ReportPanel extends Panel {
+  readonly kind = 'ReportPanel';
+  private H: number;
+  private side: 0 | 1 = 0;
+  private rep: [SideReport, SideReport];
+  private names: [string, string];
+  private scale: number;
+  private closeB: Button;
+  private tabs: [Button, Button];
+  constructor(H: number, rep: [SideReport, SideReport], enemyName: string) {
+    super();
+    this.H = H;
+    this.rep = rep;
+    this.names = ['我方', enemyName];
+    let mx = 1;
+    for (const sr of rep) for (const r of sr.rows) mx = Math.max(mx, rowTotal(r));
+    this.scale = mx;
+    this.closeB = new Button('report.close', R(0, 0, 40, 40), '', 'coin', 61);
+    this.closeB.icon = 'close';
+    this.tabs = [new Button('report.me', R(0, 0, 110, 34), '我方', 'tag', 62), new Button('report.enemy', R(0, 0, 110, 34), '对手', 'tag', 63)];
+    this.buttons = [this.closeB, ...this.tabs];
+    this.layout();
+  }
+  private rows(): ReportRow[] {
+    return this.rep[this.side].rows.slice(0, REPORT_MAX_ROWS);
+  }
+  private h(): number {
+    const n = Math.max(this.rep[0].rows.length, this.rep[1].rows.length, 3);
+    return 150 + Math.min(n, REPORT_MAX_ROWS) * 40 + 40;
+  }
+  private layout(): void {
+    const r = this.rect();
+    this.closeB.r = R(r.x + r.w - 48, r.y + 8, 40, 40);
+    this.tabs[0].r = R(80, r.y + 66, 110, 34);
+    this.tabs[1].r = R(200, r.y + 66, 110, 34);
+  }
+  rect(): Rect {
+    const h = this.h();
+    return R(16, Math.max(20, (this.H - h) / 2), 358, h);
+  }
+  activate(b: Button): void {
+    if (b === this.closeB) this.close();
+    else this.side = b === this.tabs[0] ? 0 : 1;
+  }
+  key(code: string): void {
+    if (code === 'Escape') this.close();
+    else if (code === 'ArrowLeft' || code === 'ArrowRight') this.side = this.side === 0 ? 1 : 0;
+  }
+  drawBody(ctx: CanvasRenderingContext2D, time: number, real: number): void {
+    const r = this.rect();
+    drawPanel(ctx, r, 25);
+    titleText(ctx, '战报', 195, r.y + 40, 26);
+    this.tabs.forEach((b, i) => {
+      b.tint = i === this.side ? '#f3d88a' : '';
+      b.draw(ctx, time, real);
+    });
+    const sr = this.rep[this.side];
+    const x0 = r.x + 18;
+    const x1 = r.x + r.w - 18;
+    let y = r.y + 128;
+    for (const row of this.rows()) {
+      const def = ITEMS[row.id];
+      const sh = shapeOf(row.id, 0);
+      const cell = Math.min(15, 32 / sh.w, 32 / sh.h);
+      drawItemAt(ctx, row.id, row.lv, 0, x0 + 16, y + 6, cell, 'tile', true);
+      text(ctx, def.name + (row.lv > 1 ? ' ' + '★'.repeat(row.lv) : ''), x0 + 40, y, { size: 14, weight: 800, align: 'left' });
+      const total = rowTotal(row);
+      if (total === 0) {
+        const why = def.tag === 'tool' ? '加成相邻装备' : row.fires === 0 ? '没有出手' : '没起作用';
+        text(ctx, why, x1, y, { size: 12, weight: 700, color: C.pencil, align: 'right' });
+      } else {
+        const parts = REPORT_PARTS.filter((p) => row[p.key] > 0).map((p) => p.label + ' ' + row[p.key]);
+        text(ctx, parts.join(' · '), x1, y, { size: 12, weight: 700, color: C.inkSoft, align: 'right' });
+        // 贡献条（全场统一比例，两边可比）
+        let bx = x0 + 40;
+        const bw = x1 - bx;
+        ctx.fillStyle = 'rgba(43,29,20,0.1)';
+        ctx.fillRect(bx, y + 11, bw, 7);
+        for (const p of REPORT_PARTS) {
+          const w = (row[p.key] / this.scale) * bw;
+          if (w <= 0) continue;
+          ctx.fillStyle = p.color;
+          ctx.fillRect(bx, y + 11, w, 7);
+          bx += w;
+        }
+      }
+      y += 40;
+    }
+    // 合计 + 装备以外的伤害
+    const sum = (k: (typeof REPORT_PARTS)[number]['key']): number => sr.rows.reduce((a, x) => a + x[k], 0);
+    const foot: string[] = [];
+    const dmg = sum('dmg') + sum('poison');
+    if (dmg) foot.push('伤害 ' + dmg);
+    if (sum('shield')) foot.push('护盾 ' + sum('shield'));
+    if (sum('heal')) foot.push('回复 ' + sum('heal'));
+    if (sum('block')) foot.push('减伤 ' + sum('block'));
+    if (sr.traitDmg) foot.push('首领特性 ' + sr.traitDmg);
+    if (this.rep[this.side].storm) foot.push('受风暴 ' + this.rep[this.side].storm);
+    ctx.strokeStyle = 'rgba(43,29,20,0.35)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x0, r.y + r.h - 46);
+    ctx.lineTo(x1, r.y + r.h - 46);
+    ctx.stroke();
+    text(ctx, this.names[this.side] + ' 合计　' + (foot.join(' · ') || '—'), 195, r.y + r.h - 26, { size: 13, weight: 800, color: C.ink });
     this.closeB.draw(ctx, time, real);
   }
 }
@@ -430,7 +553,7 @@ export class DrawerPanel extends Panel {
     this.list = [...seen.values()];
     // 高度按内容自适应（底边不动）
     const cell = Math.min(40, Math.floor((r.w - 40) / e.cols));
-    const want = 70 + e.rows * cell + 26 + e.traits.length * 22 + 24 + this.list.length * 40 + 64;
+    const want = 70 + e.rows * cell + 26 + (e.traits.length + (e.affixes?.length ?? 0)) * 22 + 24 + this.list.length * 40 + 64;
     const h = Math.max(300, Math.min(r.h, want));
     this.r = r = { x: r.x, y: r.y + r.h - h, w: r.w, h };
     this.closeB = new Button('drawer.close', R(r.x + r.w - 46, r.y + 6, 40, 40), '', 'coin', 61);
@@ -495,6 +618,10 @@ export class DrawerPanel extends Panel {
       text(ctx, d.effect, r.x + 24, y + 22, { size: 13, weight: 700, align: 'left', maxW: r.w - 48 });
       y += 48;
     } else {
+      for (const a of e.affixes ?? []) {
+        text(ctx, `◆ ${AFFIX_DEFS[a].name}：${AFFIX_DEFS[a].desc}`, r.x + 24, y, { size: 13, weight: 800, color: C.wax, align: 'left', maxW: r.w - 48 });
+        y += 22;
+      }
       for (const tr of e.traits) {
         const s = tr.kind === 'enrage' ? `半血狂暴：全部冷却速度 +${Math.round(tr.speed * 100)}%` : `龙怒：半血时喷吐 ${tr.trueDmg} 真实伤害，冷却速度 +${Math.round(tr.speed * 100)}%`;
         text(ctx, '◆ ' + s, r.x + 24, y, { size: 13, weight: 800, color: C.wax, align: 'left', maxW: r.w - 48 });
@@ -670,3 +797,130 @@ export class Overlays {
   }
 }
 
+
+// ---------- 轮间事件 ----------
+
+export interface ChoiceCard {
+  id: EventId;
+  desc: string[];
+}
+
+export class ChoicePanel extends Panel {
+  readonly kind = 'ChoicePanel';
+  private oy: number;
+  private cards: ChoiceCard[];
+  private onPick: (id: EventId) => void;
+  constructor(H: number, cards: ChoiceCard[], onPick: (id: EventId) => void) {
+    super();
+    this.oy = (H - 844) / 2;
+    this.cards = cards;
+    this.onPick = onPick;
+    this.outsideCloses = false;
+    this.buttons = cards.map((c, i) => new Button('choice.' + i, R(30 + i * 170, 300 + this.oy, 160, 230), EVENT_DEFS[c.id].name, 'paper', 70 + i));
+  }
+  rect(): Rect {
+    return R(16, 230 + this.oy, 358, 330);
+  }
+  key(code: string): void {
+    if (code === 'Digit1' || code === 'Digit2') this.activate(this.buttons[code === 'Digit1' ? 0 : 1]);
+  }
+  activate(b: Button): void {
+    if (this.closing) return;
+    const c = this.cards[this.buttons.indexOf(b)];
+    if (!c) return;
+    sfx('page');
+    this.close();
+    this.onPick(c.id);
+  }
+  drawBody(ctx: CanvasRenderingContext2D): void {
+    const r = this.rect();
+    titleText(ctx, '岔路', 195, r.y + 2, 30, C.paper, true);
+    this.cards.forEach((c, i) => {
+      const b = this.buttons[i];
+      const br = b.r;
+      const k = this.pressed === b ? 0.96 : 1;
+      ctx.save();
+      ctx.translate(br.x + br.w / 2, br.y + br.h / 2);
+      ctx.rotate(i === 0 ? -0.025 : 0.025);
+      ctx.scale(k, k);
+      ctx.translate(-(br.x + br.w / 2), -(br.y + br.h / 2));
+      drawPanel(ctx, br, 31 + i);
+      const def = EVENT_DEFS[c.id];
+      drawSeal(ctx, br.x + br.w / 2, br.y + 62, 34, def.glyph, 7 + i, c.id === 'elite' ? C.wax : '#7a5a2a');
+      text(ctx, def.name, br.x + br.w / 2, br.y + 122, { size: 22, weight: 900 });
+      c.desc.forEach((l, j) => text(ctx, l, br.x + br.w / 2, br.y + 160 + j * 24, { size: 15, weight: 700, color: C.inkSoft }));
+      ctx.restore();
+    });
+  }
+}
+
+// ---------- 选择冒险（难度 / 每日挑战） ----------
+
+export class StartPanel extends Panel {
+  readonly kind = 'StartPanel';
+  private oy: number;
+  private unlocked: number;
+  private dailyBest: number | null;
+  private onPick: (tier: number, daily: boolean) => void;
+  private closeB: Button;
+  private rows: Button[];
+  private dailyB: Button;
+  constructor(H: number, unlocked: number, dailyBest: number | null, onPick: (tier: number, daily: boolean) => void) {
+    super();
+    this.oy = (H - 844) / 2;
+    this.unlocked = unlocked;
+    this.dailyBest = dailyBest;
+    this.onPick = onPick;
+    const r = this.rect();
+    this.closeB = new Button('start.close', R(r.x + r.w - 48, r.y + 8, 40, 40), '', 'coin', 80);
+    this.closeB.icon = 'close';
+    this.rows = DIFFICULTY.names.map((n, i) => {
+      const b = new Button('start.tier' + i, R(r.x + 20, r.y + 70 + i * 58, r.w - 40, 50), n, 'paper', 81 + i);
+      b.enabled = i <= unlocked;
+      return b;
+    });
+    this.dailyB = new Button('start.daily', R(r.x + 20, r.y + 70 + DIFFICULTY.names.length * 58 + 14, r.w - 40, 50), '每日挑战', 'paper', 90);
+    this.buttons = [this.closeB, ...this.rows, this.dailyB];
+  }
+  rect(): Rect {
+    return R(16, 150 + this.oy, 358, 70 + DIFFICULTY.names.length * 58 + 14 + 50 + 24);
+  }
+  activate(b: Button): void {
+    if (this.closing) return;
+    if (b === this.closeB) {
+      this.close();
+      return;
+    }
+    const daily = b === this.dailyB;
+    const tier = daily ? DIFFICULTY.dailyTier : this.rows.indexOf(b);
+    this.close();
+    this.onPick(tier, daily);
+  }
+  drawBody(ctx: CanvasRenderingContext2D, time: number, real: number): void {
+    const r = this.rect();
+    drawPanel(ctx, r, 41);
+    titleText(ctx, '选择冒险', 195, r.y + 40, 26);
+    const row = (b: Button, label: string, desc: string, locked: boolean, k: number): void => {
+      const br = b.r;
+      const s = this.pressed === b ? 0.97 : 1;
+      ctx.save();
+      ctx.translate(br.x + br.w / 2, br.y + br.h / 2);
+      ctx.scale(s, s);
+      ctx.translate(-(br.x + br.w / 2), -(br.y + br.h / 2));
+      ctx.globalAlpha *= locked ? 0.45 : 1;
+      ctx.fillStyle = k > 0 ? rgba(C.wax, 0.06 + 0.04 * k) : 'rgba(43,29,20,0.06)';
+      ctx.strokeStyle = 'rgba(43,29,20,0.35)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.roundRect(br.x, br.y, br.w, br.h, 6);
+      ctx.fill();
+      ctx.stroke();
+      text(ctx, label, br.x + 16, br.y + br.h / 2, { size: 18, weight: 900, align: 'left' });
+      if (desc) text(ctx, desc, br.x + br.w - 14, br.y + br.h / 2, { size: 13, weight: 700, color: C.inkSoft, align: 'right' });
+      ctx.restore();
+    };
+    this.rows.forEach((b, i) => row(b, DIFFICULTY.names[i], DIFFICULTY.desc[i], i > this.unlocked, i / 4));
+    row(this.dailyB, '每日挑战', this.dailyBest != null ? `今日最高 ${this.dailyBest}` : DIFFICULTY.names[DIFFICULTY.dailyTier], false, 0.6);
+    this.closeB.draw(ctx, time, real);
+  }
+}

@@ -1,7 +1,7 @@
 // 确定性战斗模拟 → 事件时间线（纯函数）
-import { BATTLE } from '../../config.ts';
+import { AFFIX, BATTLE } from '../../config.ts';
 import { computeSynergy } from '../synergy.ts';
-import type { BattleEvent, BattleEventType, BattleResult, Derived, Placed, Side, TraitDef } from '../types.ts';
+import type { AffixId, BattleEvent, BattleEventType, BattleResult, Derived, Placed, Side, TraitDef } from '../types.ts';
 
 export interface FighterInput {
   items: readonly Placed[];
@@ -9,6 +9,12 @@ export interface FighterInput {
   rows: number;
   maxHp: number;
   traits?: TraitDef[];
+  /** 开放格掩码（缺省 = 全开） */
+  open?: number;
+  /** 敌人词缀（坚韧已经算进 maxHp） */
+  affixes?: AffixId[];
+  /** 额外冷却速度（无尽轮的敌人） */
+  speed?: number;
 }
 
 interface Unit {
@@ -27,6 +33,10 @@ interface Fighter {
   stun: number;
   immune: number;
   reduce: number;
+  /** 各件减伤装备（战报按它们的减伤值分摊挡下的伤害） */
+  reducers: Derived[];
+  /** 荆棘：被攻击时逐件反弹 */
+  thorns: Derived[];
   speedBonus: number;
   units: Unit[];
   potions: Derived[];
@@ -35,28 +45,36 @@ interface Fighter {
   traits: TraitDef[];
   traitFired: boolean[];
   dead: boolean;
+  affixes: AffixId[];
+  regenT: number;
 }
 
 function makeFighter(side: Side, inp: FighterInput): Fighter {
-  const syn = computeSynergy(inp.items, inp.cols, inp.rows);
+  const syn = computeSynergy(inp.items, inp.cols, inp.rows, inp.open);
   const sorted = [...inp.items].sort((a, b) => a.y - b.y || a.x - b.x);
   const units: Unit[] = [];
   const potions: Derived[] = [];
   const phoenix: Derived[] = [];
   const starts: Derived[] = [];
   let reduce = 0;
+  const reducers: Derived[] = [];
+  const thorns: Derived[] = [];
+  const affixes = inp.affixes ?? [];
+  if (affixes.includes('armored')) reduce += AFFIX.armoredReduce;
   sorted.forEach((it, i) => {
     const d = syn.derived.get(it.uid)!;
     reduce += d.reduce;
+    if (d.reduce > 0) reducers.push(d);
+    if (d.thorns > 0) thorns.push(d);
     if (d.trigger === 'cooldown' && d.cd > 0) units.push({ d, timer: 0, order: i });
     if (d.trigger === 'lowHp') potions.push(d);
     if (d.trigger === 'death') phoenix.push(d);
     if (d.trigger === 'start' && d.startShield > 0) starts.push(d);
   });
   return {
-    side, maxHp: inp.maxHp, hp: inp.maxHp, shield: 0, poison: 0, poisonT: 0, stun: 0, immune: 0, reduce,
-    speedBonus: 0, units, potions, phoenix, starts, traits: inp.traits ?? [], traitFired: (inp.traits ?? []).map(() => false),
-    dead: false,
+    side, maxHp: inp.maxHp, hp: inp.maxHp, shield: 0, poison: 0, poisonT: 0, stun: 0, immune: 0, reduce, reducers, thorns,
+    speedBonus: (affixes.includes('swift') ? AFFIX.swiftSpeed : 0) + (inp.speed ?? 0), units, potions, phoenix, starts, traits: inp.traits ?? [],
+    traitFired: (inp.traits ?? []).map(() => false), dead: false, affixes, regenT: 0,
   };
 }
 
@@ -104,9 +122,14 @@ export function simulate(player: FighterInput, enemy: FighterInput): BattleResul
     }
     if (D.hp > 0 && D.hp <= D.maxHp * 0.5 && D.potions.length > 0) {
       const p = D.potions.shift()!;
-      const amt = Math.min(p.lowHpHeal, D.maxHp - D.hp);
-      D.hp += amt;
-      push('lowHp', D.side, { uid: p.uid, amount: amt });
+      if (p.rage > 0) {
+        D.speedBonus += p.rage;
+        push('lowHp', D.side, { uid: p.uid, amount: 0, rage: true });
+      } else {
+        const amt = Math.min(p.lowHpHeal, D.maxHp - D.hp);
+        D.hp += amt;
+        push('lowHp', D.side, { uid: p.uid, amount: amt });
+      }
     }
     // 首领特性
     D.traits.forEach((tr, i) => {
@@ -153,6 +176,8 @@ export function simulate(player: FighterInput, enemy: FighterInput): BattleResul
     D.hp -= raw;
     if (A.side === 0 && total > bestHit) bestHit = total;
     push('hit', A.side, { uid: d.uid, amount: raw, absorbed, second, links: d.linkIds });
+    const blocked = d.dmg - total;
+    if (blocked > 0) for (const r of D.reducers) push('block', D.side, { uid: r.uid, amount: (blocked * r.reduce) / D.reduce });
     if (d.poison > 0) {
       D.poison += d.poison;
       push('poisonApply', D.side, { uid: d.uid, amount: d.poison });
@@ -161,7 +186,21 @@ export function simulate(player: FighterInput, enemy: FighterInput): BattleResul
       D.stun = d.stun;
       push('stun', D.side, { uid: d.uid, amount: d.stun });
     }
+    if (d.lifesteal > 0 && raw > 0 && !A.dead) {
+      const h = Math.min(Math.round(raw * d.lifesteal), A.maxHp - A.hp);
+      if (h > 0) {
+        A.hp += h;
+        push('heal', A.side, { uid: d.uid, amount: h });
+      }
+    }
     afterLoss(D);
+    // 荆棘：真实伤害，不触发对方的荆棘
+    for (const th of D.thorns) {
+      if (A.dead || D.dead) break;
+      A.hp -= th.thorns;
+      push('hit', D.side, { uid: th.uid, amount: th.thorns, absorbed: 0, thorn: true });
+      afterLoss(A);
+    }
     checkDeaths();
   };
 
@@ -209,6 +248,7 @@ export function simulate(player: FighterInput, enemy: FighterInput): BattleResul
   push('start', 0);
   for (const S of F) {
     for (const d of S.starts) gainShield(S, d.uid, d.startShield, d.linkIds);
+    if (S.affixes.includes('shielded')) gainShield(S, -1, Math.round(S.maxHp * AFFIX.shieldedFrac));
   }
 
   let tick = 0;
@@ -273,6 +313,19 @@ export function simulate(player: FighterInput, enemy: FighterInput): BattleResul
       afterLoss(E);
       checkDeaths();
       if (over) break;
+    }
+    // 再生词缀
+    for (const S of F) {
+      if (!S.affixes.includes('regen') || S.dead) continue;
+      S.regenT += dt;
+      if (S.regenT >= AFFIX.regenEvery - 1e-9) {
+        S.regenT -= AFFIX.regenEvery;
+        const amt = Math.min(Math.max(1, Math.round(S.maxHp * AFFIX.regenFrac)), S.maxHp - S.hp);
+        if (amt > 0) {
+          S.hp += amt;
+          push('heal', S.side, { amount: amt });
+        }
+      }
     }
     // 风暴
     if (t >= BATTLE.softLimit) {

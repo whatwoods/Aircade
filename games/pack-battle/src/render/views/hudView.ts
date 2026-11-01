@@ -1,5 +1,5 @@
 // HUD：心、轮次签、金币栏、敌情卡 / 详情条、桌边暂存槽
-import { ITEMS, PLAYER, RARITY_NAMES, ROUNDS, TAG_NAMES } from '../../config.ts';
+import { AFFIX_DEFS, ITEMS, PLAYER, RARITY_NAMES, ROUNDS, TAG_NAMES } from '../../config.ts';
 import type { Rolling } from '../../core/tween.ts';
 import { ease } from '../../core/tween.ts';
 import type { EnemyDef, ItemId, Lv, Placed } from '../../game/types.ts';
@@ -57,7 +57,8 @@ export function drawHearts(ctx: CanvasRenderingContext2D, r: Rect, hearts: numbe
 export function drawRoundTag(ctx: CanvasRenderingContext2D, r: Rect, round: number, attempt: number, score: number, scoreFlash: number): void {
   drawSprite(ctx, roundTagSprite(r.w, r.h), r.x, r.y);
   text(ctx, `第 ${round} 轮`, r.x + r.w / 2 - 9, r.y + 13, { size: 15, weight: 900, color: C.ink });
-  text(ctx, '/' + ROUNDS, r.x + r.w / 2 + 26, r.y + 14, { size: 13, family: HAND, color: C.inkSoft });
+  if (round > ROUNDS) text(ctx, '无尽', r.x + r.w / 2 + 30, r.y + 13, { size: 11, weight: 900, color: C.wax });
+  else text(ctx, '/' + ROUNDS, r.x + r.w / 2 + 26, r.y + 14, { size: 13, family: HAND, color: C.inkSoft });
   const col = scoreFlash > 0 ? C.goldDark : C.inkSoft;
   if (attempt > 1) {
     // "再战"小签放在轮次签第二行左侧（上下左右都没有空位：心、金币栏、敌情卡）
@@ -99,7 +100,8 @@ export function drawGold(ctx: CanvasRenderingContext2D, r: Rect, gold: Rolling, 
   ctx.translate(r.x + 44, r.y + r.h / 2 + 1);
   ctx.scale(s, s);
   const col = f > 0 ? C.goldLight : f < 0 ? '#ff8a70' : C.paper;
-  text(ctx, String(gold.int), 0, 0, { size: 28, family: HAND, color: col, stroke: C.ink, strokeW: 4.5, align: 'left' });
+  // 数字用无衬线粗体：Patrick Hand 的 7 像「ʔ」、4 像「ч」
+  text(ctx, String(gold.int), 0, 0, { size: 24, weight: 900, color: col, stroke: C.ink, strokeW: 4.5, align: 'left' });
   ctx.restore();
 }
 
@@ -146,7 +148,12 @@ export function drawEnemyCard(ctx: CanvasRenderingContext2D, r: Rect, e: EnemyDe
   text(ctx, e.boss ? '首领：' : '下一位：', 64, 19, { size: 12, weight: 700, color: e.boss ? C.wax : C.inkSoft, align: 'left' });
   const lw = measure(ctx, e.boss ? '首领：' : '下一位：', 12, 700);
   text(ctx, nm, 64 + lw, 19, { size: 16, weight: 900, color: C.ink, align: 'left', maxW: 190 - lw });
-  text(ctx, `♥${e.hp} · ${bag.length} 件装备`, 64, 41, { size: 13, weight: 700, color: C.hp, align: 'left' });
+  const stat = `♥${e.hp} · ${bag.length} 件装备`;
+  text(ctx, stat, 64, 41, { size: 13, weight: 700, color: C.hp, align: 'left' });
+  if (e.affixes?.length) {
+    const sw = measure(ctx, stat, 13, 700);
+    text(ctx, ' · ' + e.affixes.map((a) => AFFIX_DEFS[a].name).join(' '), 64 + sw, 41, { size: 13, weight: 900, color: C.wax, align: 'left' });
+  }
   const cell = 7;
   const mw = e.cols * cell;
   const mh = e.rows * cell;

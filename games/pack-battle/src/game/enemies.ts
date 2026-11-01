@@ -1,7 +1,8 @@
 // 从 ASCII 布局解析背包（敌人与参考构筑共用）
-import { ENEMIES, ITEMS, PLAYER } from '../config.ts';
+import { AFFIX, DIFFICULTY, ENDLESS, ENEMIES, EVENTS, ITEMS, PLAYER, ROUNDS } from '../config.ts';
+import { derive } from '../core/rng.ts';
 import { cellsKey, shapeOf, type Cell } from './shapes.ts';
-import type { EnemyDef, ItemId, Lv, Placed, Rot } from './types.ts';
+import type { AffixId, EnemyDef, ItemId, Lv, Placed, Rot, RunState } from './types.ts';
 
 /**
  * layout：每行一个字符串，'.' 或空格为空格子；legend：字母 → "id[:lv][方向]"
@@ -65,8 +66,63 @@ export function parseBag(layout: string[], legend: Record<string, string>, uidSt
   return out;
 }
 
+/** 无尽第几轮（第 10 轮及以前为 0） */
+export function endlessK(round: number): number {
+  return Math.max(0, round - ROUNDS);
+}
+
+/** 敌人原表（不含精英、词缀）；无尽轮依次轮换第 cycleFrom–10 轮的敌人 */
 export function enemyFor(round: number): EnemyDef {
+  const k = endlessK(round);
+  if (k > 0) {
+    const span = ROUNDS - ENDLESS.cycleFrom + 1;
+    return ENEMIES[ENDLESS.cycleFrom - 1 + ((k - 1) % span)];
+  }
   return ENEMIES[Math.max(0, Math.min(ENEMIES.length - 1, round - 1))];
+}
+
+/** 无尽轮敌人装备的最低等级（0 = 不改） */
+function endlessLvFloor(round: number): number {
+  const k = endlessK(round);
+  if (k === 0) return 0;
+  return Math.min(3, 1 + ENDLESS.lvFloorPerCycle * Math.ceil(k / (ROUNDS - ENDLESS.cycleFrom + 1)));
+}
+
+const ALL_AFFIXES: AffixId[] = ['tough', 'swift', 'armored', 'shielded', 'regen'];
+
+/** 这一局第 round 轮敌人的词缀（确定性：hash(seed, 'affix', round)） */
+export function affixesFor(seed: number, round: number, tier = 0): AffixId[] {
+  const e = enemyFor(round);
+  let n = 0;
+  const k = endlessK(round);
+  if (k > 0) n = Math.min(ENDLESS.affixMax, ENDLESS.affixBase + Math.floor(k / ENDLESS.affixEvery));
+  else if (e.boss) n = tier >= DIFFICULTY.bossAffixFrom ? 1 : 0;
+  else if (round >= AFFIX.fromRound) n = tier >= DIFFICULTY.twoAffixFrom ? 2 : AFFIX.perEnemy;
+  if (n === 0) return [];
+  const rng = derive(seed, 'affix', round);
+  const pool = [...ALL_AFFIXES];
+  const out: AffixId[] = [];
+  for (let i = 0; i < n && pool.length; i++) out.push(pool.splice(Math.floor(rng.next() * pool.length), 1)[0]);
+  return out;
+}
+
+const runEnemyCache = new Map<string, EnemyDef>();
+/** 本局实际遇到的敌人：词缀（坚韧加生命）+ 精英（生命 ×EVENTS.eliteHpMul，称号前加"精英"） */
+export function runEnemy(run: Pick<RunState, 'seed' | 'elite' | 'tier'>, round: number): EnemyDef {
+  const affixes = affixesFor(run.seed, round, run.tier);
+  const key = round + '|' + run.elite + '|' + run.tier + '|' + affixes.join(',');
+  let x = runEnemyCache.get(key);
+  if (!x) {
+    const e = enemyFor(round);
+    let hp = e.hp * (1 + ENDLESS.hpPerRound * endlessK(round));
+    if (affixes.includes('tough')) hp *= AFFIX.toughHpMul;
+    if (run.elite) hp *= EVENTS.eliteHpMul;
+    if (run.tier >= DIFFICULTY.hpMulFrom) hp *= DIFFICULTY.hpMul;
+    const k = endlessK(round);
+    x = { ...e, hp: Math.round(hp), title: (run.elite ? '精英' : '') + e.title, affixes, speed: k > 0 ? ENDLESS.speedPerRound * k : undefined };
+    runEnemyCache.set(key, x);
+  }
+  return x;
 }
 
 const enemyBagCache = new Map<number, Placed[]>();
@@ -75,11 +131,14 @@ export function enemyBag(round: number): Placed[] {
   if (!b) {
     const e = enemyFor(round);
     b = parseBag(e.layout, e.legend, 1001);
+    const floor = endlessLvFloor(round);
+    if (floor > 0) b = b.map((p) => ({ ...p, lv: Math.max(p.lv, floor) as Placed['lv'] }));
     enemyBagCache.set(round, b);
   }
   return b;
 }
 
+/** 玩家生命上限；无尽轮停在第 10 轮的值 */
 export function playerMaxHp(round: number): number {
-  return PLAYER.baseHp + PLAYER.hpPerRound * (round - 1);
+  return PLAYER.baseHp + PLAYER.hpPerRound * (Math.min(round, ROUNDS) - 1);
 }

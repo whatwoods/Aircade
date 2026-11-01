@@ -1,20 +1,29 @@
 // 一局的状态与所有规则操作（纯逻辑，无 DOM）
-import { BAG, ECONOMY, ITEMS, PLAYER, ROUNDS, SCORE, SHOP } from '../config.ts';
+import { BAG, DIFFICULTY, ECONOMY, ENDLESS, EVENTS, ITEMS, PLAYER, ROUNDS, SCORE, SHOP } from '../config.ts';
+import { derive } from '../core/rng.ts';
 import { simulate } from './battle/sim.ts';
 import { receiptFor, sellPrice, type ReceiptLine } from './economy.ts';
-import { enemyBag, enemyFor, playerMaxHp } from './enemies.ts';
-import { buildOcc, canPlace, findFit, NUDGES, type Occ } from './grid.ts';
+import { enemyBag, enemyFor, playerMaxHp, runEnemy } from './enemies.ts';
+import { buildOcc, canPlace, DIRS, findFit, isOpen, NUDGES, rectMask, type Occ } from './grid.ts';
 import { winScore } from './score.ts';
 import { rollShop } from './shop.ts';
 import { shapeOf } from './shapes.ts';
-import type { BattleResult, ItemId, ItemInst, Lv, Rot, RunState } from './types.ts';
+import type { BattleResult, EventId, ItemId, ItemInst, Lv, Rot, RunState } from './types.ts';
 
-export function newRun(seed: number, tutorial: boolean): RunState {
+export interface RunMode {
+  tier: number;
+  daily?: string;
+}
+
+export function newRun(seed: number, tutorial: boolean, mode: RunMode = { tier: 0 }): RunState {
+  const tier = tutorial ? 0 : mode.tier;
   return {
-    seed, round: 1, attempt: 1, hearts: PLAYER.hearts, gold: 0, score: 0, phase: 'receipt',
+    seed, round: 1, attempt: 1, hearts: PLAYER.hearts - (tier >= DIFFICULTY.fewerHeartsFrom ? 1 : 0), gold: 0, score: 0, phase: 'receipt',
     bag: [], stash: new Array<ItemInst | null>(SHOP.stashSlots).fill(null), shop: [], locked: false,
     refreshIndex: 0, phaseStamp: 0, lastResult: null, pouchGold: 0, savedGold: 0, lastHpRatio: 0,
     tutorial, cleared: false, stats: { bestHit: 0, merges: 0, spent: 0, roundScores: [], wins: 0 }, nextUid: 1,
+    open: rectMask(BAG.cols, BAG.start), unlocked: 0,
+    choice: null, freeCells: 0, market: false, elite: false, eliteGold: 0, tier, daily: tutorial ? undefined : mode.daily, tierBonus: 0,
   };
 }
 
@@ -28,12 +37,14 @@ export function beginArrange(run: RunState): ReceiptLine[] {
   run.shop = run.locked && run.shop.length ? rollShop(run, run.shop) : rollShop(run);
   run.pouchGold = 0;
   run.savedGold = 0;
+  run.charmCap = 0;
+  run.eliteGold = 0;
   run.phase = 'arrange';
   return lines;
 }
 
 export function bagOcc(run: RunState): Occ {
-  return buildOcc(run.bag, BAG.cols, BAG.rows);
+  return buildOcc(run.bag, BAG.cols, BAG.rows, run.open);
 }
 
 export function find(run: RunState, uid: number): ItemInst | null {
@@ -119,7 +130,7 @@ export function buy(run: RunState, slot: number, dest: Dest): OpResult {
   const s = run.shop[slot];
   if (!s || !s.id) return { ok: false, reason: '已售出' };
   if (run.gold < s.price) return { ok: false, reason: '金币不足' };
-  const it = makeInst(run, s.id, 1, s.price);
+  const it = makeInst(run, s.id, s.lv ?? 1, s.price);
   it.zone = 'stash';
   it.slot = -1;
   const r = putAt(run, it, dest);
@@ -138,7 +149,7 @@ export function quickBuyDest(run: RunState, slot: number, merge: boolean): Dest 
   const s = run.shop[slot];
   if (!s || !s.id) return null;
   if (merge) {
-    const t = mergeTargetFor(run, s.id, 1);
+    const t = mergeTargetFor(run, s.id, s.lv ?? 1);
     if (t) return { zone: 'merge', uid: t.uid };
   }
   const free = run.stash.findIndex((x) => x === null);
@@ -236,6 +247,41 @@ export function refresh(run: RunState): boolean {
   return true;
 }
 
+export function cellPrice(run: RunState): number {
+  if (run.freeCells > 0) return 0;
+  const p = BAG.cellPrice;
+  return p[Math.min(run.unlocked, p.length - 1)];
+}
+
+/** 锁着、并且上下左右挨着开放格 */
+export function canUnlock(run: RunState, x: number, y: number): boolean {
+  if (x < 0 || y < 0 || x >= BAG.cols || y >= BAG.rows || isOpen(run.open, BAG.cols, x, y)) return false;
+  return DIRS.some(([dx, dy]) => {
+    const nx = x + dx;
+    const ny = y + dy;
+    return nx >= 0 && ny >= 0 && nx < BAG.cols && ny < BAG.rows && isOpen(run.open, BAG.cols, nx, ny);
+  });
+}
+
+export function unlockable(run: RunState): [number, number][] {
+  const out: [number, number][] = [];
+  for (let y = 0; y < BAG.rows; y++) for (let x = 0; x < BAG.cols; x++) if (canUnlock(run, x, y)) out.push([x, y]);
+  return out;
+}
+
+export function unlockCell(run: RunState, x: number, y: number): OpResult {
+  if (run.phase !== 'arrange') return { ok: false, reason: '只能在整理阶段操作' };
+  if (!canUnlock(run, x, y)) return { ok: false, reason: '要挨着已开放的格子' };
+  const price = cellPrice(run);
+  if (run.gold < price) return { ok: false, reason: '金币不足' };
+  run.gold -= price;
+  run.stats.spent += price;
+  run.open += 2 ** (y * BAG.cols + x);
+  if (run.freeCells > 0) run.freeCells--;
+  else run.unlocked++;
+  return { ok: true, uid: 0 };
+}
+
 export function hasWeapon(run: RunState): boolean {
   return run.bag.some((it) => ITEMS[it.id].tag === 'weapon');
 }
@@ -245,10 +291,14 @@ export function startBattle(run: RunState): BattleResult {
   let pouch = 0;
   for (const it of run.bag) if (it.id === 'pouch') pouch += ITEMS.pouch.lv[it.lv - 1].gold ?? 0;
   run.pouchGold = pouch;
-  const e = enemyFor(run.round);
+  let cap = 0;
+  for (const it of run.bag) if (it.id === 'charm') cap += ITEMS.charm.lv[it.lv - 1].interest ?? 0;
+  run.charmCap = cap;
+  run.market = false;
+  const e = runEnemy(run, run.round);
   const res = simulate(
-    { items: run.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(run.round) },
-    { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits },
+    { items: run.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(run.round), open: run.open },
+    { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits, affixes: e.affixes, speed: e.speed },
   );
   run.phase = 'battle';
   return res;
@@ -267,22 +317,27 @@ export function applyResult(run: RunState, res: BattleResult): Outcome {
   let gain = 0;
   let ending = false;
   let clearBonus = 0;
+  // 精英只打一次：输了重打时是普通敌人
+  if (win && run.elite) run.eliteGold = EVENTS.eliteGold;
+  run.elite = false;
   if (win) {
     const ratio = res.hpEnd[0] / res.maxHp[0];
     run.lastHpRatio = ratio;
     gain = winScore(run.round, ratio);
     run.score += gain;
-    run.stats.roundScores.push(gain);
+    run.stats.roundScores[run.round - 1] = gain;
     run.stats.wins++;
     run.lastResult = 'win';
-    if (run.round >= ROUNDS) {
+    if (run.round >= ROUNDS && !run.endless) {
       run.cleared = true;
+      run.clearHearts = run.hearts;
       clearBonus = SCORE.clearBonus + SCORE.heartBonus * run.hearts;
       run.score += clearBonus;
       ending = true;
     } else {
       run.round++;
       run.attempt = 1;
+      run.choice = rollChoices(run);
     }
   } else {
     run.hearts--;
@@ -290,8 +345,81 @@ export function applyResult(run: RunState, res: BattleResult): Outcome {
     run.attempt++;
     if (run.hearts <= 0) ending = true;
   }
+  if (ending && run.tier > 0) {
+    // 无尽里再结算一次：先撤掉通关时算过的加成，按总分重算
+    run.score -= run.tierBonus;
+    run.tierBonus = Math.round(run.score * DIFFICULTY.scoreBonus * run.tier);
+    run.score += run.tierBonus;
+  }
   run.phase = ending ? 'ending' : 'result';
   return { win, gain, ending, clearBonus };
+}
+
+/** 通关后进入无尽：同一局接着打第 11 轮 */
+export function enterEndless(run: RunState): boolean {
+  if (!run.cleared || run.endless || run.daily) return false;
+  run.endless = true;
+  run.round = ROUNDS + 1;
+  run.attempt = 1;
+  if (ENDLESS.refillHearts) run.hearts = PLAYER.hearts - (run.tier >= DIFFICULTY.fewerHeartsFrom ? 1 : 0);
+  run.choice = null;
+  run.lastResult = 'win';
+  run.phase = 'result';
+  return true;
+}
+
+// ---------- 轮间事件 ----------
+
+/** 铁匠升级的目标：背包里 ★ 的装备中最贵的一件（只升到 ★★） */
+export function smithTarget(run: RunState): ItemInst | null {
+  let best: ItemInst | null = null;
+  for (const it of run.bag) if (it.lv === 1 && (!best || it.value > best.value)) best = it;
+  return best;
+}
+
+/** 两个候选（确定性：hash(seed, 'event', round)） */
+export function rollChoices(run: RunState): EventId[] | null {
+  if (run.tutorial && run.round === 2) return null;
+  const pool: EventId[] = ['smith', 'tailor', 'market', 'cache'];
+  if (!enemyFor(run.round).boss) pool.push('elite');
+  if (run.hearts < PLAYER.hearts) pool.push('rest');
+  if (!smithTarget(run)) pool.splice(pool.indexOf('smith'), 1);
+  if (unlockable(run).length < EVENTS.tailorCells) pool.splice(pool.indexOf('tailor'), 1);
+  const rng = derive(run.seed, 'event', run.round);
+  const a = rng.pick(pool);
+  const b = rng.pick(pool.filter((x) => x !== a));
+  return [a, b];
+}
+
+export function applyChoice(run: RunState, id: EventId): boolean {
+  if (!run.choice || !run.choice.includes(id)) return false;
+  run.choice = null;
+  switch (id) {
+    case 'smith': {
+      const it = smithTarget(run);
+      if (it) {
+        it.lv = (it.lv + 1) as Lv;
+        it.value *= 2;
+      }
+      break;
+    }
+    case 'tailor':
+      run.freeCells += EVENTS.tailorCells;
+      break;
+    case 'market':
+      run.market = true;
+      break;
+    case 'elite':
+      run.elite = true;
+      break;
+    case 'rest':
+      run.hearts = Math.min(PLAYER.hearts, run.hearts + 1);
+      break;
+    case 'cache':
+      run.gold += EVENTS.cacheGold;
+      break;
+  }
+  return true;
 }
 
 /** 调试：直接放置/给予 */

@@ -1,9 +1,13 @@
 // 标题页：Logo 横幅（钉子 + 缓慢摆动 + 墨线沸腾）、合着的行囊（呼吸 + 扣具闪光）、开始按钮、最高分签、设置 / 规则
+import { ROUNDS } from '../config.ts';
 import { setMusic } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
 import { clock } from '../core/loop.ts';
-import { loadBest, type BestRecord } from '../game/score.ts';
+import { loadBest, loadDaily, today, unlockedTier, type BestRecord } from '../game/score.ts';
+import { clearRun, loadRun } from '../game/save.ts';
 import { resetTutorialFlag, tutorialDone } from '../game/tutorial.ts';
+import type { RunState } from '../game/types.ts';
+import { endingData } from './gameScene.ts';
 import type { InputHandler } from '../core/input.ts';
 import { glowOf } from '../render/fx/particles.ts';
 import { ellipsePts, inkStroke, rectPts, type Pts } from '../render/ink.ts';
@@ -11,7 +15,7 @@ import { C, cached, drawPaper, pat, rivet } from '../render/kit.ts';
 import { LW, stage } from '../render/stage.ts';
 import { LOGO, drawSprite, num, text, type Sprite } from '../render/text.ts';
 import { Button, type UiEl } from '../render/ui/widgets.ts';
-import { RulesPanel, Overlays, SettingsPanel } from './overlays.ts';
+import { RulesPanel, Overlays, SettingsPanel, StartPanel } from './overlays.ts';
 import { factories, gotoScene, type Scene } from './sceneManager.ts';
 
 interface Mote {
@@ -28,6 +32,9 @@ export class TitleScene implements Scene {
   handler: InputHandler;
   private ov = new Overlays();
   private start: Button;
+  /** 有存档时：继续（主按钮），开始冒险降为次按钮并需二次确认 */
+  private cont: Button;
+  private saved: RunState | null = null;
   private gear: Button;
   private help: Button;
   private pressed: Button | null = null;
@@ -39,6 +46,8 @@ export class TitleScene implements Scene {
   constructor() {
     this.start = new Button('btn.start', { x: 95, y: 610, w: 200, h: 70 }, '开始冒险', 'sealTag', 21);
     this.start.fontSize = 22;
+    this.cont = new Button('btn.continue', { x: 95, y: 596, w: 200, h: 70 }, '继续冒险', 'sealTag', 24);
+    this.cont.fontSize = 18;
     this.gear = new Button('btn.settings', { x: 24, y: 760, w: 44, h: 44 }, '', 'coin', 22);
     this.gear.icon = 'gear';
     this.help = new Button('btn.rules', { x: 322, y: 760, w: 44, h: 44 }, '', 'coin', 23);
@@ -53,6 +62,13 @@ export class TitleScene implements Scene {
 
   enter(): void {
     this.best = loadBest();
+    this.saved = loadRun();
+    if (this.saved) {
+      const r = this.saved;
+      this.cont.label = r.phase === 'ending' ? '查看结算' : `继续 · 第${r.round}轮`;
+      this.start = new Button('btn.start', { x: 125, y: 678, w: 140, h: 44 }, '新的冒险', 'paper', 21);
+      this.start.fontSize = 17;
+    }
     setMusic('arrange');
     this.layout();
   }
@@ -65,22 +81,64 @@ export class TitleScene implements Scene {
     const H = stage.H;
     this.oy = (H - 844) / 2;
     const oy = this.oy;
-    this.start.r = { x: 95, y: 610 + oy, w: 200, h: 70 };
+    if (this.saved) {
+      this.cont.r = { x: 95, y: 596 + oy, w: 200, h: 70 };
+      this.start.r = { x: 125, y: 678 + oy, w: 140, h: 44 };
+    } else this.start.r = { x: 95, y: 610 + oy, w: 200, h: 70 };
     this.gear.r = { x: 24, y: H - 84, w: 44, h: 44 };
     this.help.r = { x: 322, y: H - 84, w: 44, h: 44 };
   }
 
   private go(): void {
     sfx('click');
-    gotoScene(() => factories.game({ tutorial: !tutorialDone() }), 0.5, (610 + this.oy + 35) / stage.H);
+    const saved = this.saved;
+    if (saved) {
+      if (saved.phase === 'ending') gotoScene(() => factories.ending(endingData(saved)));
+      else gotoScene(() => factories.game({ resume: saved }), 0.5, (596 + this.oy + 35) / stage.H);
+      return;
+    }
+    this.pickMode((610 + this.oy + 35) / stage.H);
+  }
+
+  /** 打过引导后：先选难度 / 每日挑战 */
+  private pickMode(fy: number): void {
+    if (!tutorialDone()) {
+      gotoScene(() => factories.game({ tutorial: true }), 0.5, fy);
+      return;
+    }
+    const date = today();
+    this.ov.open(
+      new StartPanel(stage.H, unlockedTier(), loadDaily(date)?.score ?? null, (tier, daily) => {
+        clearRun();
+        this.saved = null;
+        const mode = { tier, daily: daily ? date : undefined };
+        gotoScene(() => factories.game({ tutorial: false, mode }), 0.5, fy);
+      }),
+    );
+  }
+
+  /** 有存档时开新局：二次确认后丢弃存档 */
+  private goNew(): void {
+    const real = clock.real;
+    if (this.start.confirmUntil <= real) {
+      this.start.confirmUntil = real + 3;
+      return;
+    }
+    this.start.confirmUntil = 0;
+    sfx('click');
+    this.pickMode((678 + this.oy + 22) / stage.H);
   }
 
   private buttons(): Button[] {
-    return [this.start, this.gear, this.help];
+    return this.saved ? [this.cont, this.start, this.gear, this.help] : [this.start, this.gear, this.help];
   }
 
   private activate(b: Button): void {
-    if (b === this.start) this.go();
+    if (b === this.cont) this.go();
+    else if (b === this.start) {
+      if (this.saved) this.goNew();
+      else this.go();
+    }
     else if (b === this.gear) {
       this.ov.open(
         new SettingsPanel(stage.H, () => {
@@ -147,7 +205,7 @@ export class TitleScene implements Scene {
     if (this.oy !== (stage.H - 844) / 2) this.layout();
     this.time += dt;
     this.ov.update(raw);
-    this.start.pulse = 0.035;
+    (this.saved ? this.cont : this.start).pulse = 0.035;
     for (const m of this.motes) {
       m.x += (m.vx + Math.sin(this.time * 0.7 + m.ph) * 4) * dt;
       m.y += m.vy * dt;
@@ -211,12 +269,14 @@ export class TitleScene implements Scene {
     }
     ctx.restore();
     // 按钮
+    if (this.saved) this.cont.draw(ctx, t, real);
     this.start.draw(ctx, t, real);
     if (this.best && this.best.score > 0) {
       const b = this.best;
-      const s = `最高分 ${num(b.score)} · ${b.cleared ? '已通关' : '最远第 ' + b.round + ' 轮'}`;
-      drawSprite(ctx, bestTag(), 105, 694 + oy);
-      text(ctx, s, 195, 707 + oy, { size: 13, weight: 700, color: C.ink });
+      const s = `最高分 ${num(b.score)} · ${b.round > ROUNDS ? '无尽第 ' + b.round + ' 轮' : b.cleared ? '已通关' : '最远第 ' + b.round + ' 轮'}`;
+      const by = this.saved ? 734 : 694;
+      drawSprite(ctx, bestTag(), 105, by + oy);
+      text(ctx, s, 195, by + 13 + oy, { size: 13, weight: 700, color: C.ink });
     }
     this.gear.draw(ctx, t, real);
     this.help.draw(ctx, t, real);
@@ -319,7 +379,7 @@ function logoSprite(frame: number): Sprite {
 }
 
 /** 合着的行囊：皮革包身 + 翻盖 + 黄铜扣 + 露出的剑柄和弓梢（中心在 (130, 205-?)） */
-function closedBag(): Sprite {
+export function closedBag(): Sprite {
   return cached('title.bag', 260, 230, 16, (ctx, r) => {
     const T = (p: Pts): Pts => p;
     // 弓梢（在包后面）

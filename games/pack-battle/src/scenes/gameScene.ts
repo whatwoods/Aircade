@@ -2,20 +2,25 @@
 import { duckMusic, au } from '../audio/audio.ts';
 import { setMusic } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
-import { BAG, ECONOMY, ITEMS, SHOP } from '../config.ts';
+import { BAG, ECONOMY, EVENTS, ITEMS, ROUNDS, SHOP } from '../config.ts';
 import { input, type InputHandler } from '../core/input.ts';
 import { clock } from '../core/loop.ts';
 import { Spring } from '../core/spring.ts';
 import { settings } from '../core/storage.ts';
 import { Rolling, ease } from '../core/tween.ts';
 import type { ReceiptLine } from '../game/economy.ts';
-import { enemyBag, enemyFor } from '../game/enemies.ts';
+import { battleReport, type SideReport } from '../game/report.ts';
+import { clearRun, saveRun, saveable } from '../game/save.ts';
+import { clearScore, dailySeed } from '../game/score.ts';
+import { enemyBag, enemyFor, runEnemy } from '../game/enemies.ts';
 import {
-  applyResult, beginArrange, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, type Outcome, type SellRecord,
+  applyChoice, applyResult, beginArrange, canUnlock, mergeTargetFor, smithTarget, cellPrice, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, unlockable, unlockCell,
+  type Outcome, type RunMode, type SellRecord,
 } from '../game/run.ts';
+import { fullMask } from '../game/grid.ts';
 import { computeSynergy, type SynergyResult } from '../game/synergy.ts';
 import { hintSeen, markHint, markTutorialDone, resetTutorialFlag, HINT_TEXT, Tutorial, type HintId } from '../game/tutorial.ts';
-import type { ItemInst, Rot, RunState } from '../game/types.ts';
+import type { EventId, ItemInst, Lv, Rot, RunState } from '../game/types.ts';
 import { drawParticles, emit } from '../render/fx/particles.ts';
 import { drawPopups, popup } from '../render/fx/popups.ts';
 import { shake, tier } from '../render/fx/shake.ts';
@@ -26,7 +31,7 @@ import { drawSprite, text } from '../render/text.ts';
 import { Button, drawToast, showToast, drawBubble, drawStamp, type UiEl } from '../render/ui/widgets.ts';
 import { setBackdrop } from '../render/views/background.ts';
 import { drawMapFlag } from '../render/views/desktopDecor.ts';
-import { drawPlayerBag } from '../render/views/bagView.ts';
+import { drawLockedCells, drawPlayerBag } from '../render/views/bagView.ts';
 import { drawDetailBar, drawEnemyCard, drawGold, drawHearts, drawRoundTag, type DetailInfo, type HeartBreak } from '../render/views/hudView.ts';
 import { LinkLayer, drawBowDots, drawHornWaves } from '../render/views/linkView.ts';
 import { ShopView } from '../render/views/shopView.ts';
@@ -36,8 +41,8 @@ import { BattleController } from './battleController.ts';
 import { describe } from './describe.ts';
 import { Guide } from './guide.ts';
 import { HALF_PI, ItemView, stashCell } from './itemView.ts';
-import { ConfirmPanel, DetailPanel, DrawerPanel, Overlays, PausePanel, RoutePanel, SettingsPanel } from './overlays.ts';
-import { factories, gotoScene, type Scene } from './sceneManager.ts';
+import { ChoicePanel, ConfirmPanel, DetailPanel, DrawerPanel, Overlays, PausePanel, ReportPanel, RoutePanel, SettingsPanel } from './overlays.ts';
+import { factories, gotoScene, type EndingData, type Scene } from './sceneManager.ts';
 
 export type GPhase = 'receipt' | 'arrange' | 'toBattle' | 'battle' | 'result' | 'toArrange';
 
@@ -87,6 +92,8 @@ export class GameScene implements Scene {
   stampT = -1;
   hint: { s: string; t: number } | null = null;
   undo: { rec: SellRecord; until: number; slide: number } | null = null;
+  cellPick: { cell: [number, number]; until: number } | null = null;
+  readonly fullOpen = fullMask(BAG.cols, BAG.rows);
   outcome: Outcome | null = null;
   collapse = new Spring(14, 0.45, 0);
   paused = false;
@@ -102,6 +109,10 @@ export class GameScene implements Scene {
   lockB: Button;
   speedB: Button;
   contB: Button;
+  reportB: Button;
+  /** 刚打完这场的战报（结算时可看） */
+  report: [SideReport, SideReport] | null = null;
+  private battleItems: ItemInst[] = [];
   nextB: Button;
   pressed: Button | null = null;
   private pressedHud: 'round' | 'enemy' | null = null;
@@ -109,9 +120,15 @@ export class GameScene implements Scene {
   speedFlip = 1;
   handler: InputHandler;
 
-  constructor(o: { seed?: number; tutorial?: boolean; round?: number }) {
-    const seed = o.seed ?? (Date.now() % 1000000);
-    this.run = newRun(seed, !!o.tutorial);
+  /** 读档进入（不重放引导、已在整理阶段时不重发收入） */
+  private resumed = false;
+  private saveT = 0;
+  private lastSave = '';
+
+  constructor(o: { seed?: number; tutorial?: boolean; round?: number; resume?: RunState; mode?: RunMode }) {
+    const seed = o.mode?.daily ? dailySeed(o.mode.daily) : o.seed ?? (Date.now() % 1000000);
+    this.resumed = !!o.resume;
+    this.run = o.resume ?? newRun(seed, !!o.tutorial, o.mode);
     this.pauseB = new Button('btn.pause', { x: 12, y: 8, w: 44, h: 44 }, '', 'coin', 3);
     this.pauseB.icon = 'pause';
     this.fightB = new Button('btn.fight', { x: 95, y: 732, w: 200, h: 60 }, '开战', 'plank', 5);
@@ -127,6 +144,8 @@ export class GameScene implements Scene {
     this.contB = new Button('btn.continue', { x: 95, y: 732, w: 200, h: 60 }, '继续 ›', 'plank', 11);
     this.contB.glyph = '✦';
     this.contB.visible = false;
+    this.reportB = new Button('btn.report', { x: 302, y: 740, w: 72, h: 44 }, '战报', 'tag', 13);
+    this.reportB.visible = false;
     this.nextB = new Button('btn.tutNext', { x: 150, y: 470, w: 90, h: 34 }, '下一步', 'tag', 12);
     this.nextB.visible = false;
     this.ac = new ArrangeController(this);
@@ -143,7 +162,7 @@ export class GameScene implements Scene {
   enter(): void {
     this.layout(true);
     const goldBefore = this.run.gold;
-    const lines = beginArrange(this.run);
+    const lines = this.run.phase === 'arrange' ? [] : beginArrange(this.run);
     this.recompute(false);
     this.syncViews(true);
     this.shopV.setInstant(this.run.shop);
@@ -154,7 +173,8 @@ export class GameScene implements Scene {
     this.tr.open = 0;
     this.phase = 'arrange';
     if (lines.length) this.startReceipt(lines, goldBefore);
-    if (this.run.tutorial && this.run.round === 1) this.tut.start();
+    if (this.run.tutorial && this.run.round === 1 && !this.resumed) this.tut.start();
+    this.persist();
     setMusic('arrange');
     this.speedB.label = settings.speed + '×';
     this.bc.speed = settings.speed;
@@ -166,7 +186,17 @@ export class GameScene implements Scene {
   }
 
   autoPause(): void {
+    this.persist();
     if (!this.paused) this.openPause();
+  }
+
+  /** 整理阶段存档（内容没变就不写） */
+  persist(): void {
+    if (this.run.phase !== 'arrange' || !saveable(this.run)) return;
+    const s = JSON.stringify(this.run);
+    if (s === this.lastSave) return;
+    this.lastSave = s;
+    saveRun(this.run);
   }
 
   // ---------- 布局 ----------
@@ -185,6 +215,7 @@ export class GameScene implements Scene {
     this.refreshB.r = L.refresh;
     this.lockB.r = L.lock;
     this.speedB.r = B.speed;
+    this.reportB.r = { x: B.speed.x, y: B.cont.y + (B.cont.h - 44) / 2, w: B.speed.w, h: 44 };
     this.contB.r = B.cont;
     this.nextB.r = { x: 150, y: L.bubbleY - 70, w: 90, h: 34 };
     // 桌边装备的像素位置跟着布局
@@ -220,7 +251,7 @@ export class GameScene implements Scene {
 
   /** 重新计算加成；animate=true 时连线生长 / 断开有动画与音效 */
   recompute(animate: boolean, labelNew = true): void {
-    this.syn = computeSynergy(this.run.bag, BAG.cols, BAG.rows);
+    this.syn = computeSynergy(this.run.bag, BAG.cols, BAG.rows, this.run.open);
     const { added, removed } = this.links.sync(this.syn.links, animate);
     if (!animate) return;
     if (added.length) {
@@ -319,6 +350,11 @@ export class GameScene implements Scene {
     return info;
   }
 
+  /** 调试：正在显示的情境提示 */
+  hintText(): string | null {
+    return this.hint ? this.hint.s : null;
+  }
+
   showHint(id: HintId): void {
     if (hintSeen(id) || this.hintQ.includes(id)) return;
     // 引导气泡或另一条提示正在显示：排队，避免互相覆盖
@@ -373,8 +409,12 @@ export class GameScene implements Scene {
     this.gold.set(this.run.gold);
     this.phase = 'arrange';
     if (this.run.tutorial && this.run.round === 2 && this.run.attempt === 1 && this.tut.step !== 6) this.tut.go(6);
-    if (enemyFor(this.run.round).boss) this.showHint('boss');
-    if (this.run.gold >= 10) this.showHint('interest');
+    const run = this.run;
+    if (run.round === ROUNDS + 1) this.showHint('endless');
+    if (enemyFor(run.round).boss) this.showHint('boss');
+    if (runEnemy(run, run.round).affixes?.length) this.showHint('affix');
+    if (run.round >= 2 && run.gold >= cellPrice(run) && unlockable(run).length > 0) this.showHint('unlock');
+    if (run.gold >= 10) this.showHint('interest');
   }
 
   // ---------- 开战 ----------
@@ -405,6 +445,15 @@ export class GameScene implements Scene {
     this.recompute(false);
     this.battleRound = this.run.round;
     const res = startBattle(this.run);
+    this.battleItems = this.run.bag.map((it) => ({ ...it }));
+    this.report = null;
+    // 存"打完之后"的状态：战斗中关掉页面也不能换装重打
+    if (saveable(this.run)) {
+      const after = structuredClone(this.run);
+      applyResult(after, res);
+      saveRun(after);
+      this.lastSave = '';
+    }
     this.bc.begin(res);
     this.phase = 'toBattle';
     this.tt = 0;
@@ -475,24 +524,51 @@ export class GameScene implements Scene {
     this.contB.alpha = 0;
     this.contB.visible = true;
     this.speedB.visible = false;
+    this.report = battleReport(res, [this.battleItems, enemyBag(this.battleRound)]);
+    this.reportB.visible = !out.ending;
   }
 
   continueFromResult(): void {
     if (this.phase !== 'result' || !this.outcome) return;
     const out = this.outcome;
     if (out.ending) {
-      const run = this.run;
-      const e = enemyFor(run.round);
-      factories.ending &&
-        gotoScene(() =>
-          factories.ending({
-            cleared: run.cleared, round: run.round, score: run.score, roundScores: run.stats.roundScores.slice(), clearBonus: out.clearBonus,
-            hearts: run.hearts, seed: run.seed, bestHit: run.stats.bestHit, merges: run.stats.merges, spent: run.stats.spent,
-            killer: run.cleared ? null : e.portrait, killerName: `${e.title}「${e.name}」`,
-          }),
-        );
+      const data = endingData(this.run);
+      factories.ending && gotoScene(() => factories.ending(data));
       return;
     }
+    const ch = this.run.choice;
+    if (ch && !this.ov.active) {
+      this.ov.open(new ChoicePanel(stage.H, ch.map((id) => ({ id, desc: this.choiceDesc(id) })), (id) => this.pickChoice(id)));
+      return;
+    }
+    this.goArrange();
+  }
+
+  private choiceDesc(id: EventId): string[] {
+    switch (id) {
+      case 'smith': {
+        const it = smithTarget(this.run);
+        return it ? [ITEMS[it.id].name, '升到 ' + '★'.repeat(it.lv + 1)] : [];
+      }
+      case 'tailor': return ['免费解锁', `${EVENTS.tailorCells} 格背包`];
+      case 'market': return ['本轮商店', '多出稀有货'];
+      case 'elite': return [`敌人生命 ×${EVENTS.eliteHpMul}`, `赢了 +${EVENTS.eliteGold} 金`];
+      case 'rest': return ['恢复 1 颗心'];
+      case 'cache': return [`立刻 +${EVENTS.cacheGold} 金`];
+    }
+  }
+
+  private pickChoice(id: EventId): void {
+    if (this.phase !== 'result') return;
+    const smith = id === 'smith' ? smithTarget(this.run) : null;
+    if (!applyChoice(this.run, id)) return;
+    if (smith) {
+      this.syncViews(true);
+      sfx(smith.lv === 3 ? 'merge3' : 'merge2');
+    } else if (id === 'cache') {
+      this.setGold(this.run.gold);
+      sfx('buy');
+    } else if (id === 'rest') sfx('heal');
     this.goArrange();
   }
 
@@ -501,6 +577,7 @@ export class GameScene implements Scene {
     this.tt = 0;
     this.outcome = null;
     this.contB.visible = false;
+    this.reportB.visible = false;
     this.bc.leave();
     this.collapse.target = 0;
     for (const v of this.views.values()) v.gray = 0;
@@ -558,7 +635,9 @@ export class GameScene implements Scene {
           ),
         restart: () => {
           this.ov.closeAll();
-          gotoScene(() => factories.game({ tutorial: false }));
+          clearRun();
+          const mode = { tier: this.run.tier, daily: this.run.daily };
+          gotoScene(() => factories.game({ tutorial: false, mode }));
         },
         title: () => {
           this.ov.closeAll();
@@ -566,6 +645,12 @@ export class GameScene implements Scene {
         },
       }),
     );
+  }
+
+  openReport(): void {
+    if (!this.report) return;
+    const e = runEnemy({ seed: this.run.seed, elite: false, tier: this.run.tier }, this.battleRound);
+    this.ov.open(new ReportPanel(stage.H, this.report, e.title));
   }
 
   resume(): void {
@@ -585,6 +670,11 @@ export class GameScene implements Scene {
     if (this.paused) {
       if (!this.ov.has(PausePanel)) this.paused = false;
       return;
+    }
+    this.saveT += raw;
+    if (this.saveT >= 0.5) {
+      this.saveT = 0;
+      this.persist();
     }
     this.time += dt;
     this.gold.update(dt);
@@ -695,6 +785,12 @@ export class GameScene implements Scene {
       ctx.translate(-195, -(g.y + g.h));
     }
     drawPlayerBag(ctx, g, 1 - 0.1 * this.collapse.x);
+    if (this.run.open !== this.fullOpen) {
+      const can = this.phase === 'arrange' && !this.tut.arranging ? unlockable(this.run) : [];
+      const pick = this.cellPick && clock.real < this.cellPick.until ? this.cellPick.cell : null;
+      const price = cellPrice(this.run);
+      drawLockedCells(ctx, g, this.run.open, can, pick, price, this.run.gold >= price, time);
+    }
     this.ac.drawUnder(ctx, g, time);
     const hide = this.ac.hiddenUid();
     for (const v of this.views.values()) if (v.zone === 'bag') v.draw(ctx, g, time, true);
@@ -711,7 +807,8 @@ export class GameScene implements Scene {
     }
     // 连线：整理时全亮；战斗中变暗，被用到时闪
     const dim = this.phase === 'battle' || this.phase === 'result' || this.phase === 'toBattle' ? 0.32 : 1;
-    if (!this.ac.drag || !this.ac.previewing()) this.links.draw(ctx, g, time, dim, hide);
+    const focus = this.phase === 'arrange' || this.phase === 'receipt' ? this.ac.focusUid() : -1;
+    if (!this.ac.drag || !this.ac.previewing()) this.links.draw(ctx, g, time, dim, hide, focus);
     else this.ac.drawPreviewLinks(ctx, g, time);
     // 号角 / 长弓（整理阶段）
     if (this.phase === 'arrange' || this.phase === 'receipt') {
@@ -748,7 +845,7 @@ export class GameScene implements Scene {
       this.shopV.sellK.target = sm ? 1 : 0;
       this.shopV.draw(ctx, L, this.run.shop, time, {
         gold: this.run.gold, sell: sm ? sm.price : 0, sellFull: sm ? sm.full : false,
-        mergeable: (id) => this.mergeable(id), out, locked: this.run.locked, hover: this.ac.hoverCard,
+        mergeable: (id, lv) => this.mergeable(id, lv), out, locked: this.run.locked, hover: this.ac.hoverCard,
       });
       if (a > 0.01) {
         ctx.save();
@@ -764,6 +861,12 @@ export class GameScene implements Scene {
     }
     if (this.speedB.visible) this.drawSpeed(ctx, time, real);
     if (this.contB.visible) this.contB.draw(ctx, time, real);
+    if (this.reportB.visible && this.phase === 'result') {
+      ctx.save();
+      ctx.globalAlpha *= this.contB.alpha;
+      this.reportB.draw(ctx, time, real);
+      ctx.restore();
+    }
     this.bc.drawEffects(ctx, time);
     drawParticles(ctx, false);
     drawPopups(ctx, false);
@@ -832,7 +935,7 @@ export class GameScene implements Scene {
       ctx.translate(0, -this.tr.enemy * 40);
       const showDetail = this.detail && this.phase !== 'toBattle';
       if (showDetail && this.detail) drawDetailBar(ctx, L.enemyCard, this.detail.info, this.detail.t);
-      else drawEnemyCard(ctx, L.enemyCard, enemyFor(this.run.round), enemyBag(this.run.round), this.enemyFlip, time);
+      else drawEnemyCard(ctx, L.enemyCard, runEnemy(this.run, this.run.round), enemyBag(this.run.round), this.enemyFlip, time);
       ctx.restore();
     }
   }
@@ -952,9 +1055,12 @@ export class GameScene implements Scene {
     if (!h) return;
     const k = Math.min(1, (3.4 - h.t) / 0.25);
     const a = h.t < 0.3 ? h.t / 0.3 : 1;
-    const y = this.phase === 'arrange' || this.phase === 'receipt' ? this.L.bubbleY - 36 : this.B.band.y + this.B.band.h + (this.phase === 'result' ? 42 : 32);
+    // 整理阶段放在桌边那一排上，不压背包格子；拖拽时淡下去
+    const st = this.L.stash[0];
+    const arranging = this.phase === 'arrange' || this.phase === 'receipt';
+    const y = arranging ? st.y + st.h / 2 : this.B.band.y + this.B.band.h + (this.phase === 'result' ? 42 : 32);
     ctx.save();
-    ctx.globalAlpha *= a;
+    ctx.globalAlpha *= a * (arranging && this.ac.drag ? 0.3 : 1);
     drawBubble(ctx, '💡 ' + h.s, 195, y, 330, null, k);
     ctx.restore();
   }
@@ -969,10 +1075,8 @@ export class GameScene implements Scene {
     }
   }
 
-  mergeable(id: ItemInst['id']): boolean {
-    for (const it of this.run.bag) if (it.id === id && it.lv === 1) return true;
-    for (const it of this.run.stash) if (it && it.id === id && it.lv === 1) return true;
-    return false;
+  mergeable(id: ItemInst['id'], lv: Lv = 1): boolean {
+    return !!mergeTargetFor(this.run, id, lv);
   }
 
   // ---------- 输入 ----------
@@ -987,6 +1091,7 @@ export class GameScene implements Scene {
     }
     if (this.speedB.visible && this.phase === 'battle') out.push(this.speedB);
     if (this.phase === 'result' && this.contB.visible && this.contB.alpha > 0.5) out.push(this.contB);
+    if (this.phase === 'result' && this.reportB.visible && this.contB.alpha > 0.5) out.push(this.reportB);
     return out;
   }
 
@@ -996,6 +1101,7 @@ export class GameScene implements Scene {
     else if (b === this.fightB) this.tryFight();
     else if (b === this.contB) this.continueFromResult();
     else if (b === this.speedB) this.cycleSpeed();
+    else if (b === this.reportB) this.openReport();
     else if (b === this.skipB) {
       markTutorialDone();
       this.tut.stop();
@@ -1142,7 +1248,7 @@ export class GameScene implements Scene {
         this.pressedHud = null;
         if (ph && tap) {
           if (ph === 'round') this.ov.open(new RoutePanel(this.run.round, this.run.round - 1));
-          else if (ph === 'enemy') this.ov.open(new DrawerPanel(this.L.drawer, enemyFor(this.run.round), this.run.round));
+          else if (ph === 'enemy') this.ov.open(new DrawerPanel(this.L.drawer, runEnemy(this.run, this.run.round), this.run.round));
           return;
         }
         if (this.phase === 'arrange') this.ac.up(x, y, tap);
@@ -1244,6 +1350,42 @@ export class GameScene implements Scene {
     return { x: TMPP.x - (w * c) / 2, y: TMPP.y - (h * c) / 2, w: w * c, h: h * c };
   }
 
+  /** 点锁格：第一下亮出价格，2.5 秒内再点同一格解锁 */
+  tapLocked(px: number, py: number): void {
+    const g = this.L.bag;
+    const x = Math.floor((px - g.gx) / g.cell);
+    const y = Math.floor((py - g.gy) / g.cell);
+    if (this.tut.arranging || !canUnlock(this.run, x, y)) {
+      this.cellPick = null;
+      return;
+    }
+    const p = this.cellPick;
+    if (!p || p.cell[0] !== x || p.cell[1] !== y || clock.real > p.until) {
+      this.cellPick = { cell: [x, y], until: clock.real + 2.5 };
+      sfx('tick');
+      return;
+    }
+    const price = cellPrice(this.run);
+    const r = unlockCell(this.run, x, y);
+    if (!r.ok) {
+      this.gold.flash = -0.45;
+      sfx('noGold');
+      p.until = clock.real + 2.5;
+      return;
+    }
+    this.cellPick = null;
+    this.setGold(this.run.gold);
+    sfx('buy');
+    sfx('drop', 0, 0.08);
+    tier('T1', false);
+    const cx = g.gx + (x + 0.5) * g.cell;
+    const cy = g.gy + (y + 0.5) * g.cell;
+    const gr = this.L.gold;
+    popup('−' + price, gr.x + gr.w - 20, gr.y + gr.h / 2, '#ffb4a0', 20, { ui: true, life: 0.9, vy: -26 });
+    emit('coin', cx, cy, 4, { speed: 90, life: 0.5 });
+    this.recompute(true);
+  }
+
   /** 调试：全量重建视图 */
   rebuild(): void {
     this.views.clear();
@@ -1265,11 +1407,15 @@ export class GameScene implements Scene {
     this.receipt = null;
     this.outcome = null;
     this.contB.visible = false;
+    this.reportB.visible = false;
     this.run.round = n;
     this.run.attempt = 1;
     this.run.phase = 'result';
     this.run.lastResult = null;
     this.run.locked = false;
+    this.run.choice = null;
+    this.run.elite = false;
+    this.run.market = false;
     beginArrange(this.run);
     this.phase = 'arrange';
     this.enemyFlip = 0;
@@ -1294,6 +1440,20 @@ export class GameScene implements Scene {
   inputState(): { dragging: boolean } {
     return { dragging: input.dragging };
   }
+}
+
+/** 一局结束时交给结局页的数据（读档进入结局时也用） */
+export function endingData(run: RunState): EndingData {
+  const e = enemyFor(run.round);
+  const dead = !run.cleared || !!run.endless;
+  const hearts = run.clearHearts ?? run.hearts;
+  return {
+    cleared: run.cleared, round: run.round, score: run.score, roundScores: run.stats.roundScores.slice(),
+    clearBonus: run.cleared ? clearScore(hearts) : 0, hearts, seed: run.seed, bestHit: run.stats.bestHit,
+    merges: run.stats.merges, spent: run.stats.spent, killer: dead ? e.portrait : null, killerName: `${e.title}「${e.name}」`,
+    debug: run.debug, tier: run.tier, tierBonus: run.tierBonus, daily: run.daily,
+    endless: !!run.endless, resume: run.cleared && !run.endless && !run.daily ? run : undefined,
+  };
 }
 
 function shapeMouth(it: ItemInst): { mouth: [number, number]; dir: [number, number] } | null {

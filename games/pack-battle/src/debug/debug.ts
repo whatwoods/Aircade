@@ -1,10 +1,13 @@
 // ?debug=1：FPS 浮层（DOM）+ window.__game 测试 / 审查接口（坐标一律为 CSS 像素）
+import { musicInfo } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
-import { BAG, ENEMIES, ITEMS, ROUNDS, SCORE } from '../config.ts';
+import { BAG, DIFFICULTY, ENEMIES, ITEMS, ROUNDS, SCORE } from '../config.ts';
+import { save } from '../core/storage.ts';
 import { clock } from '../core/loop.ts';
 import { simulate as runSim } from '../game/battle/sim.ts';
-import { enemyBag, enemyFor, parseBag, playerMaxHp } from '../game/enemies.ts';
-import { giveItem } from '../game/run.ts';
+import { enemyBag, enemyFor, parseBag, playerMaxHp, runEnemy } from '../game/enemies.ts';
+import { fullMask } from '../game/grid.ts';
+import { giveItem, unlockCell } from '../game/run.ts';
 import { rollShop } from '../game/shop.ts';
 import { markTutorialDone, resetHints, resetTutorialFlag } from '../game/tutorial.ts';
 import type { BattleEvent, BattleResult, ItemId, ItemInst, Lv, Rot } from '../game/types.ts';
@@ -13,6 +16,7 @@ import { popup } from '../render/fx/popups.ts';
 import { tier } from '../render/fx/shake.ts';
 import { C } from '../render/kit.ts';
 import { rectCss, stage } from '../render/stage.ts';
+import { EndingScene } from '../scenes/endingScene.ts';
 import { GameScene } from '../scenes/gameScene.ts';
 import { factories, gotoScene, setScene, sm } from '../scenes/sceneManager.ts';
 import { buildFor } from '../../scripts/balance-builds.ts';
@@ -32,6 +36,16 @@ function safe<A extends unknown[], R>(fn: (...a: A) => R): (...a: A) => R | Fail
       return fail(e instanceof Error ? e.message : String(e));
     }
   };
+}
+
+/** 改状态的接口：标记本局为调试局（不存档、不计最高分） */
+function mut<A extends unknown[], R>(fn: (...a: A) => R): (...a: A) => R | Fail {
+  return safe((...a: A) => {
+    const r = fn(...a);
+    const g = game();
+    if (g) g.run.debug = true;
+    return r;
+  });
 }
 
 function css(r: { x: number; y: number; w: number; h: number } | null | undefined) {
@@ -67,9 +81,16 @@ function gotoRound(n: number, build: 'none' | 'weak' | 'mid' | 'strong' = 'mid')
   if (!(n >= 1 && n <= ROUNDS)) return fail('轮次应在 1–10');
   const g = ensureGame();
   g.gotoRoundDirect(n);
+  // 参考构筑按整个 6×5 摆：跳轮时背包全开
+  if (n > 1 || build !== 'none') openAll(g);
   applyBuild(g, n, build);
   g.rebuild();
   return { ok: true, round: n };
+}
+
+function openAll(g: GameScene): void {
+  g.run.open = fullMask(BAG.cols, BAG.rows);
+  g.run.unlocked = BAG.cols * BAG.rows - BAG.start.w * BAG.start.h;
 }
 
 /** 把当前战斗换成一个立即分出胜负的时间线 */
@@ -137,18 +158,20 @@ export function installDebug(): void {
       const g = game();
       if (!g) return { scene: sm.cur?.name ?? null };
       const r = g.run;
-      const e = enemyFor(r.round);
+      const e = runEnemy(r, r.round);
       return {
         scene: 'game', phase: g.phase, round: r.round, attempt: r.attempt, hearts: r.hearts, gold: r.gold, score: r.score,
         bag: r.bag.map((i) => ({ uid: i.uid, id: i.id, lv: i.lv, rot: i.rot, x: i.x, y: i.y })),
         stash: r.stash.map((i) => (i ? { uid: i.uid, id: i.id, lv: i.lv, rot: i.rot, slot: i.slot } : null)),
-        shop: r.shop.map((s) => ({ id: s.id, price: s.price })),
-        locked: r.locked, enemy: { name: e.name, title: e.title, hp: e.hp, boss: !!e.boss },
+        shop: r.shop.map((s) => ({ id: s.id, price: s.price, lv: s.lv ?? 1 })),
+        tier: r.tier, daily: r.daily ?? null, locked: r.locked, open: r.open, unlocked: r.unlocked, freeCells: r.freeCells, choice: r.choice, market: r.market, elite: r.elite, enemy: { name: e.name, title: e.title, hp: e.hp, boss: !!e.boss, affixes: e.affixes ?? [] },
         tutorial: g.tut.step, paused: g.paused, speed: g.bc.speed, overlay: g.ov.top ? g.ov.top.kind : null,
         dragging: !!g.ac.drag, links: g.syn.links.map((l) => ({ from: l.from, to: l.to, kind: l.kind, label: l.label })),
-        maxHp: playerMaxHp(r.round), undo: !!g.undo, outcome: g.outcome,
+        maxHp: playerMaxHp(r.round), undo: !!g.undo, outcome: g.outcome, hint: g.hintText(),
       };
     }),
+    /** 背景音乐：当前曲式、播的是文件还是程序化、哪些文件已解码 */
+    music: safe(() => musicInfo()),
     ui: safe(() => (sm.cur ? sm.cur.ui().map((u) => ({ ...u, ...rectCss(u.x, u.y, u.w, u.h) })) : [])),
     cell: safe((c: number, r: number) => {
       const g = game();
@@ -172,32 +195,32 @@ export function installDebug(): void {
       if (!g) return fail('不在游戏中');
       return css(g.itemRect(uid)) ?? fail('装备不存在');
     }),
-    addGold: safe((n: number) => {
+    addGold: mut((n: number) => {
       const g = game();
       if (!g) return fail('不在游戏中');
       g.run.gold = Math.max(0, g.run.gold + n);
       g.gold.set(g.run.gold);
       return g.run.gold;
     }),
-    setGold: safe((n: number) => {
+    setGold: mut((n: number) => {
       const g = game();
       if (!g) return fail('不在游戏中');
       g.run.gold = Math.max(0, n);
       g.gold.set(g.run.gold);
       return g.run.gold;
     }),
-    setHearts: safe((n: number) => {
+    setHearts: mut((n: number) => {
       const g = game();
       if (!g) return fail('不在游戏中');
       g.run.hearts = Math.max(1, Math.min(3, n));
       return g.run.hearts;
     }),
-    gotoRound: safe(gotoRound),
-    boss: safe((n: 5 | 10) => {
+    gotoRound: mut(gotoRound),
+    boss: mut((n: 5 | 10) => {
       if (n !== 5 && n !== 10) return fail('只能是 5 或 10');
       return gotoRound(n, 'mid');
     }),
-    give: safe((id: ItemId, lv: Lv = 1, where: 'stash' | 'bag' | { x: number; y: number; rot?: Rot } = 'stash') => {
+    give: mut((id: ItemId, lv: Lv = 1, where: 'stash' | 'bag' | { x: number; y: number; rot?: Rot } = 'stash') => {
       const g = game();
       if (!g) return fail('不在游戏中');
       if (!ITEMS[id]) return fail('没有这件装备');
@@ -208,7 +231,7 @@ export function installDebug(): void {
       g.recompute(true);
       return { ok: true, uid: r.uid };
     }),
-    place: safe((id: ItemId, x: number, y: number, rot: Rot = 0, lv: Lv = 1) => {
+    place: mut((id: ItemId, x: number, y: number, rot: Rot = 0, lv: Lv = 1) => {
       const g = game();
       if (!g) return fail('不在游戏中');
       if (!ITEMS[id]) return fail('没有这件装备');
@@ -219,7 +242,29 @@ export function installDebug(): void {
       g.recompute(true);
       return r.uid;
     }),
-    clearBag: safe(() => {
+    /** 解锁全部难度（写进本地纪录） */
+    unlockTiers: safe(() => {
+      save('tier', DIFFICULTY.names.length - 1);
+      return true;
+    }),
+    /** 背包全开 */
+    openBag: mut(() => {
+      const g = game();
+      if (!g) return fail('不在游戏中');
+      openAll(g);
+      g.rebuild();
+      return true;
+    }),
+    /** 花金币解锁一格（同玩家点锁格） */
+    unlock: mut((x: number, y: number) => {
+      const g = game();
+      if (!g) return fail('不在游戏中');
+      const r = unlockCell(g.run, x, y);
+      if (!r.ok) return fail(r.reason);
+      g.rebuild();
+      return true;
+    }),
+    clearBag: mut(() => {
       const g = game();
       if (!g) return fail('不在游戏中');
       if (g.phase !== 'arrange') return fail('只能在整理阶段');
@@ -228,7 +273,7 @@ export function installDebug(): void {
       g.rebuild();
       return true;
     }),
-    clearStash: safe(() => {
+    clearStash: mut(() => {
       const g = game();
       if (!g) return fail('不在游戏中');
       if (g.phase !== 'arrange') return fail('只能在整理阶段');
@@ -237,7 +282,7 @@ export function installDebug(): void {
       g.rebuild();
       return true;
     }),
-    setShop: safe((ids: (ItemId | null)[]) => {
+    setShop: mut((ids: (ItemId | null)[]) => {
       const g = game();
       if (!g) return fail('不在游戏中');
       if (g.phase !== 'arrange') return fail('只能在整理阶段');
@@ -250,7 +295,7 @@ export function installDebug(): void {
       g.shopV.setInstant(g.run.shop);
       return true;
     }),
-    reroll: safe(() => {
+    reroll: mut(() => {
       const g = game();
       if (!g) return fail('不在游戏中');
       if (g.phase !== 'arrange') return fail('只能在整理阶段');
@@ -266,12 +311,12 @@ export function installDebug(): void {
       g.goBattle();
       return true;
     }),
-    winBattle: safe(() => {
+    winBattle: mut(() => {
       const g = game();
       if (!g) return fail('不在游戏中');
       return forceResult(g, true);
     }),
-    loseBattle: safe(() => {
+    loseBattle: mut(() => {
       const g = game();
       if (!g) return fail('不在游戏中');
       return forceResult(g, false);
@@ -281,13 +326,13 @@ export function installDebug(): void {
       const run = g?.run;
       const hearts = run?.hearts ?? 3;
       const scores = run ? run.stats.roundScores.slice() : [];
-      while (scores.length < ROUNDS) scores.push(110 + scores.length * 30);
+      for (let i = 0; i < ROUNDS; i++) scores[i] ??= 110 + i * 30;
       const clearBonus = SCORE.clearBonus + SCORE.heartBonus * hearts;
-      const score = scores.reduce((a, b) => a + b, 0) + clearBonus;
+      const score = scores.reduce<number>((a, b) => a + (b ?? 0), 0) + clearBonus;
       gotoScene(() =>
         factories.ending({
           cleared: true, round: ROUNDS, score, roundScores: scores, clearBonus, hearts, seed: run?.seed ?? 0,
-          bestHit: run?.stats.bestHit ?? 0, merges: run?.stats.merges ?? 0, spent: run?.stats.spent ?? 0, killer: null, killerName: '',
+          bestHit: run?.stats.bestHit ?? 0, merges: run?.stats.merges ?? 0, spent: run?.stats.spent ?? 0, killer: null, killerName: '', debug: true, tier: 0, tierBonus: 0,
         }),
       );
       return true;
@@ -301,19 +346,26 @@ export function installDebug(): void {
         factories.ending({
           cleared: false, round, score: run?.score ?? 0, roundScores: run ? run.stats.roundScores.slice() : [], clearBonus: 0, hearts: 0,
           seed: run?.seed ?? 0, bestHit: run?.stats.bestHit ?? 0, merges: run?.stats.merges ?? 0, spent: run?.stats.spent ?? 0,
-          killer: e.portrait, killerName: `${e.title}「${e.name}」`,
+          killer: e.portrait, killerName: `${e.title}「${e.name}」`, debug: true, tier: 0, tierBonus: 0,
         }),
       );
       return true;
+    }),
+    /** 结局页：返回分享图（dataURL）和尺寸 */
+    cert: safe(() => {
+      const e = sm.cur;
+      if (!(e instanceof EndingScene)) return fail('不在结局页');
+      const c = e.renderCert();
+      return { w: c.width, h: c.height, url: c.toDataURL('image/png') };
     }),
     simulate: safe(() => {
       const g = game();
       if (!g) return fail('不在游戏中');
       const r = g.run;
-      const e = enemyFor(r.round);
+      const e = runEnemy(r, r.round);
       const res = runSim(
-        { items: r.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(r.round) },
-        { items: enemyBag(r.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits },
+        { items: r.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(r.round), open: r.open },
+        { items: enemyBag(r.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits, affixes: e.affixes },
       );
       return { winner: res.winner, duration: +res.duration.toFixed(2), hpEnd: res.hpEnd, events: res.events.length };
     }),

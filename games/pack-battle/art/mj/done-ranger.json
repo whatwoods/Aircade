@@ -1,0 +1,32 @@
+Creating task at /vendors/midjourney/v1/tob/diffusion...
+Task created: 1234a99c-2cff-469d-9976-914baf48ceb5
+[0.0s] Task 1234a99c... status: processing
+[20.9s] Task 1234a99c... status: processing
+[43.4s] Task 1234a99c... status: processing
+[65.3s] Task 1234a99c... status: completed
+{
+  "task_id": "1234a99c-2cff-469d-9976-914baf48ceb5",
+  "status": "completed",
+  "api_path": "/vendors/midjourney/v1/tob/diffusion",
+  "images": [
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/1234a99c-2cff-469d-9976-914baf48ceb5/outputs/result_00.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/1234a99c-2cff-469d-9976-914baf48ceb5/outputs/result_01.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/1234a99c-2cff-469d-9976-914baf48ceb5/outputs/result_02.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/1234a99c-2cff-469d-9976-914baf48ceb5/outputs/result_03.png"
+  ],
+  "data": {
+    "task_info": {
+      "id": "1234a99c-2cff-469d-9976-914baf48ceb5",
+      "status": "completed",
+      "created_at": "2026-11-01T11:54:00.528110+00:00",
+      "updated_at": "2026-11-01T11:55:06.457471+00:00"
+    },
+    "images": [
+      "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/1234a99c-2cff-469d-9976-914baf48ceb5/outputs/result_00.png",
+      "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/1234a99c-2cff-469d-9976-914baf48ceb5/outputs/result_01.png",
+      "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/1234a99c-2cff-469d-9976-914baf48ceb5/outputs/result_02.png",
+      "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/1234a99c-2cff-469d-9976-914baf48ceb5/outputs/result_03.png"
+    ],
+    "seed": 4242
+  }
+}

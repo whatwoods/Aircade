@@ -2,7 +2,8 @@
 import { sfx } from '../audio/sfx.ts';
 import { input, type InputHandler } from '../core/input.ts';
 import { blot, inkTransition } from '../render/fx/transitions.ts';
-import type { PortraitId } from '../game/types.ts';
+import type { RunMode } from '../game/run.ts';
+import type { PortraitId, RunState } from '../game/types.ts';
 import type { UiEl } from '../render/ui/widgets.ts';
 
 export type SceneName = 'title' | 'game' | 'ending';
@@ -69,7 +70,7 @@ export function gotoScene(make: () => Scene, cx = 0.5, cy = 0.5): void {
 /** 场景工厂（main.ts 注册，避免循环依赖） */
 export const factories = {
   title: null as unknown as () => Scene,
-  game: null as unknown as (o: { seed?: number; tutorial?: boolean; round?: number }) => Scene,
+  game: null as unknown as (o: { seed?: number; tutorial?: boolean; round?: number; resume?: RunState; mode?: RunMode }) => Scene,
   ending: null as unknown as (o: EndingData) => Scene,
 };
 
@@ -77,7 +78,7 @@ export interface EndingData {
   cleared: boolean;
   round: number;
   score: number;
-  roundScores: number[];
+  roundScores: (number | null)[];
   clearBonus: number;
   hearts: number;
   seed: number;
@@ -86,4 +87,13 @@ export interface EndingData {
   spent: number;
   killer: PortraitId | null;
   killerName: string;
+  /** 调试接口造出的结局：不计最高分 */
+  debug?: boolean;
+  tier: number;
+  tierBonus: number;
+  daily?: string;
+  /** 通关后在无尽里结束的 */
+  endless?: boolean;
+  /** 刚通关、还能进无尽：这一局的状态 */
+  resume?: RunState;
 }
