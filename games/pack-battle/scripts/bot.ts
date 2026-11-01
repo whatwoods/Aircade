@@ -36,7 +36,9 @@ function power(items: readonly Placed[], open: number): number {
     if (d.tag === 'weapon') p += (d.dmg * d.hits + d.poison * 3) * rate + d.shieldOnHit * rate * 0.6;
     if (d.tag === 'armor') p += d.shield * rate * 0.6;
     if (d.tag === 'remedy') p += d.heal * rate * 0.8;
-    p += d.startShield * 0.1 + d.reduce * 3 + d.lowHpHeal * 0.05 + d.reviveFrac * 10;
+    if (d.tag === 'weapon') p += d.dmg * d.hits * rate * d.lifesteal * 0.8;
+    p += d.startShield * 0.1 + d.reduce * 3 + d.lowHpHeal * 0.05 + d.reviveFrac * 10 + d.thorns * 0.8 + d.rage * 8;
+    if (d.id === 'charm') p += 1.5;
   }
   return p;
 }

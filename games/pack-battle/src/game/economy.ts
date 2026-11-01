@@ -15,11 +15,16 @@ export function receiptFor(run: RunState): ReceiptLine[] {
   lines.push({ label: run.attempt > 1 ? '本轮收入（再战）' : '本轮收入', amount: base });
   if (run.lastResult === 'win') lines.push({ label: '胜利奖励', amount: ECONOMY.winBonus });
   else if (run.lastResult === 'loss') lines.push({ label: '失败补偿', amount: ECONOMY.lossBonus });
-  const interest = Math.min(ECONOMY.interestCap, Math.floor(run.savedGold / ECONOMY.interestStep));
+  const interest = Math.min(interestCap(run), Math.floor(run.savedGold / ECONOMY.interestStep));
   if (interest > 0) lines.push({ label: `利息（存 ${run.savedGold} 金）`, amount: interest });
   if (run.pouchGold > 0) lines.push({ label: '钱袋', amount: run.pouchGold });
   if (run.eliteGold > 0) lines.push({ label: '精英赏金', amount: run.eliteGold });
   return lines;
+}
+
+/** 利息上限：基础 + 开战时背包里的幸运符 */
+export function interestCap(run: RunState): number {
+  return ECONOMY.interestCap + (run.charmCap ?? 0);
 }
 
 export function sellPrice(value: number, boughtStamp: number, phaseStamp: number): number {

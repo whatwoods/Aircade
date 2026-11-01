@@ -33,6 +33,8 @@ interface Fighter {
   reduce: number;
   /** 各件减伤装备（战报按它们的减伤值分摊挡下的伤害） */
   reducers: Derived[];
+  /** 荆棘：被攻击时逐件反弹 */
+  thorns: Derived[];
   speedBonus: number;
   units: Unit[];
   potions: Derived[];
@@ -54,19 +56,21 @@ function makeFighter(side: Side, inp: FighterInput): Fighter {
   const starts: Derived[] = [];
   let reduce = 0;
   const reducers: Derived[] = [];
+  const thorns: Derived[] = [];
   const affixes = inp.affixes ?? [];
   if (affixes.includes('armored')) reduce += AFFIX.armoredReduce;
   sorted.forEach((it, i) => {
     const d = syn.derived.get(it.uid)!;
     reduce += d.reduce;
     if (d.reduce > 0) reducers.push(d);
+    if (d.thorns > 0) thorns.push(d);
     if (d.trigger === 'cooldown' && d.cd > 0) units.push({ d, timer: 0, order: i });
     if (d.trigger === 'lowHp') potions.push(d);
     if (d.trigger === 'death') phoenix.push(d);
     if (d.trigger === 'start' && d.startShield > 0) starts.push(d);
   });
   return {
-    side, maxHp: inp.maxHp, hp: inp.maxHp, shield: 0, poison: 0, poisonT: 0, stun: 0, immune: 0, reduce, reducers,
+    side, maxHp: inp.maxHp, hp: inp.maxHp, shield: 0, poison: 0, poisonT: 0, stun: 0, immune: 0, reduce, reducers, thorns,
     speedBonus: affixes.includes('swift') ? AFFIX.swiftSpeed : 0, units, potions, phoenix, starts, traits: inp.traits ?? [],
     traitFired: (inp.traits ?? []).map(() => false), dead: false, affixes, regenT: 0,
   };
@@ -116,9 +120,14 @@ export function simulate(player: FighterInput, enemy: FighterInput): BattleResul
     }
     if (D.hp > 0 && D.hp <= D.maxHp * 0.5 && D.potions.length > 0) {
       const p = D.potions.shift()!;
-      const amt = Math.min(p.lowHpHeal, D.maxHp - D.hp);
-      D.hp += amt;
-      push('lowHp', D.side, { uid: p.uid, amount: amt });
+      if (p.rage > 0) {
+        D.speedBonus += p.rage;
+        push('lowHp', D.side, { uid: p.uid, amount: 0, rage: true });
+      } else {
+        const amt = Math.min(p.lowHpHeal, D.maxHp - D.hp);
+        D.hp += amt;
+        push('lowHp', D.side, { uid: p.uid, amount: amt });
+      }
     }
     // 首领特性
     D.traits.forEach((tr, i) => {
@@ -175,7 +184,21 @@ export function simulate(player: FighterInput, enemy: FighterInput): BattleResul
       D.stun = d.stun;
       push('stun', D.side, { uid: d.uid, amount: d.stun });
     }
+    if (d.lifesteal > 0 && raw > 0 && !A.dead) {
+      const h = Math.min(Math.round(raw * d.lifesteal), A.maxHp - A.hp);
+      if (h > 0) {
+        A.hp += h;
+        push('heal', A.side, { uid: d.uid, amount: h });
+      }
+    }
     afterLoss(D);
+    // 荆棘：真实伤害，不触发对方的荆棘
+    for (const th of D.thorns) {
+      if (A.dead || D.dead) break;
+      A.hp -= th.thorns;
+      push('hit', D.side, { uid: th.uid, amount: th.thorns, absorbed: 0, thorn: true });
+      afterLoss(A);
+    }
     checkDeaths();
   };
 

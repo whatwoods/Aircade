@@ -12,6 +12,7 @@ export type ItemId =
   | 'boomerang' | 'axe' | 'kris' | 'helmet' | 'potion' | 'moonstone'
   | 'hammer' | 'bow' | 'horn' | 'cauldron'
   | 'phoenix' | 'thunder' | 'hourglass'
+  | 'shuriken' | 'venom' | 'thorns' | 'fang' | 'brew' | 'charm'
   | 'slime' | 'ratfang' | 'breath' | 'claw' | 'scale';
 
 export interface LevelStats {
@@ -29,18 +30,26 @@ export interface LevelStats {
   gold?: number;
   reviveFrac?: number;
   startShield?: number;
+  /** 被攻击时反弹的伤害 */
+  thorns?: number;
+  /** 打进生命的伤害按此比例回血 */
+  lifesteal?: number;
+  /** 低血时全部冷却速度加成 */
+  rage?: number;
+  /** 利息上限加成 */
+  interest?: number;
   /** 相邻规则每单位数值 */
   adj?: number;
 }
 
-export type AdjStat = 'dmg' | 'shield' | 'heal' | 'poison' | 'reduce' | 'reviveFrac' | 'startShield' | 'lowHpHeal';
+export type AdjStat = 'dmg' | 'shield' | 'heal' | 'poison' | 'reduce' | 'reviveFrac' | 'startShield' | 'lowHpHeal' | 'thorns' | 'lifesteal';
 
 export type AdjRule =
   | { kind: 'countTag'; tag: Tag | 'any'; stat: AdjStat; /** 只算不同种类的装备 */ otherId?: boolean; /** 最多计几件 */ max?: number }
   | { kind: 'ifTag'; tag: Tag; effect: 'shieldOnHit' }
   | { kind: 'lone'; tag: Tag; mult: number }
   | { kind: 'emptyCells'; stat: 'dmg' }
-  | { kind: 'aura'; tags: (Tag | 'any')[]; stat: 'speed' | 'dmgBonus' | 'boost' }
+  | { kind: 'aura'; tags: (Tag | 'any')[]; stat: 'speed' | 'dmgBonus' | 'boost' | 'poison' }
   | { kind: 'line'; stat: 'speed' }
   | { kind: 'none' };
 
@@ -131,6 +140,8 @@ export interface RunState {
   pouchGold: number;
   /** 开战时手中金币（用于利息） */
   savedGold: number;
+  /** 开战时背包里幸运符加的利息上限，下轮整理时用 */
+  charmCap?: number;
   lastHpRatio: number;
   tutorial: boolean;
   cleared: boolean;
@@ -197,6 +208,9 @@ export interface Derived {
   lowHpHeal: number;
   gold: number;
   shieldBreak: number;
+  thorns: number;
+  lifesteal: number;
+  rage: number;
   /** 光环类数值（用于详情显示） */
   auraSpeed: number;
   auraDmg: number;
@@ -259,6 +273,10 @@ export interface BattleEvent {
   second?: boolean;
   /** 龙炎 */
   fire?: boolean;
+  /** 荆棘甲反伤 */
+  thorn?: boolean;
+  /** 狂暴药剂（lowHp 事件：加速而不是回血） */
+  rage?: boolean;
   hp: [number, number];
   shield: [number, number];
   poison: [number, number];

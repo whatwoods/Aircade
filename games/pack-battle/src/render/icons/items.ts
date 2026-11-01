@@ -1,4 +1,4 @@
-// 26 个装备图标（rot0，1 格 = 54 单位）
+// 32 个装备图标（rot0，1 格 = 54 单位）
 import type { ItemId } from '../../game/types.ts';
 import { bez, ellipsePts, fillPts, pathPts, quad, rectPts, xform, type Pts } from '../ink.ts';
 import { hashf } from '../noise.ts';
@@ -745,10 +745,160 @@ const scale: Draw = (pen) => {
   }
 };
 
+const shuriken: Draw = (pen) => {
+  const ctx = pen.ctx;
+  const p: Pts = [];
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 - Math.PI / 4;
+    const b = a + Math.PI / 4;
+    p.push(27 + Math.cos(a) * 24, 27 + Math.sin(a) * 24);
+    p.push(27 + Math.cos(b + 0.25) * 7, 27 + Math.sin(b + 0.25) * 7);
+  }
+  paint(pen, p, steel(ctx, 6, 6, 48, 48), '#3e4447', { hatch: 0, outline: 2.2 });
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 - Math.PI / 4;
+    line(pen, [27 + Math.cos(a) * 8, 27 + Math.sin(a) * 8, 27 + Math.cos(a) * 20, 27 + Math.sin(a) * 20], 1, 'rgba(255,255,255,0.6)');
+  }
+  const hole = ellipsePts(27, 27, 4.2, 4.2, 12);
+  fillPts(ctx, hole, '#2a2624');
+  outline(pen, hole, 1.4);
+};
+
+const venom: Draw = (pen) => {
+  const ctx = pen.ctx;
+  const p: Pts = [];
+  p.push(22, 14, 22, 22);
+  bez(p, 22, 22, 8, 26, 8, 48, 27, 49, 8, true);
+  bez(p, 27, 49, 46, 48, 46, 26, 32, 22, 8, true);
+  p.push(32, 14);
+  fillPts(ctx, p, 'rgba(220,235,225,0.55)');
+  ctx.save();
+  pathPts(ctx, p, true);
+  ctx.clip();
+  const lq: Pts = [];
+  quad(lq, 6, 32, 27, 28, 48, 32, 8);
+  lq.push(48, 52, 6, 52);
+  fillPts(ctx, lq, rad(ctx, 22, 38, 20, '#c6f07a', '#5ea32c', '#2c5a14'));
+  ctx.restore();
+  bubbles(pen, [[22, 40, 2.4], [31, 36, 1.8], [27, 44, 1.5]], '#8fd04a');
+  shine(pen, [14, 32, 13, 40], 2, 0.8);
+  outline(pen, p, 2);
+  // 骷髅塞
+  const cap = ellipsePts(27, 10, 8, 7, 14);
+  fillPts(ctx, cap, rad(ctx, 25, 8, 9, '#f6f0dc', '#cfc4a2', '#8a7e5c'));
+  outline(pen, cap, 1.6);
+  ctx.fillStyle = '#2a2624';
+  for (const x of [24, 30]) {
+    ctx.beginPath();
+    ctx.arc(x, 9.5, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+};
+
+const thorns: Draw = (pen) => {
+  const ctx = pen.ctx;
+  // L 形甲片：左列两格 + 右下一格
+  const p: Pts = [];
+  p.push(8, 10);
+  quad(p, 8, 10, 27, 4, 46, 10, 6, true);
+  p.push(48, 58);
+  quad(p, 48, 58, 80, 56, 100, 62, 6, true);
+  p.push(100, 98);
+  quad(p, 100, 98, 54, 104, 8, 98, 8, true);
+  paint(pen, p, lin(ctx, 8, 6, 100, 104, '#7a8a5a', '#4f5f36', '#2c3a1c'), '#1e2812', { hatch: 5, outline: 0, edgeW: 3 });
+  // 棘刺
+  const spikes: [number, number, number][] = [
+    [8, 22, Math.PI], [8, 46, Math.PI], [8, 72, Math.PI], [8, 90, Math.PI],
+    [20, 8, -Math.PI / 2], [36, 8, -Math.PI / 2],
+    [62, 58, -Math.PI / 2], [86, 60, -Math.PI / 2], [100, 78, 0],
+    [30, 101, Math.PI / 2], [60, 101, Math.PI / 2], [86, 100, Math.PI / 2],
+  ];
+  for (const [x, y, a] of spikes) {
+    const n = a + Math.PI / 2;
+    const s: Pts = [
+      x + Math.cos(n) * 4.5, y + Math.sin(n) * 4.5,
+      x + Math.cos(a) * 11, y + Math.sin(a) * 11,
+      x - Math.cos(n) * 4.5, y - Math.sin(n) * 4.5,
+    ];
+    paint(pen, s, '#d8d0b0', '#3a3420', { hatch: 0, outline: 1.4 });
+  }
+  outline(pen, p, 2.4);
+  // 铆钉与藤纹
+  line(pen, [27, 20, 22, 44, 30, 66, 52, 80, 82, 78], 2.2, '#2a3a18', 0.8);
+  for (const [x, y] of [[27, 30], [27, 80], [80, 80]] as [number, number][]) ball(pen, x, y, 3.4, 'steel');
+};
+
+const fang: Draw = (pen) => {
+  const ctx = pen.ctx;
+  grip(pen, 27, 104, 27, 80, 9, '#4a2018', '#b8a070');
+  guard(pen, 27, 78, 34, 7, 0);
+  const p: Pts = [];
+  p.push(19, 76);
+  bez(p, 19, 76, 14, 50, 18, 26, 30, 6, 12, true);
+  bez(p, 30, 6, 34, 30, 38, 54, 35, 76, 12, true);
+  paint(pen, p, lin(ctx, 16, 10, 38, 76, '#fbf6e6', '#e2d6b4', '#a8987a'), '#4a3e2a', { hatch: 0, outline: 2.2 });
+  shine(pen, [22, 64, 22, 40, 28, 18], 1.8, 0.7);
+  // 血槽
+  ctx.save();
+  pathPts(ctx, p, true);
+  ctx.clip();
+  line(pen, [29, 70, 29, 46, 31, 24], 2.4, '#a8202a', 0.9);
+  ctx.fillStyle = '#c2303a';
+  ctx.beginPath();
+  ctx.arc(29.5, 30, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ball(pen, 27, 107, 4.4);
+};
+
+const brew: Draw = (pen) => {
+  const ctx = pen.ctx;
+  const p: Pts = [];
+  p.push(23, 12, 23, 20);
+  quad(p, 23, 20, 8, 28, 10, 46, 8, true);
+  p.push(44, 46);
+  quad(p, 44, 46, 46, 28, 31, 20, 8, true);
+  p.push(31, 12);
+  fillPts(ctx, p, 'rgba(235,225,225,0.5)');
+  ctx.save();
+  pathPts(ctx, p, true);
+  ctx.clip();
+  const lq: Pts = [];
+  quad(lq, 4, 30, 27, 26, 50, 30, 8);
+  lq.push(50, 52, 4, 52);
+  fillPts(ctx, lq, rad(ctx, 22, 38, 22, '#ffb07a', '#e04a24', '#7a1a0c'));
+  ctx.restore();
+  spark(pen, 27, 38, 6.5, '#ffe28a');
+  shine(pen, [14, 32, 15, 42], 2, 0.8);
+  outline(pen, p, 2);
+  const cork = rectPts(20, 4, 14, 10, 2);
+  fillPts(ctx, cork, lin(ctx, 20, 4, 34, 14, '#d7a868', '#a8743c'));
+  outline(pen, cork, 1.6);
+};
+
+const charm: Draw = (pen) => {
+  const ctx = pen.ctx;
+  line(pen, [27, 4, 27, 12], 2, '#8a6a3a');
+  const ring = ellipsePts(27, 7, 4, 4, 10);
+  outline(pen, ring, 1.6, true, '#c8963e');
+  // 四叶草
+  for (let i = 0; i < 4; i++) {
+    const a = -Math.PI / 4 + (i / 4) * Math.PI * 2;
+    const x = 27 + Math.cos(a) * 8;
+    const y = 30 + Math.sin(a) * 8;
+    const lf = ellipsePts(x, y, 9, 9, 16);
+    paint(pen, lf, rad(ctx, x - 2, y - 2, 11, '#b8e27a', '#5a9a2c', '#2c5a14'), '#1e3a0c', { hatch: 0, outline: 1.8 });
+  }
+  line(pen, [27, 30, 33, 48], 2.2, '#3a6a1c');
+  ball(pen, 27, 30, 4);
+  shine(pen, [17, 22, 20, 18], 1.6, 0.8);
+};
+
 export const ICONS: Record<ItemId, Draw> = {
   dagger, sword, buckler, leather, herb, whetstone, glove, pouch,
   boomerang, axe, kris, helmet, potion, moonstone,
   hammer, bow, horn, cauldron,
   phoenix, thunder, hourglass,
+  shuriken, venom, thorns, fang, brew, charm,
   slime, ratfang, breath, claw, scale,
 };

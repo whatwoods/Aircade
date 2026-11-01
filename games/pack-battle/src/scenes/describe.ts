@@ -3,7 +3,7 @@ import { ITEMS } from '../config.ts';
 import type { Derived, ItemId, Lv } from '../game/types.ts';
 import type { DetailInfo } from '../render/views/hudView.ts';
 
-const PCT = new Set(['speed', 'boost', 'reviveFrac']);
+const PCT = new Set(['speed', 'boost', 'reviveFrac', 'lifesteal', 'rage']);
 
 function fmt(v: number): string {
   if (Math.abs(v - Math.round(v)) < 1e-6) return String(Math.round(v));
@@ -34,6 +34,8 @@ function derivedValues(id: ItemId, lv: Lv, d: Derived): Record<string, number> {
   v.startShield = d.startShield;
   v.lowHpHeal = d.lowHpHeal;
   v.cleanse = d.cleanse;
+  v.thorns = d.thorns;
+  v.lifesteal = d.lifesteal;
   return v;
 }
 
@@ -41,7 +43,7 @@ export function fill(tpl: string, id: ItemId, vals: Record<string, number>): str
   const def = ITEMS[id];
   return tpl.replace(/\{(\w+)\}/g, (_, k: string) => {
     const v = vals[k] ?? 0;
-    if (PCT.has(k) || (k === 'adj' && def.adj.kind === 'countTag' && def.adj.stat === 'reviveFrac')) return Math.round(v * 100) + '%';
+    if (PCT.has(k) || (k === 'adj' && def.adj.kind === 'countTag' && (def.adj.stat === 'reviveFrac' || def.adj.stat === 'lifesteal'))) return Math.round(v * 100) + '%';
     return fmt(v);
   });
 }

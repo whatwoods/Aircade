@@ -4,6 +4,7 @@ import { sfx } from '../audio/sfx.ts';
 import { BATTLE, ECONOMY, FX, ITEMS, TUTORIAL } from '../config.ts';
 import { Spring } from '../core/spring.ts';
 import { Playback } from '../game/battle/playback.ts';
+import { interestCap } from '../game/economy.ts';
 import { enemyBag, enemyFor, runEnemy } from '../game/enemies.ts';
 import { badgeCell, shapeOf } from '../game/shapes.ts';
 import { computeSynergy, type SynergyResult } from '../game/synergy.ts';
@@ -388,6 +389,7 @@ export class BattleController {
         const big = amt >= res.maxHp[tgt] * FX.bigHitFrac;
         const bar = tgt === 0 ? this.hpP : this.hpE;
         this.targetPoint(tgt, TMP);
+        if (e.thorn) emit('spark', TMP.x, TMP.y, 1, { color: '#c8e07a', speed: 0, size: 14, life: 0.2 });
         if (e.fire) {
           // 龙炎：真实伤害，火焰扫过下半屏
           this.fireSweep = 0;
@@ -508,8 +510,9 @@ export class BattleController {
       }
       case 'lowHp': {
         this.barCenter(e.side, TMP);
-        popup('+' + (e.amount ?? 0), TMP.x - 70, TMP.y - 34, C.healLight, 34, { ui: true, life: 1.2, vy: -50 });
-        emit('bubble', TMP.x, TMP.y, 12, { color: C.healLight, speed: 140, life: 0.7, ui: true });
+        const col = e.rage ? '#ff9a5a' : C.healLight;
+        popup(e.rage ? '狂暴' : '+' + (e.amount ?? 0), TMP.x - 70, TMP.y - 34, col, 34, { ui: true, life: 1.2, vy: -50 });
+        emit('bubble', TMP.x, TMP.y, 12, { color: col, speed: 140, life: 0.7, ui: true });
         sfx('potion');
         tier('T3');
         if (e.uid !== undefined) {
@@ -749,7 +752,7 @@ export class BattleController {
     const k = Math.min(1, Math.max(0, (this.ribbonK - 0.6) / 0.4));
     if (k <= 0) return;
     const run = this.gs.run;
-    const interest = Math.min(ECONOMY.interestCap, Math.floor(run.savedGold / ECONOMY.interestStep));
+    const interest = Math.min(interestCap(run), Math.floor(run.savedGold / ECONOMY.interestStep));
     const parts = [win ? `+${ECONOMY.winBonus} 胜利` : `+${ECONOMY.lossBonus} 失败补偿`];
     if (interest > 0) parts.push(`+${interest} 利息`);
     if (run.pouchGold > 0) parts.push(`+${run.pouchGold} 钱袋`);

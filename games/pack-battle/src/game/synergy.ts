@@ -14,7 +14,7 @@ export interface SynergyResult {
 
 const STAT_KIND: Record<AdjStat, LinkKind> = {
   dmg: 'dmg', shield: 'shield', heal: 'heal', poison: 'poison', reduce: 'reduce',
-  reviveFrac: 'heal', startShield: 'shield', lowHpHeal: 'heal',
+  reviveFrac: 'heal', startShield: 'shield', lowHpHeal: 'heal', thorns: 'dmg', lifesteal: 'heal',
 };
 
 function pct(v: number): string {
@@ -29,6 +29,8 @@ function statLabel(stat: AdjStat, v: number): string {
     case 'poison': return `+${v} 层中毒`;
     case 'reduce': return `-${v} 受伤`;
     case 'reviveFrac': return `+${Math.round(v * 100)}% 复活`;
+    case 'thorns': return `+${v} 反弹`;
+    case 'lifesteal': return `+${Math.round(v * 100)}% 吸血`;
   }
 }
 
@@ -62,6 +64,7 @@ export function computeSynergy(items: readonly Placed[], cols: number, rows: num
       stun: st.stun ?? 0, reduce: st.reduce ?? 0, reviveFrac: st.reviveFrac ?? 0,
       startShield: st.startShield ?? 0, lowHpHeal: def.trigger === 'lowHp' ? st.heal ?? 0 : 0,
       gold: st.gold ?? 0, shieldBreak: def.shieldBreak ?? 1,
+      thorns: st.thorns ?? 0, lifesteal: st.lifesteal ?? 0, rage: st.rage ?? 0,
       auraSpeed: st.speed ?? 0, auraDmg: st.dmgBonus ?? 0, auraBoost: st.boost ?? 0,
       sources: [], linkIds: [], emptyCells: [],
     });
@@ -96,6 +99,11 @@ export function computeSynergy(items: readonly Placed[], cols: number, rows: num
         dmgBonus.set(nu, dmgBonus.get(nu)! + v);
         contrib.push({ from: it.uid, to: nu, kind: 'dmg', label: `+${v} 伤害` });
         tgt.sources.push({ uid: it.uid, label: `${def.name} +${v} 伤害` });
+      } else if (rule.stat === 'poison') {
+        const v = st.poison ?? 0;
+        tgt.poison += v;
+        contrib.push({ from: it.uid, to: nu, kind: 'poison', label: `+${v} 层中毒` });
+        tgt.sources.push({ uid: it.uid, label: `${def.name} +${v} 层中毒` });
       } else if (rule.stat === 'boost') {
         const v = st.boost ?? 0;
         boost.set(nu, boost.get(nu)! + v);
@@ -194,6 +202,8 @@ export function computeSynergy(items: readonly Placed[], cols: number, rows: num
         case 'reduce': d.reduce += add; break;
         case 'reviveFrac': d.reviveFrac += add; break;
         case 'startShield': d.startShield += add; break;
+        case 'thorns': d.thorns += add; break;
+        case 'lifesteal': d.lifesteal += add; break;
       }
     }
     if (def.tag === 'weapon') d.dmg = Math.floor((d.dmg + dmgBonus.get(it.uid)!) * mult.get(it.uid)!);

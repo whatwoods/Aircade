@@ -37,6 +37,7 @@ export function beginArrange(run: RunState): ReceiptLine[] {
   run.shop = run.locked && run.shop.length ? rollShop(run, run.shop) : rollShop(run);
   run.pouchGold = 0;
   run.savedGold = 0;
+  run.charmCap = 0;
   run.eliteGold = 0;
   run.phase = 'arrange';
   return lines;
@@ -290,6 +291,9 @@ export function startBattle(run: RunState): BattleResult {
   let pouch = 0;
   for (const it of run.bag) if (it.id === 'pouch') pouch += ITEMS.pouch.lv[it.lv - 1].gold ?? 0;
   run.pouchGold = pouch;
+  let cap = 0;
+  for (const it of run.bag) if (it.id === 'charm') cap += ITEMS.charm.lv[it.lv - 1].interest ?? 0;
+  run.charmCap = cap;
   run.market = false;
   const e = runEnemy(run, run.round);
   const res = simulate(

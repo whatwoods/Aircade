@@ -218,7 +218,14 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     trigger: 'roundStart',
     lv: [{ gold: 1 }, { gold: 2 }, { gold: 4 }],
     adj: { kind: 'none' },
-    text: { effect: '每轮整理开始时 +{gold} 金', adj: '开战时须放在背包内' },
+    text: { effect: '每轮整理开始时 +{gold} 金', adj: '无相邻效果' },
+  },
+  shuriken: {
+    id: 'shuriken', name: '飞镖', tag: 'weapon', rarity: 0, price: 3, shape: ['#'],
+    trigger: 'cooldown', cd: 0.9,
+    lv: [{ dmg: 1, adj: 1 }, { dmg: 2, adj: 2 }, { dmg: 4, adj: 3 }],
+    adj: { kind: 'countTag', tag: 'tool', stat: 'dmg' },
+    text: { effect: '每 {cd} 秒造成 {dmg} 伤害', adj: '每相邻 1 件器具：伤害 +{adj}' },
   },
   // ───────── 精良 ─────────
   boomerang: {
@@ -263,6 +270,34 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     adj: { kind: 'aura', tags: ['armor', 'remedy'], stat: 'boost' },
     text: { effect: '相邻护具、药物效果 +{boost}', adj: '增强护盾量与回复量' },
   },
+  venom: {
+    id: 'venom', name: '毒囊', tag: 'tool', rarity: 1, price: 5, shape: ['#'],
+    trigger: 'passive',
+    lv: [{ poison: 1 }, { poison: 2 }, { poison: 3 }],
+    adj: { kind: 'aura', tags: ['weapon'], stat: 'poison' },
+    text: { effect: '相邻武器每次命中 +{poison} 层中毒', adj: '只对相邻（共享边）的武器生效' },
+  },
+  thorns: {
+    id: 'thorns', name: '荆棘甲', tag: 'armor', rarity: 1, price: 5, shape: ['#.', '##'],
+    trigger: 'passive',
+    lv: [{ thorns: 2, adj: 1 }, { thorns: 4, adj: 2 }, { thorns: 7, adj: 3 }],
+    adj: { kind: 'countTag', tag: 'armor', stat: 'thorns' },
+    text: { effect: '每次被攻击，反弹 {thorns} 伤害', adj: '每相邻 1 件其他护具：反弹 +{adj}' },
+  },
+  brew: {
+    id: 'brew', name: '狂暴药剂', tag: 'remedy', rarity: 1, price: 5, shape: ['#'],
+    trigger: 'lowHp',
+    lv: [{ rage: 0.3 }, { rage: 0.5 }, { rage: 0.8 }],
+    adj: { kind: 'none' },
+    text: { effect: '生命首次低于 50% 时：全部冷却速度 +{rage}', adj: '无相邻效果' },
+  },
+  charm: {
+    id: 'charm', name: '幸运符', tag: 'tool', rarity: 1, price: 4, shape: ['#'],
+    trigger: 'roundStart',
+    lv: [{ interest: 2 }, { interest: 3 }, { interest: 5 }],
+    adj: { kind: 'none' },
+    text: { effect: '利息上限 +{interest}', adj: '无相邻效果' },
+  },
   // ───────── 稀有 ─────────
   hammer: {
     id: 'hammer', name: '战锤', tag: 'weapon', rarity: 2, price: 8, shape: ['###', '.#.'],
@@ -291,6 +326,13 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     lv: [{ heal: 6, cleanse: 1, adj: 2 }, { heal: 12, cleanse: 2, adj: 4 }, { heal: 24, cleanse: 4, adj: 6 }],
     adj: { kind: 'countTag', tag: 'remedy', stat: 'heal' },
     text: { effect: '每 {cd} 秒回复 {heal}，解毒 {cleanse} 层', adj: '每相邻 1 件其他药物：回复 +{adj}' },
+  },
+  fang: {
+    id: 'fang', name: '吸血獠牙', tag: 'weapon', rarity: 2, price: 8, shape: ['#', '#'],
+    trigger: 'cooldown', cd: 2.2,
+    lv: [{ dmg: 7, lifesteal: 0.4, adj: 0.15 }, { dmg: 14, lifesteal: 0.4, adj: 0.15 }, { dmg: 27, lifesteal: 0.5, adj: 0.2 }],
+    adj: { kind: 'countTag', tag: 'remedy', stat: 'lifesteal' },
+    text: { effect: '每 {cd} 秒 {dmg} 伤害，吸血 {lifesteal}', adj: '每相邻 1 件药物：吸血 +{adj}' },
   },
   // ───────── 传说 ─────────
   phoenix: {
