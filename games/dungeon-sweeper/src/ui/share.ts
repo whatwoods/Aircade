@@ -2,7 +2,7 @@ import { COLS, N, ROWS, cx, cy, inLair } from '../game/board';
 import type { Game } from '../game/rules';
 import { fmtInt, fmtTime } from '../game/score';
 import { Kind, type ScoreBreakdown } from '../game/types';
-import { FONT_CN, FONT_DECO, FONT_NUM } from '../view/glyphs';
+import { FONT_CN, FONT_DECO, FONT_NUM, FONT_TITLE } from '../view/glyphs';
 import { PAL } from '../view/palette';
 import { dayLabel } from './screens';
 
@@ -59,8 +59,8 @@ function backdrop(ctx: CanvasRenderingContext2D, W: number, H: number): void {
 function logo(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  setSpacing(ctx, size * 0.08);
-  ctx.font = `900 ${size}px ${FONT_CN}`;
+  setSpacing(ctx, size * 0.04);
+  ctx.font = `${size}px ${FONT_TITLE}, ${FONT_CN}`;
   ctx.shadowColor = 'rgba(255,181,74,0.55)';
   ctx.shadowBlur = size * 0.3;
   const grad = ctx.createLinearGradient(0, y - size, 0, y);

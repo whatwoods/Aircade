@@ -208,10 +208,12 @@ body {
 }
 .logo h1 {
   margin: 0;
-  font-size: 64px;
-  font-weight: 900;
-  letter-spacing: 0.1em;
-  padding-left: 0.1em;
+  font-family: 'Ma Shan Zheng', var(--cn);
+  font-size: min(64px, 16vw);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  padding-left: 0.04em;
   background: linear-gradient(180deg, #e9dcc0 0%, #c9b896 55%, #9c8e7a 100%);
   -webkit-background-clip: text;
   background-clip: text;

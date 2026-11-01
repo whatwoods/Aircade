@@ -47,7 +47,7 @@
 | 动画/缓动 | **自研 tween 池 + 缓动函数表**（约 150 行） | 预分配对象池，每帧零分配。支持延迟、链式、yoyo，受全局时间缩放影响（hitstop/慢动作）。不用 GSAP 之类，避免体积和每帧闭包 |
 | 音频 | **WebAudio 实时合成**（振荡器、噪声缓冲、Biquad、Convolver 程序化混响、DynamicsCompressor） | 遵守约定。音效按「配方」函数生成；背景音乐是程序化氛围层（§5.6） |
 | 随机 | **mulberry32** 可播种 PRNG；地图、贴图变体、烛台位置都从种子派生 | `?seed=` 可复现 |
-| 字体 | **Cinzel（可变字重，latin 子集）** 用于数字和 HUD；**Cinzel Decorative 700（latin）** 只用于英文 Logo 和 LEVEL UP。中文用系统字体栈 | 古典碑刻感，符合美术分区。通过 `?url` 只引入需要的 woff2 文件，用 `FontFace` API 加载，加载完成后再烘焙 Canvas 字形图集 |
+| 字体 | **Cinzel（可变字重，latin 子集）** 用于数字和 HUD；**Cinzel Decorative 700（latin）** 只用于英文 Logo 和 LEVEL UP；**马善政（Ma Shan Zheng，OFL）** 毛笔楷书只用于中文 Logo，子集化到「地牢扫雷」四个字（woff2 约 2.4KB，`src/assets/fonts/`，许可证同目录）。其余中文用系统字体栈 | 古典碑刻感，符合美术分区。通过 `?url` 只引入需要的 woff2 文件，用 `FontFace` API 加载，加载完成后再烘焙 Canvas 字形图集 |
 
 **依赖清单**（2026-10 用 `npm view` 核实）
 
@@ -387,7 +387,7 @@ input:  { longPressMs: 380, longPressHintMs: 120, tapSlopPx: 10, radialRadius: 7
 
 | 场景 | 字体 | 规格 |
 |---|---|---|
-| 中文 Logo「地牢扫雷」 | 系统栈 `"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif`，字重 900 | 64px，字距 0.10em；石材渐变填充 `#E9DCC0→#9C8E7A`；分层 text-shadow 做出碑刻厚度（`0 2px 0 #3A2D24, 0 4px 0 #1C1511`）；烛光外发光 `0 0 24px rgba(255,181,74,.35)`，随烛火闪烁 |
+| 中文 Logo「地牢扫雷」 | 马善政毛笔楷书（`FONT_TITLE`），回退系统栈 | `min(64px, 16vw)`（窄屏不碰蜡烛），字距 0.04em；石材渐变填充 `#E9DCC0→#9C8E7A`；分层 text-shadow 做出碑刻厚度（`0 2px 0 #3A2D24, 0 4px 0 #1C1511`）；烛光外发光 `0 0 24px rgba(255,181,74,.35)`，随烛火闪烁 |
 | 英文副标 / LEVEL UP | Cinzel Decorative 700 | 字距 0.32em，熔金 |
 | 格内数字 | Cinzel 800（可变字重） | 一位数 22px，两位数 18px（cell = 40px 时）；先画深色下偏移 1px 再画本色，做出凹刻感 |
 | HUD 数值 | Cinzel 700 | 生命 15px，分数 18px，计时 15px |
@@ -464,7 +464,7 @@ Canvas 里的数字全部预烘焙进**字形图集**（每档颜色 × 0–9，
 
 **A. 标题页（390×844）**
 - 全屏石墙（`#151821→#0C0E14`，大块砖），强暗角。左上方一道琥珀体积光柱斜穿画面（约 25°），尘埃在光里漂浮。
-- y≈22–36%：中文 Logo「地牢扫雷」（64px 碑刻字）。下方是 `DUNGEON SWEEPER`（Cinzel Decorative 15px，字距 0.32em，熔金）。Logo 左右各有一支 Canvas 绘制的蜡烛（约 x=40、x=350），火焰摇曳，Logo 的外发光强度随烛火同步闪烁。
+- y≈22–36%：中文 Logo「地牢扫雷」（64px 毛笔字）。下方是 `DUNGEON SWEEPER`（Cinzel Decorative 15px，字距 0.32em，熔金）。Logo 左右各有一支 Canvas 绘制的蜡烛（约 x=40、x=350），火焰摇曳，Logo 的外发光强度随烛火同步闪烁。
 - y≈50%：远处黑暗中有一对龙眼（龙眼金竖缝加光晕），每 6–9 秒缓缓睁开，持续 1.2 秒后闭上。睁眼时隐约能看到龙首轮廓的微弱轮廓光。
 - 菜单从底部 8% 起向上排，宽 260，间距 12：
   - 主按钮（260×56）：青铜渐变底、金色描边、内嵌暗环加一道金线，左右两颗菱形铆钉，2.4s 呼吸外发光。无存档时是【开始冒险】，有存档时是【继续冒险】。
@@ -1035,6 +1035,7 @@ URL 参数：
 | 巨龙美术 | §4.6：新文件 `view/dragonArt.ts`；`shapes.ts` 里的 `DRAGON_LAIR` / `DRAGON_CRACKS` / `DRAGON_RISE` 删除 | 原先巢中是看不出形状的黑团加随机橙色弧线，战斗形态像卡通猫 |
 | 苏醒效果 | 巢外的金红光圈改为身下暖光加升起的余烬 | 光圈糊成一片米色，盖住龙 |
 | 调试 | `__game.dragonSheet()` | 调龙的造型时不用打到屠龙 |
+| 中文标题字体 | 系统黑体 900 → 马善政毛笔楷书（§4.3），标题页和分享卡都用 | 系统黑体太普通；对比过马善政、志莽行、龙藏、站酷小薇、站酷庆科黄油、思源宋体 Black，毛笔字最贴暗黑地牢气质且仍好认 |
 
 ---
 

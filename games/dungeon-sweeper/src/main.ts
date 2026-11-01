@@ -1,5 +1,6 @@
 import cinzelUrl from '@fontsource-variable/cinzel/files/cinzel-latin-wght-normal.woff2?url';
 import decoUrl from '@fontsource/cinzel-decorative/files/cinzel-decorative-latin-700-normal.woff2?url';
+import titleUrl from './assets/fonts/ma-shan-zheng-title.woff2?url';
 import './ui/styles.css';
 import { App } from './app';
 import { validateConfig } from './config';
@@ -21,6 +22,7 @@ function loadFonts(onLate: () => void): Promise<void> {
   try {
     faces.push(new FontFace('Cinzel', `url(${cinzelUrl}) format('woff2')`, { weight: '400 900', display: 'swap' }));
     faces.push(new FontFace('Cinzel Decorative', `url(${decoUrl}) format('woff2')`, { weight: '700', display: 'swap' }));
+    faces.push(new FontFace('Ma Shan Zheng', `url(${titleUrl}) format('woff2')`, { display: 'swap' }));
   } catch {
     return Promise.resolve();
   }
