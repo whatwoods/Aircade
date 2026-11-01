@@ -91,16 +91,17 @@ function arrange(run: RunState): void {
     run.shop.forEach((slot, i) => {
       if (!slot.id || slot.price > run.gold) return;
       const id = slot.id;
-      const mt = mergeTargetFor(run, id, 1);
+      const lv = slot.lv ?? 1;
+      const mt = mergeTargetFor(run, id, lv);
       if (mt) consider((r) => buy(r, i, { zone: 'merge', uid: mt.uid }).ok);
-      const spot = bestSpot(run.bag, run.open, id, 1);
+      const spot = bestSpot(run.bag, run.open, id, lv);
       if (spot) consider((r) => buy(r, i, spot).ok);
       else {
         // 背包满：试着卖掉一件再放
         for (const old of run.bag) {
           consider((r) => {
             if (!sell(r, old.uid, 0)) return false;
-            const sp = bestSpot(r.bag, r.open, id, 1);
+            const sp = bestSpot(r.bag, r.open, id, lv);
             return !!sp && r.gold >= slot.price && buy(r, i, sp).ok;
           });
         }
@@ -121,7 +122,7 @@ function arrange(run: RunState): void {
       continue;
     }
     // 有放不下的卡：解锁一格
-    const unfit = run.shop.filter((s) => s.id && !mergeTargetFor(run, s.id, 1) && !bestSpot(run.bag, run.open, s.id, 1));
+    const unfit = run.shop.filter((s) => s.id && !mergeTargetFor(run, s.id, s.lv ?? 1) && !bestSpot(run.bag, run.open, s.id, s.lv ?? 1));
     const cheapest = Math.min(...unfit.map((s) => s.price));
     const free = buildOcc(run.bag, BAG.cols, BAG.rows, run.open).cells.filter((c) => c === 0).length;
     if ((unfit.length && run.gold >= cellPrice(run) + cheapest) || (free <= 1 && run.gold >= cellPrice(run) + 3)) {

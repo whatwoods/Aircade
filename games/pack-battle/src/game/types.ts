@@ -93,6 +93,8 @@ export interface Placed {
 export interface ShopSlot {
   id: ItemId | null;
   price: number;
+  /** 后期商店会直接卖 ★★（缺省 = 1） */
+  lv?: Lv;
 }
 
 /** 轮间事件 */

@@ -55,13 +55,14 @@ export function rollShop(run: RunState, keep?: ShopSlot[]): ShopSlot[] {
   for (let i = 0; i < SHOP.slots; i++) {
     const k = keep?.[i];
     if (k && k.id) {
-      out.push({ id: k.id, price: k.price });
+      out.push({ id: k.id, price: k.price, lv: k.lv });
       counts.set(k.id, (counts.get(k.id) ?? 0) + 1);
       continue;
     }
     const id = pickItem(rng, pickRarity(rng, run.round + (run.market ? EVENTS.marketBoost : 0)), owned, counts);
     counts.set(id, (counts.get(id) ?? 0) + 1);
-    out.push({ id, price: ITEMS[id].price });
+    const lv2 = rng.next() < (SHOP.lv2Chance[Math.min(run.round, SHOP.lv2Chance.length - 1)] ?? 0);
+    out.push(lv2 ? { id, price: ITEMS[id].price * 2, lv: 2 } : { id, price: ITEMS[id].price });
   }
   // 前几轮保底武器
   if (run.round <= SHOP.weaponGuaranteeUntil && !out.some((s) => s.id && ITEMS[s.id].tag === 'weapon')) {

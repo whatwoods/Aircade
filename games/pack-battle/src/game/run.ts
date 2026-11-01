@@ -123,7 +123,7 @@ export function buy(run: RunState, slot: number, dest: Dest): OpResult {
   const s = run.shop[slot];
   if (!s || !s.id) return { ok: false, reason: '已售出' };
   if (run.gold < s.price) return { ok: false, reason: '金币不足' };
-  const it = makeInst(run, s.id, 1, s.price);
+  const it = makeInst(run, s.id, s.lv ?? 1, s.price);
   it.zone = 'stash';
   it.slot = -1;
   const r = putAt(run, it, dest);
@@ -142,7 +142,7 @@ export function quickBuyDest(run: RunState, slot: number, merge: boolean): Dest 
   const s = run.shop[slot];
   if (!s || !s.id) return null;
   if (merge) {
-    const t = mergeTargetFor(run, s.id, 1);
+    const t = mergeTargetFor(run, s.id, s.lv ?? 1);
     if (t) return { zone: 'merge', uid: t.uid };
   }
   const free = run.stash.findIndex((x) => x === null);

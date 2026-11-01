@@ -5,7 +5,7 @@ import { input } from '../core/input.ts';
 import { clock } from '../core/loop.ts';
 import { Spring, Spring2 } from '../core/spring.ts';
 import { canPlace, conflictCells, type Occ } from '../game/grid.ts';
-import { buy, canMerge, find, move, quickBuyDest, rotateInPlace, sell, sellValue, type Dest, type OpResult } from '../game/run.ts';
+import { buy, canMerge, find, mergeTargetFor, move, quickBuyDest, rotateInPlace, sell, sellValue, type Dest, type OpResult } from '../game/run.ts';
 import { shapeOf, type Cell } from '../game/shapes.ts';
 import { computeSynergy } from '../game/synergy.ts';
 import type { ItemId, ItemInst, Link, Lv, Placed, Rot } from '../game/types.ts';
@@ -287,7 +287,7 @@ export class ArrangeController {
         return;
       }
       id = slot.id;
-      lv = 1;
+      lv = slot.lv ?? 1;
       rot = 0;
       const box = gs.shopV.itemBox(L, s.slot, id);
       const sh = shapeOf(id, 0);
@@ -448,9 +448,9 @@ export class ArrangeController {
     if (s.kind === 'card') {
       const slot = run.shop[s.slot];
       if (!slot || !slot.id) return;
-      const canM = !!this.mergeTargetForCard(slot.id);
+      const canM = !!this.mergeTargetForCard(slot.id, slot.lv ?? 1);
       gs.openDetail({
-        id: slot.id, lv: 1, d: null, shop: { slot: s.slot, price: slot.price, canMerge: canM, afford: run.gold >= slot.price },
+        id: slot.id, lv: slot.lv ?? 1, d: null, shop: { slot: s.slot, price: slot.price, canMerge: canM, afford: run.gold >= slot.price },
         peek, fx: x, fy: y,
       });
     } else {
@@ -463,11 +463,8 @@ export class ArrangeController {
     vibrate(4);
   }
 
-  private mergeTargetForCard(id: ItemId): ItemInst | null {
-    const run = this.gs.run;
-    for (const it of run.bag) if (it.id === id && it.lv === 1) return it;
-    for (const it of run.stash) if (it && it.id === id && it.lv === 1) return it;
-    return null;
+  private mergeTargetForCard(id: ItemId, lv: Lv): ItemInst | null {
+    return mergeTargetFor(this.gs.run, id, lv);
   }
 
   /** 详情卡里的「购买」/「购买并合成」 */
@@ -501,7 +498,7 @@ export class ArrangeController {
     this.afterBuy(slot, price, box.cx, box.cy);
     if (dest.zone === 'merge') {
       this.flyers.push({
-        id, lv: 1, x0: box.cx, y0: box.cy, x1: 0, y1: 0, ang: 0, cell: box.cell, t: 0, dur: 0.22, spin: 0, kind: 'absorb', target: r.uid, big: false,
+        id, lv: s.lv ?? 1, x0: box.cx, y0: box.cy, x1: 0, y1: 0, ang: 0, cell: box.cell, t: 0, dur: 0.22, spin: 0, kind: 'absorb', target: r.uid, big: false,
       });
       gs.syncViews(false);
       gs.recompute(true);
@@ -891,8 +888,8 @@ export class ArrangeController {
       const s = this.srcAt(input.hx, input.hy);
       if (s) {
         if (s.kind === 'card') {
-          const id = gs.run.shop[s.slot]?.id;
-          if (id) gs.showDetail(describe(id, 1), 0.4);
+          const c = gs.run.shop[s.slot];
+          if (c?.id) gs.showDetail(describe(c.id, c.lv ?? 1), 0.4);
         } else {
           const it = find(gs.run, s.uid);
           if (it) gs.showDetail(gs.detailFor(it), 0.4);
@@ -966,7 +963,7 @@ export class ArrangeController {
     const d = this.drag;
     if (!d) return;
     const gs = this.gs;
-    if (d.src.kind === 'card') gs.showDetail(describe(d.id, 1), 1);
+    if (d.src.kind === 'card') gs.showDetail(describe(d.id, d.lv), 1);
     else {
       const it = find(gs.run, d.src.uid);
       if (it) gs.showDetail(gs.detailFor(it), 1);

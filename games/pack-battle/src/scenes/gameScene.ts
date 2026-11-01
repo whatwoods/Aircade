@@ -14,13 +14,13 @@ import { clearRun, saveRun, saveable } from '../game/save.ts';
 import { clearScore } from '../game/score.ts';
 import { enemyBag, enemyFor } from '../game/enemies.ts';
 import {
-  applyChoice, applyResult, beginArrange, canUnlock, smithTarget, cellPrice, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, unlockable, unlockCell,
+  applyChoice, applyResult, beginArrange, canUnlock, mergeTargetFor, smithTarget, cellPrice, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, unlockable, unlockCell,
   type Outcome, type SellRecord,
 } from '../game/run.ts';
 import { fullMask } from '../game/grid.ts';
 import { computeSynergy, type SynergyResult } from '../game/synergy.ts';
 import { hintSeen, markHint, markTutorialDone, resetTutorialFlag, HINT_TEXT, Tutorial, type HintId } from '../game/tutorial.ts';
-import type { EventId, ItemInst, Rot, RunState } from '../game/types.ts';
+import type { EventId, ItemInst, Lv, Rot, RunState } from '../game/types.ts';
 import { drawParticles, emit } from '../render/fx/particles.ts';
 import { drawPopups, popup } from '../render/fx/popups.ts';
 import { shake, tier } from '../render/fx/shake.ts';
@@ -835,7 +835,7 @@ export class GameScene implements Scene {
       this.shopV.sellK.target = sm ? 1 : 0;
       this.shopV.draw(ctx, L, this.run.shop, time, {
         gold: this.run.gold, sell: sm ? sm.price : 0, sellFull: sm ? sm.full : false,
-        mergeable: (id) => this.mergeable(id), out, locked: this.run.locked, hover: this.ac.hoverCard,
+        mergeable: (id, lv) => this.mergeable(id, lv), out, locked: this.run.locked, hover: this.ac.hoverCard,
       });
       if (a > 0.01) {
         ctx.save();
@@ -1065,10 +1065,8 @@ export class GameScene implements Scene {
     }
   }
 
-  mergeable(id: ItemInst['id']): boolean {
-    for (const it of this.run.bag) if (it.id === id && it.lv === 1) return true;
-    for (const it of this.run.stash) if (it && it.id === id && it.lv === 1) return true;
-    return false;
+  mergeable(id: ItemInst['id'], lv: Lv = 1): boolean {
+    return !!mergeTargetFor(this.run, id, lv);
   }
 
   // ---------- 输入 ----------

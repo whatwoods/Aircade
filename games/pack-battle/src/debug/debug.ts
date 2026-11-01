@@ -161,7 +161,7 @@ export function installDebug(): void {
         scene: 'game', phase: g.phase, round: r.round, attempt: r.attempt, hearts: r.hearts, gold: r.gold, score: r.score,
         bag: r.bag.map((i) => ({ uid: i.uid, id: i.id, lv: i.lv, rot: i.rot, x: i.x, y: i.y })),
         stash: r.stash.map((i) => (i ? { uid: i.uid, id: i.id, lv: i.lv, rot: i.rot, slot: i.slot } : null)),
-        shop: r.shop.map((s) => ({ id: s.id, price: s.price })),
+        shop: r.shop.map((s) => ({ id: s.id, price: s.price, lv: s.lv ?? 1 })),
         locked: r.locked, open: r.open, unlocked: r.unlocked, freeCells: r.freeCells, choice: r.choice, market: r.market, elite: r.elite, enemy: { name: e.name, title: e.title, hp: e.hp, boss: !!e.boss },
         tutorial: g.tut.step, paused: g.paused, speed: g.bc.speed, overlay: g.ov.top ? g.ov.top.kind : null,
         dragging: !!g.ac.drag, links: g.syn.links.map((l) => ({ from: l.from, to: l.to, kind: l.kind, label: l.label })),

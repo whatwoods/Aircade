@@ -48,6 +48,8 @@ export const SHOP = {
   ownedWeightMul: 1.6,
   maxDupPerShop: 2,
   weaponGuaranteeUntil: 3,
+  /** 每张卡直接是 ★★ 的概率（下标 = 轮次），价格 ×2 */
+  lv2Chance: [0, 0, 0, 0, 0, 0.1, 0.12, 0.15, 0.18, 0.2, 0.2],
 };
 
 export const BATTLE = {
@@ -346,7 +348,7 @@ export const ENEMIES: EnemyDef[] = [
   {
     round: 6, name: '吱吱帮', title: '鼠群', hp: 170, cols: 5, rows: 4, frame: 'crate', portrait: 'rats',
     layout: ['a.c.e', 'bM.d.', '..f..', 'H.J..'],
-    legend: { a: 'ratfang', b: 'ratfang', c: 'ratfang', d: 'ratfang', e: 'ratfang', f: 'ratfang', M: 'whetstone', H: 'herb', J: 'herb' }, traits: [],
+    legend: { a: 'ratfang:2', b: 'ratfang', c: 'ratfang:2', d: 'ratfang', e: 'ratfang:2', f: 'ratfang', M: 'whetstone', H: 'herb', J: 'herb' }, traits: [],
     hint: '一大堆小伤害：铁盔、护盾能减免，输出够高也能抢先咬死它们。',
   },
   {
@@ -356,7 +358,7 @@ export const ENEMIES: EnemyDef[] = [
     hint: '她会不停回血，爆发要够高。',
   },
   {
-    round: 8, name: '铁蹄', title: '黑骑士', hp: 300, cols: 6, rows: 4, frame: 'iron', portrait: 'knight',
+    round: 8, name: '铁蹄', title: '黑骑士', hp: 260, cols: 6, rows: 4, frame: 'iron', portrait: 'knight',
     layout: ['SWWLLL', 'SWW.L.', 'SII...', 'M.....'],
     legend: { S: 'sword:3', W: 'buckler:2', L: 'leather:2', I: 'helmet', M: 'whetstone:2' }, traits: [],
     hint: '每次受击减伤 2：小刀刮不动他。',
@@ -368,7 +370,7 @@ export const ENEMIES: EnemyDef[] = [
     hint: '冷箭很痛，开场就要有护盾。',
   },
   {
-    round: 10, name: '烬', title: '古龙', hp: 620, cols: 6, rows: 5, frame: 'gold', portrait: 'dragon', boss: true,
+    round: 10, name: '烬', title: '古龙', hp: 680, cols: 6, rows: 5, frame: 'gold', portrait: 'dragon', boss: true,
     layout: ['BB....', 'BBGC..', '..GD..', '......', '...X..'],
     legend: { B: 'breath', G: 'hourglass', C: 'claw', D: 'claw', X: 'scale' },
     traits: [{ kind: 'dragonRage', at: 0.5, trueDmg: 20, speed: 0.3 }],
