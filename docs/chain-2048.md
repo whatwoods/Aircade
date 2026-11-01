@@ -67,7 +67,7 @@
 | UI | 原生 DOM + CSS（无框架） | 面板、按钮用 DOM：文字清晰、可访问（role/aria）、Playwright 可用 `getByRole` 定位。分数、金印、链头进度等 HUD 也用 DOM（只在数值变化时写，transform/opacity 动画） |
 | 音频 | WebAudio 实时合成：振荡器、FM、噪声、双二阶滤波、包络、卷积混响（程序生成的脉冲响应）、压缩器 | 素材约定要求程序化；连锁音高要按连锁步数实时升调，合成器天然适合 |
 | 字体 | `@fontsource/bungee`（latin 400，14.3 KB）做 Logo/标题/分数；`@fontsource/big-shoulders-display`（latin 800，14.6 KB）做珠子上的数字和 HUD 数字。共 **28.9 KB** | 见 §4.3 的实测数据 |
-| 构建 | Vite 8 + TypeScript 6（strict，`erasableSyntaxOnly`），npm | 与第一批一致。`erasableSyntaxOnly` 让 `src/game/` 的纯逻辑可以被 Node 22 原生类型剥离直接运行（已在本机 Node v22.22.0 验证 `.ts` 互相 import 可直接 `node` 执行），模拟器不需要额外依赖 |
+| 构建 | Vite 8 + TypeScript 6（strict，`erasableSyntaxOnly`），pnpm | 与第一批一致。`erasableSyntaxOnly` 让 `src/game/` 的纯逻辑可以被 Node 22 原生类型剥离直接运行（已在本机 Node v22.22.0 验证 `.ts` 互相 import 可直接 `node` 执行），模拟器不需要额外依赖 |
 
 ### 2.2 依赖清单（精确版本）与体积
 
@@ -79,8 +79,8 @@
 | `@fontsource/big-shoulders-display` | `5.3.0` | dependency（只引用 1 个文件） | `big-shoulders-display-latin-800-normal.woff2` 14.6 KB |
 
 - 不引入任何其他运行时依赖。字体用 `import url from '@fontsource/.../files/xxx.woff2?url'` 引入，自己写 `new FontFace()` 注册并 `await`（珠子精灵需要在字体就绪后烘焙；字体 300 ms 内未就绪先用系统字体烘焙，就绪后重烘，不阻塞开始按钮）。不引包自带 CSS，避免把 `.woff` 后备文件打进 dist。
-- **首包预算**：JS ≤ 95 KB 压缩（gzip ≤ 34 KB）；CSS ≤ 8 KB（gzip ≤ 3 KB）；HTML ≤ 4 KB（标题页 DOM 直出）；字体 28.9 KB。首次传输合计 **≤ 70 KB**。`npm run build` 后在文档里回填实测值。
-- npm scripts：`dev`（5105，strictPort，host）、`build`（`tsc --noEmit && vite build`）、`preview`（5105）、`sim`（`node scripts/sim.ts`）。
+- **首包预算**：JS ≤ 95 KB 压缩（gzip ≤ 34 KB）；CSS ≤ 8 KB（gzip ≤ 3 KB）；HTML ≤ 4 KB（标题页 DOM 直出）；字体 28.9 KB。首次传输合计 **≤ 70 KB**。`pnpm build` 后在文档里回填实测值。
+- package.json scripts：`dev`（5105，strictPort，host）、`build`（`tsc --noEmit && vite build`）、`preview`（5105）、`sim`（`node scripts/sim.ts`）。
 
 ### 2.3 轨道与链条算法（实现依据）
 
@@ -310,7 +310,7 @@ near(p)   = p > push.nearFrom ? push.nearMul : 1                               p
 
 ### 3.13 难度曲线与验证计划（规避第一批的问题）
 
-**目标**（`npm run sim` 输出，作为验收门槛）
+**目标**（`pnpm sim` 输出，作为验收门槛）
 
 | 指标 | 新手机器人 | 认真机器人 |
 |---|---|---|
@@ -672,7 +672,7 @@ games/chain-2048/
 ├─ index.html              标题页 DOM 直出、meta viewport、safe-area
 ├─ package.json / package-lock.json / tsconfig.json / vite.config.ts
 ├─ scripts/
-│  └─ sim.ts               npm run sim：批量跑机器人，打印难度曲线报表（纯 Node，无 DOM）
+│  └─ sim.ts               pnpm sim：批量跑机器人，打印难度曲线报表（纯 Node，无 DOM）
 └─ src/
    ├─ main.ts              入口：字体注册、舞台初始化、启动 app
    ├─ app.ts               场景状态机（boot/title/playing/results + 叠加层）
@@ -798,7 +798,7 @@ URL 参数：
 
 调用时机不合法时返回 `{ok:false, reason}`，不抛错、不产生控制台报错。
 
-`npm run sim` 示例输出（格式）：
+`pnpm sim` 示例输出（格式）：
 ```
 bot=careful runs=40 lives=2   run: median 10.8 min (7.9–14.2), stopStage median 11
 stage  clear%  time(s)  maxP(med)  danger%  merges/shot  cascade p90
@@ -835,7 +835,7 @@ CHECKS: [ok] novice median 4–6 min  [ok] careful stage step ≤15pp  [FAIL] gr
 | # | 内容 | 验收 |
 |---|---|---|
 | M1 可玩核心 | 工程脚手架；`track.ts` + 4 条轨道；`chain.ts`（推进、插入、合成、三合一、封印、缺口回吸、接合）；`ammo.ts`；`shooter.ts`；圆 + 数字的调试画面；按住瞄准松手发射；关卡流程与玉佩；单元自检（`scripts/sim.ts --selftest` 跑一组确定的链条用例：阶梯连锁、三合一、封印回吸、链头插入失败宽限） | 能从第 1 关打到第 12 关；?seed 可复现 |
-| M2 难度验证 | `bots.ts` + `npm run sim` + `__game.simulate()`；按 §3.13 门槛调 `config.stages` | 所有 CHECKS 通过或在 §11 写明取舍 |
+| M2 难度验证 | `bots.ts` + `pnpm sim` + `__game.simulate()`；按 §3.13 门槛调 `config.stages` | 所有 CHECKS 通过或在 §11 写明取舍 |
 | M3 流程与 UI | 标题、引导（4 步 + 情境提示）、HUD、暂停、结算、设置、存储、转场、桌面适配、debug 浮层 | 首次进入 30 s 内完成引导；全流程无报错 |
 | M4 美术 | 珠子三层精灵（12 级）、石槽轨道、闸门、蛇口、石桥、图腾、背景烘焙、god rays、光尘、桌面装饰、Logo | `showcase()` 截图中所有数字在 390×844 下清晰可读 |
 | M5 动效与音频 | §5.2 全表、trauma/hitstop、粒子、跳字避让、放大镜、WebAudio 音效与程序化音乐 | 逐条对照 §5.2 |
@@ -870,7 +870,7 @@ CHECKS: [ok] novice median 4–6 min  [ok] careful stage step ≤15pp  [FAIL] gr
 
 ### 11.2 阶段 2 关卡表调参（已被 §11.6 取代，保留作记录）
 
-调参工具：`node scripts/sim.ts N`（`npm run sim`）。它和 `__game.simulate()` 共用 `src/game/simulate.ts` 与 `bots.ts`，用真实轨道、射线遮挡、飞行时间和 120 Hz 步进。
+调参工具：`node scripts/sim.ts N`（`pnpm sim`）。它和 `__game.simulate()` 共用 `src/game/simulate.ts` 与 `bots.ts`，用真实轨道、射线遮挡、飞行时间和 120 Hz 步进。
 
 与设计原表相比，主要改了这些：
 - **第 6 → 7 关新手断崖（M2 头号任务）**：原表在真实几何下，新手过第 6 关的通关率约 63%，第 7 关跌到 0–10%（换轨道 C、金印 512、出生 4–64 三件事叠在一起）。处理方法是把难度台阶拆开：

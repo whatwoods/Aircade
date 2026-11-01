@@ -31,7 +31,7 @@
 | 随机 | 自写 sfc32，按字符串哈希派生独立流（shape / color / garbage / fx） | 支持 `?seed=`。视觉特效用独立的流，不影响玩法序列的复现。 |
 | 字体 | `@fontsource/inter@5.3.0`，只用 latin 子集的 **300**（23.9KB，大号数字、Logo）和 **600**（24.5KB，标签） | 合计 48.4KB，低于 150KB 上限（已在 scratchpad 实测 woff2 体积）。Inter 是瑞士风新怪诞体，数字清晰。不 import 包里自带的 css（会把 .woff 一起打包），在 `styles.css` 里自写 `@font-face`，只引用 woff2。<br>Canvas 不支持 `tnum` 等宽数字，所以分数按固定字宽逐位绘制，避免跳动。<br>备选 Outfit（14KB/字重）几何感更强，但数字 1 和 7 在小字号下辨识度不如 Inter。 |
 | 中文 | 系统字体栈 `"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif` | 遵守约定。中文用 500/600 字重，字距加 0.04em，显得更克制。 |
-| 数值验证 | `scripts/sim.ts`，用 Node 22 原生类型剥离直接运行，`npm run sim` | 需要开启 `allowImportingTsExtensions` 和 `erasableSyntaxOnly`，代码里不用 enum 和 namespace（pack-battle 已验证可行）。 |
+| 数值验证 | `scripts/sim.ts`，用 Node 22 原生类型剥离直接运行，`pnpm sim` | 需要开启 `allowImportingTsExtensions` 和 `erasableSyntaxOnly`，代码里不用 enum 和 namespace（pack-battle 已验证可行）。 |
 
 **依赖清单**
 
@@ -43,7 +43,7 @@
 "typescript": "5.9.3"
 ```
 
-**npm scripts**
+**package.json scripts**
 - `dev`: `vite --port 5106 --strictPort --host`（同时写进 `vite.config.ts` 的 `server`）
 - `build`: `tsc --noEmit && vite build`（`base: './'`，输出到 `dist/`）
 - `preview`: `vite preview --port 5106 --strictPort --host`
@@ -257,13 +257,13 @@ onLock(piece):
   出下一块（若碰撞则失败）
 ```
 
-**规则测试用例**（`npm run rules`，用 ASCII 盘面描述，断言消除的格子、得分、补位后的盘面）：横/竖/两种斜向五连；6 连和 9 连；十字交叉共享 1 颗子；X 形交叉；冰晶子同时连成黑线和白线；满行 5:4、8:1，以及冰晶子导致的平局；补位后形成连锁；补位填进 r* 正下方的洞；没有消除的列保持悬空；顶线消除救命；垃圾顶出。
+**规则测试用例**（`pnpm rules`，用 ASCII 盘面描述，断言消除的格子、得分、补位后的盘面）：横/竖/两种斜向五连；6 连和 9 连；十字交叉共享 1 颗子；X 形交叉；冰晶子同时连成黑线和白线；满行 5:4、8:1，以及冰晶子导致的平局；补位后形成连锁；补位填进 r* 正下方的洞；没有消除的列保持悬空；顶线消除救命；垃圾顶出。
 
 ### 3.13 初始数值汇总与验证方法
 
 全部数值写在 `src/config.ts` 里（第 7.2 节）。验证分三层：
-1. **规则正确性**：`npm run rules`，覆盖第 3.12 节列出的用例。
-2. **难度曲线**：`npm run sim` 跑机器人（第 10.3 节），按验收指标调整等级时长、重力曲线、颜色权重、垃圾行间隔和冰晶子概率。
+1. **规则正确性**：`pnpm rules`，覆盖第 3.12 节列出的用例。
+2. **难度曲线**：`pnpm sim` 跑机器人（第 10.3 节），按验收指标调整等级时长、重力曲线、颜色权重、垃圾行间隔和冰晶子概率。
 3. **手感**：开发时用 `?debug=1&level=n` 直接体验各个阶段，再用 `__game.autoplay('serious')` 观察后期。
 
 ---
@@ -726,7 +726,7 @@ URL 参数：
 | `danger()` | 把盘面堆到危险态 |
 | `lose()` | 立即失败，进入结算 |
 | `autoplay(persona \| null)` | 开关机器人自动玩：`'novice'`、`'serious'`、`'colorblind'`、`'shapeblind'` |
-| `simulate({persona, games, seed?, maxMinutes?, fullRowMode?})` | 在浏览器里无头跑模拟，返回汇总统计（与 `npm run sim` 相同） |
+| `simulate({persona, games, seed?, maxMinutes?, fullRowMode?})` | 在浏览器里无头跑模拟，返回汇总统计（与 `pnpm sim` 相同） |
 | `timeScale(x)` | 全局时间缩放 |
 | `fx(name)` | 单独触发反馈：`'shake1'`/`'shake2'`/`'shake3'`、`'five'`、`'cross'`、`'chain'`、`'levelup'`、`'record'`、`'gameover'` |
 | `pause()` / `resume()` | |
@@ -765,7 +765,7 @@ URL 参数：
 
 | 里程碑 | 内容 | 验收 |
 |---|---|---|
-| M1 核心逻辑 | `core/`：网格、方块、旋转踢墙、生成器、规则（五连、满行、重力、连锁、计分）、等级、垃圾行、失败；`rules-test.ts` | `npm run rules` 全部通过 |
+| M1 核心逻辑 | `core/`：网格、方块、旋转踢墙、生成器、规则（五连、满行、重力、连锁、计分）、等级、垃圾行、失败；`rules-test.ts` | `pnpm rules` 全部通过 |
 | M2 可玩原型 | 纯色块渲染、键盘与触屏手势、影子、预告、HUD 数字、暂停、结算（简版） | 能完整玩一局；Playwright 能用指针完成全部操作 |
 | M3 机器人与调平衡 | `ai/` 与 `scripts/sim.ts`，四种人格；跑完第 10.3 节的指标并调整 config | 指标全部达标，结果回填到第 11 节 |
 | M4 美术 | 石板、黑曜石/白瓷/冰晶精灵、背景层、Logo、标题页待机动画、桌面装饰、HUD 面板 | 每个画面都像成品 |
@@ -782,9 +782,9 @@ URL 参数：
 | 中期无压力 / 某一级突然成墙 | 压力源分阶段叠加（第 3.9 节），垃圾行间隔平滑递减；模拟器检查每级死亡分布 |
 | 连锁动画太长，打断节奏 | 每轮结算动画 ≤ 520ms；连锁 ≥ 3 后每轮压缩 15%；结算期间等级计时照走，但不出块 |
 
-### 10.3 自动模拟器（`npm run sim`）
+### 10.3 自动模拟器（`pnpm sim`）
 
-**命令**：`npm run sim -- --persona serious --games 200 --seed 1 --fullRow majority`；不带参数时依次跑四种人格加三种满行模式，输出表格。
+**命令**：`pnpm sim --persona serious --games 200 --seed 1 --fullRow majority`；不带参数时依次跑四种人格加三种满行模式，输出表格。
 
 **机器人**：对当前方块（以及暂存交换后的方块）× 是否翻色 × 4 个朝向 × 所有可达列，枚举硬降落点；用 `resolveAll` 完整结算后打分：
 
@@ -836,7 +836,7 @@ eval = w_clear·移除子数 + w_score·得分/100 − w_h·总高度 − w_hole
 
 ### 11.1 模拟器验收结果（最终数值）
 
-`npm run sim`（每组 100 局，种子 1…100，单局上限 25 分钟，4 线程约 170 秒）。存活、得分、等级为中位数。
+`pnpm sim`（每组 100 局，种子 1…100，单局上限 25 分钟，4 线程约 170 秒）。存活、得分、等级为中位数。
 
 | 组 | 存活 | 得分 | 等级 | 五连占移除子数 | 翻色/块 |
 |---|---|---|---|---|---|
@@ -907,7 +907,7 @@ eval = w_clear·移除子数 + w_score·得分/100 − w_h·总高度 − w_hole
 
 ### 11.5 测试
 
-- `npm run rules`：55 条规则断言全部通过，覆盖各方向五连、6/9 连、交叉、冰晶子、满行（5:4 不退场、6:3 退场、8:1、冰晶子平局、三种模式）、连锁、补位重力、顶线救命、垃圾顶出、计分示例、旋转踢墙、三步引导盘面、确定性、出块保护、暂存。
+- `pnpm rules`：55 条规则断言全部通过，覆盖各方向五连、6/9 连、交叉、冰晶子、满行（5:4 不退场、6:3 退场、8:1、冰晶子平局、三种模式）、连锁、补位重力、顶线救命、垃圾顶出、计分示例、旋转踢墙、三步引导盘面、确定性、出块保护、暂存。
 - Playwright 触控回归（390×844，`isMobile`、`hasTouch`、DPR 2，通过 CDP 发送真实触摸事件）：29 项全部通过。覆盖：
   - 相对拖动 ±1/±2/±3 列，含 ±0.35 格的误差容忍；
   - 慢速下拖只软降；横向锁定后再快速下甩不会硬降；
@@ -934,6 +934,6 @@ eval = w_clear·移除子数 + w_score·得分/100 − w_h·总高度 − w_hole
 | P2 | 隐藏行出块看不见 | 隐藏行部分透明度下限 0.25→0.85，并加一圈冰蓝描边，黑子在深色 HUD 底上可辨认。石板没有向上延伸（会压到 HUD 信息栏）。 |
 | P2 | 引导步骤之间冒出可操作的 WWW 方块 | `Game.spawnLocked`：引导每一步的方块锁定后停在 ARE，不再出下一块，直到切换步骤或结束卡片走完（引导中本就隐藏 NEXT 预告）。 |
 
-验证：`npm run build` 无告警，rules 55/55，sim 13 项全部通过，触控 29/29 + 长甩 10/10，390×844 与 1280×800 全流程控制台 0 问题。截图：`scratchpad/five-drop/shots/p3_*.png`。
+验证：`pnpm build` 无告警，rules 55/55，sim 13 项全部通过，触控 29/29 + 长甩 10/10，390×844 与 1280×800 全流程控制台 0 问题。截图：`scratchpad/five-drop/shots/p3_*.png`。
 
 Round 2：引导卡片正文折行宽度 300→270px，为右侧完成勾号（x 332–360）留位，第 3 步文案不再被勾号压住「置」。

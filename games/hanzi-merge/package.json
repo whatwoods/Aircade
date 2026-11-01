@@ -24,5 +24,6 @@
     "subset-font": "2.9.0",
     "typescript": "~6.0.3",
     "vite": "^8.3.5"
-  }
+  },
+  "packageManager": "pnpm@11.8.0"
 }

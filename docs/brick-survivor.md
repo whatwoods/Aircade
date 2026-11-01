@@ -121,7 +121,7 @@
 - 调试模块（`src/debug/*`）在 `?debug=1` 时才通过动态 `import()` 加载，不进主包。
 - 字体导入方式：`import orb900 from '@fontsource/orbitron/files/orbitron-latin-900-normal.woff2?url'`，然后 `new FontFace(...)` 加 `document.fonts.add`。这样不会把 .woff 回退文件打进 dist；`await font.load()` 最多等 1500 ms，超时就先用回退字体烘焙，字体到达后重新烘焙。
 - 工具链兜底：如果 TS 7 或 Vite 8 有兼容问题，就降到 typescript 5.9.3 / vite 7.3.x，设计不受影响。
-- npm scripts：`dev` = `vite`，`build` = `tsc --noEmit && vite build`，`preview` = `vite preview`。
+- package.json scripts：`dev` = `vite`，`build` = `tsc --noEmit && vite build`，`preview` = `vite preview`。
 - vite.config：`base: './'`；server 与 preview 都是 `port: 5102, strictPort: true, host: true`；`build.target: 'es2020'`；`sourcemap: false`。
 - tsconfig：`strict`、`noUncheckedIndexedAccess`、`moduleResolution: 'bundler'`、`types: ['vite/client']`。
 
@@ -1288,7 +1288,7 @@ interface RunState {
 | **M2 系统完整** | 12 项强化加 4 个进化；全部砖型；完整的 20 波波次表；4 个 Boss（先做方碑和脉冲星，再用工具箱复用做霓蛇和终焉之核）；胜利与无尽；计分与连击；debug API、autoplay、simulate | autoplay 带固定种子能打到第 20 波；simulate 输出的每波时长与 §3.16 的偏差在 ±25% 以内 |
 | **M3 画面** | 图集烘焙全部贴图；拖尾、粒子与碎裂；元素状态视觉；背景着色器；bloom 与合成；相机 trauma 与 hitstop；Boss 外观与击破演出；连击显示；浮字 | 与 §4.6 的五个关键画面逐条对照截图 |
 | **M4 界面与音频** | 标题页（含待机演示）；HUD 缓动；三选一、暂停、结算、新纪录、设置；转场；桌面侧边面板；横屏提示；全部音效与程序化 BGM；首局引导 | 完整走通流程，每一屏都像成品；所有操作都能用指针完成；音频开关会被记住 |
-| **M5 打磨与验收** | 用 simulate 做平衡；画质分档在 CPU 4× 降速下的性能调优；用 Playwright 在 390×844 下截图自检；检查控制台零报错零警告、构建零警告；核对产物体积 | §9 的预算达标；`npm run build` 没有警告 |
+| **M5 打磨与验收** | 用 simulate 做平衡；画质分档在 CPU 4× 降速下的性能调优；用 Playwright 在 390×844 下截图自检；检查控制台零报错零警告、构建零警告；核对产物体积 | §9 的预算达标；`pnpm build` 没有警告 |
 
 ### 10.2 风险与对策
 

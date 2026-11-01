@@ -12,13 +12,13 @@
 | 五子落 · Five Drop | 俄罗斯方块 × 五子棋 | [`games/five-drop`](games/five-drop) | [`docs/five-drop.md`](docs/five-drop.md) | 5106 |
 | 造字记 · Hanzi Merge | 汉字偏旁部首 × 合成 | [`games/hanzi-merge`](games/hanzi-merge) | [`docs/hanzi-merge.md`](docs/hanzi-merge.md) | 5107 |
 
-每款游戏都是独立项目：各自的 `package.json` / `package-lock.json`、各自安装依赖、各自构建，互不依赖，仓库根目录没有 workspace。
+每款游戏都是独立项目：各自的 `package.json` / `pnpm-lock.yaml`、各自安装依赖、各自构建，互不依赖，仓库根目录没有 workspace。
 
 ## 技术栈
 
 所有游戏的共同底座：
 
-- **TypeScript（strict）+ Vite 8**，npm 管理依赖，不引入游戏引擎。
+- **TypeScript（strict）+ Vite 8**，pnpm 管理依赖，不引入游戏引擎。
 - **音频**：WebAudio 实时合成（振荡器、噪声、滤波、包络、程序化混响），背景音乐是程序化生成的；首次点击后解锁，音效/音乐开关记在本地。
 - **字体**：标题和数字用 OFL 开源拉丁字体，通过 `@fontsource/*` 打包进本地（只含 latin 子集）；中文用系统字体栈。例外是 hanzi-merge：汉字本身就是美术，构建时把 OFL 字体霞鹜文楷（LXGW WenKai）和马善政按游戏实际用到的字做子集化后打包，缺字则构建失败。
 - **本地存储**：最高分、设置、引导是否完成，key 前缀 `aircade.<游戏名>.`。
@@ -39,14 +39,14 @@
 
 ## 本地运行
 
-环境要求：**Node.js ≥ 22.12**（Vite 8 的要求），npm 10+。直接运行 `.ts` 的脚本需要 **Node ≥ 22.18**：pack-battle 的 `npm run balance`、chain-2048 / five-drop / hanzi-merge 的 `npm run sim`、five-drop 的 `npm run rules`、hanzi-merge 的 `npm run verify`，以及 hanzi-merge 的 `npm run build`（构建前后会运行字体子集检查脚本）。
+环境要求：**Node.js ≥ 22.12**（Vite 8 的要求），pnpm 11+（`packageManager` 字段已固定版本，可用 `corepack enable` 自动获取）。直接运行 `.ts` 的脚本需要 **Node ≥ 22.18**：pack-battle 的 `pnpm balance`、chain-2048 / five-drop / hanzi-merge 的 `pnpm sim`、five-drop 的 `pnpm rules`、hanzi-merge 的 `pnpm verify`，以及 hanzi-merge 的 `pnpm build`（构建前后会运行字体子集检查脚本）。
 
 进入某个游戏目录：
 
 ```bash
 cd games/sling-merge     # 或其他任一游戏目录
-npm install
-npm run dev              # 开发服务器，固定端口，见上表；同时监听局域网，可用手机直接访问
+pnpm install
+pnpm dev                 # 开发服务器，固定端口，见上表；同时监听局域网，可用手机直接访问
 ```
 
 打开 `http://localhost:5103/`（端口按上表替换）。用手机测试时，访问终端里打印的局域网地址即可。
@@ -60,23 +60,23 @@ npm run dev              # 开发服务器，固定端口，见上表；同时�
 
 | 命令 | 游戏 | 作用 |
 |---|---|---|
-| `npm run balance` | pack-battle | 自动战斗数值平衡模拟 |
-| `npm run sim` | chain-2048 / five-drop / hanzi-merge | 用不同水平的机器人跑难度曲线并检查验收阈值 |
-| `npm run rules` | five-drop | 消除 / 重力 / 连锁规则单元测试 |
-| `npm run verify` | hanzi-merge | 校验全部汉字配方（结构、偏旁变体、繁体、标签一致性） |
+| `pnpm balance` | pack-battle | 自动战斗数值平衡模拟 |
+| `pnpm sim` | chain-2048 / five-drop / hanzi-merge | 用不同水平的机器人跑难度曲线并检查验收阈值 |
+| `pnpm rules` | five-drop | 消除 / 重力 / 连锁规则单元测试 |
+| `pnpm verify` | hanzi-merge | 校验全部汉字配方（结构、偏旁变体、繁体、标签一致性） |
 
 ## 构建
 
 ```bash
 cd games/<游戏名>
-npm run build      # 先做 TypeScript 类型检查，再做生产构建，输出到 dist/
-npm run preview    # 在同一端口预览 dist/
+pnpm build         # 先做 TypeScript 类型检查，再做生产构建，输出到 dist/
+pnpm preview       # 在同一端口预览 dist/
 ```
 
 全部游戏一次构建：
 
 ```bash
-for g in games/*/; do (cd "$g" && npm ci && npm run build) || break; done
+for g in games/*/; do (cd "$g" && pnpm install --frozen-lockfile && pnpm build) || break; done
 ```
 
 构建产物是纯静态文件（HTML + JS + CSS + woff2），`base: './'` 使用相对路径，可放在任意域名的任意子路径下。
@@ -87,14 +87,14 @@ for g in games/*/; do (cd "$g" && npm ci && npm run build) || break; done
 
 - **任意静态服务器 / 对象存储（Nginx、S3、OSS、COS 等）**：把 `games/<游戏名>/dist/` 的内容上传到某个目录，例如 `https://example.com/aircade/sling-merge/`。建议给 `assets/` 下的带哈希文件设置长缓存，`index.html` 不缓存。
 - **GitHub Pages**：把各个 `dist/` 分别拷贝到同一个发布目录的子文件夹（如 `site/dungeon-sweeper/` …），再发布这个目录。
-- **Netlify / Vercel / Cloudflare Pages**：每款游戏建一个项目，根目录（Base directory）设为 `games/<游戏名>`，构建命令 `npm run build`，发布目录 `dist`。
+- **Netlify / Vercel / Cloudflare Pages**：每款游戏建一个项目，根目录（Base directory）设为 `games/<游戏名>`，构建命令 `pnpm build`，发布目录 `dist`。
 
 合并发布全部游戏的示例：
 
 ```bash
 rm -rf site && mkdir site
 for g in dungeon-sweeper brick-survivor sling-merge pack-battle chain-2048 five-drop hanzi-merge; do
-  (cd games/$g && npm ci && npm run build) && cp -r games/$g/dist site/$g
+  (cd games/$g && pnpm install --frozen-lockfile && pnpm build) && cp -r games/$g/dist site/$g
 done
 # 把 site/ 上传到静态托管
 ```
@@ -109,12 +109,14 @@ done
 
 ```
 .
+├── CLAUDE.md             # 给 Claude 会话的共用约定
+├── .claude/launch.json   # 各游戏开发服务器（预览用）
 ├── docs/                 # 各游戏的设计文档（规则、数值、美术、动效清单、界面流程、模块划分）
 └── games/
     ├── dungeon-sweeper/  # 每个游戏：index.html、src/、vite.config.ts、tsconfig.json、package.json
     ├── brick-survivor/
     ├── sling-merge/
-    ├── pack-battle/      # 另有 scripts/balance.ts：数值平衡模拟（npm run balance）
+    ├── pack-battle/      # 另有 scripts/balance.ts：数值平衡模拟（pnpm balance）
     ├── chain-2048/       # 另有 scripts/sim.ts：难度曲线模拟
     ├── five-drop/        # 另有 scripts/sim.ts、scripts/rules-test.ts
     └── hanzi-merge/      # 另有 tools/：字体子集化、配方校验、难度模拟

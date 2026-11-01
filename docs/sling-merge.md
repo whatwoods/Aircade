@@ -53,7 +53,7 @@
 | 动画/缓动 | 自研 `tween` + `spring`（约 2 KB） | 需求只有缓动函数、补间池和弹簧，用 GSAP 太重 |
 | UI | 原生 DOM + CSS（不用框架）覆盖在画布上 | 菜单、按钮、面板用 DOM：文字清晰，CSS 过渡好做，可访问（role/aria），Playwright 能用 `getByRole` 定位。游戏内 HUD 用画布绘制，和世界统一缩放与特效 |
 | 音频 | WebAudio 实时合成：振荡器、噪声、滤波、包络、压缩器 | 素材约定要求原创和程序化生成；合成音高能按等级和连击实时变化 |
-| 构建 | Vite 8 + TypeScript 6（strict），只用 npm | 与 create-vite 9.3.1 的 vanilla-ts 模板一致（`typescript ~6.0.3`、`vite ^8.3.4`）。TS 7.0 原生版虽已发布，但为了降低工具链风险，选 6.0 |
+| 构建 | Vite 8 + TypeScript 6（strict），只用 pnpm | 与 create-vite 9.3.1 的 vanilla-ts 模板一致（`typescript ~6.0.3`、`vite ^8.3.4`）。TS 7.0 原生版虽已发布，但为了降低工具链风险，选 6.0 |
 | 字体 | `@fontsource/fredoka` 只取 latin 600 和 700 两档 woff2，用 `FontFace` 手动注册 | 圆润胖体，符合糖果气质；总共 32.4 KB，不超过 150 KB；OFL-1.1 许可 |
 
 ### 2.2 依赖清单与体积
@@ -171,7 +171,7 @@
 
 ### 2.8 构建与工程
 
-- **npm scripts**：
+- **package.json scripts**：
   - `dev`：`vite`
   - `build`：`tsc && vite build`（tsconfig 设了 `noEmit`，所以 tsc 只做类型检查）
   - `preview`：`vite preview`
@@ -1175,7 +1175,7 @@ type GameEvent =
 
 | 里程碑 | 内容 | 验收标准 |
 |---|---|---|
-| **M0 工程骨架** | Vite/TS/npm 脚本、config、loop、stage（安全区和 DPR）、storage、rng、事件总线、debug 浮层 | `npm run dev` 在 5103 可访问；`npm run build` 零警告；resize 和 DPR 正确；FPS 浮层显示 |
+| **M0 工程骨架** | Vite/TS/pnpm 脚本、config、loop、stage（安全区和 DPR）、storage、rng、事件总线、debug 浮层 | `pnpm dev` 在 5103 可访问；`pnpm build` 零警告；resize 和 DPR 正确；FPS 浮层显示 |
 | **M1 可玩核心（灰盒）** | 物理世界（墙、浮力、软约束子步、休眠、钳制）；水果先画成纯色圆加等级数字；弹弓瞄准和发射；预测线；合成、连锁、超级合成；计分和连击；警戒线 3 s；出生规则；失败；debug API 主体 | ① `fillToLine()` 后 5 s 内 ≥ 90% 的刚体休眠，静止堆叠中任一果 1 s 内位移 < 0.5 px ② `stress(150)` 后 `physicsFaults = 0`，没有果跑出容器 ③ `verifyPrediction` 取 20 组随机参数，首撞前最大误差 < 0.5 px ④ 120 果加连发时，桌面 4× CPU 降速下物理 ≤ 2.5 ms ⑤ 合成、连锁、超级合成、越线、救场、妙击都能用 debug 脚本复现。**① 或 ② 不达标就切换 Planck 适配器** |
 | **M2 角色与画面** | 11 级水果精灵；表情系统；形变弹簧和视觉角回正；罐体两层和盖子；弹弓美术；预测线样式；舞台背景；画布 HUD（分数、进化链、下一个、连击、倒计时） | `showcase()` 截图：11 级一眼能分辨，所有表情可以切换；挤压拉伸不影响判定（开关形变时物理快照一致） |
 | **M3 打击感与声音** | 粒子、圆环、溅痕、跳字、残影、光芒；trauma 震屏、hitstop、慢动作、缩放冲击；分档反馈分发；SFX 全套；BGM；震动 | §5.2 每一行都能触发；L11 高潮分镜完整；同屏 150 果加大合成时帧耗时仍在预算内；不爆音、不刺耳 |

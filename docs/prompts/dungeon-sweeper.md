@@ -293,7 +293,7 @@ src/
 
 ### A. 共同技术约束
 
-- **TypeScript（strict）+ Vite 8**，npm 管理依赖，不引入游戏引擎、不引入动画库。每个游戏是独立项目，有自己的 `package.json` 和 `package-lock.json`，仓库没有 workspace。
+- **TypeScript（strict）+ Vite 8**，pnpm 管理依赖，不引入游戏引擎、不引入动画库。每个游戏是独立项目，有自己的 `package.json` 和 `pnpm-lock.yaml`，仓库没有 workspace。
 - `vite.config.ts`：`base: './'`，固定开发端口加 `strictPort` 和 `host: true`（本游戏为 5101），`assetsInlineLimit: 0`。
 - scripts：`dev`，`build = tsc --noEmit && vite build`，`preview`。构建需要零错误、零警告。
 - 运行时零外部请求；无图片、无音频文件；favicon 用内联 SVG。字体只能用 OFL 授权的 `@fontsource/*`，只打包 latin 子集；中文用系统字体栈。
@@ -354,7 +354,7 @@ src/
 
 ### C. 验收清单
 
-- [ ] `npm ci && npm run build` 零错误、零警告，`dist/` 能在任意子路径下运行。
+- [ ] `pnpm install --frozen-lockfile && pnpm build` 零错误、零警告，`dist/` 能在任意子路径下运行。
 - [ ] 390×844 竖屏、844×390 横屏、1440×900 桌面三种视口都无裁切、无重叠，触控目标 ≥ 44px。
 - [ ] 中端手机稳定 60fps；稳态零分配；首包在预算内。
 - [ ] 规则边界逐条可复现：HP 恰好为 0 判死、连升多级、满血点血瓶、生命 < 14 点龙巢、致命标记二次确认、快开中途死亡。
