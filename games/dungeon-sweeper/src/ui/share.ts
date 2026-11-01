@@ -190,20 +190,15 @@ export function drawOgImage(): HTMLCanvasElement {
   return c;
 }
 
-/**
- * 应用图标：黑暗中一双龙眼，下方一排暗砖、正中一块被烛光照亮的数字砖。
- * full = 满版（maskable / apple-touch-icon 由系统裁圆角）；否则自带圆角。
- */
-export function drawIcon(size: number, full: boolean): HTMLCanvasElement {
+/** 网站图标：黑暗中一双龙眼，下方一排暗砖、正中一块被烛光照亮的数字砖。自带圆角 */
+export function drawIcon(size: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d')!;
   const u = size / 100;
-  if (!full) {
-    ctx.beginPath();
-    ctx.roundRect(0, 0, size, size, 22 * u);
-    ctx.clip();
-  }
+  ctx.beginPath();
+  ctx.roundRect(0, 0, size, size, 22 * u);
+  ctx.clip();
   ctx.fillStyle = PAL.abyss;
   ctx.fillRect(0, 0, size, size);
   const glow = ctx.createRadialGradient(50 * u, 70 * u, 0, 50 * u, 70 * u, 55 * u);

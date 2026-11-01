@@ -233,10 +233,7 @@ export function installDebug(app: App): void {
     /** 开发服务器专用：把图标与 OG 图写进 public/（vite.config.ts 的 /__asset 中间件） */
     async exportAssets() {
       const out: Record<string, HTMLCanvasElement> = {
-        'icon-512.png': drawIcon(512, false),
-        'icon-192.png': drawIcon(192, false),
-        'icon-maskable-512.png': drawIcon(512, true),
-        'apple-touch-icon.png': drawIcon(180, true),
+        'favicon.png': drawIcon(192),
         'og.png': drawOgImage(),
       };
       const done: string[] = [];

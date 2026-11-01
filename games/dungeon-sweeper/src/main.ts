@@ -70,11 +70,18 @@ async function boot(): Promise<void> {
   }
 }
 
-// 离线可玩：只在生产构建注册（开发时不缓存，避免拿到旧代码）
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => undefined);
-  });
+// PWA 已废弃：注销早先版本注册的 Service Worker，并删掉它的缓存
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker
+    .getRegistrations()
+    .then((rs) => rs.forEach((r) => void r.unregister()))
+    .catch(() => undefined);
+}
+if ('caches' in window) {
+  caches
+    .keys()
+    .then((ks) => ks.filter((k) => k.startsWith('aircade.dungeon-sweeper.')).forEach((k) => void caches.delete(k)))
+    .catch(() => undefined);
 }
 
 void boot();

@@ -739,12 +739,11 @@ Canvas 里的数字全部预烘焙进**字形图集**（每档颜色 × 0–9，
   - 地图只分「探索过 🟨 / 黑暗 ⬛ / 龙巢 🟥🐉 / 倒下处 💀」，**不暴露怪物位置**，每日挑战的分享不会剧透盘面。
   - 顺序：系统分享带图（`navigator.canShare({files})`）→ 系统分享纯文字 → 复制文字到剪贴板 → 都不行就下载分享图。
 
-### 6.10 PWA 与预览图
+### 6.10 网站图标与预览图
 
-- `public/manifest.webmanifest`（standalone、竖屏、主题色 `#07080D`）、`icon-192/512.png`、`icon-maskable-512.png`、`apple-touch-icon.png`、`og.png`（1200×630）。`index.html` 带 manifest、apple-touch-icon、`og:*` 与 `twitter:card`。`og:image` 是相对路径，部署到固定域名后应改成绝对 URL（部分抓取方不解析相对路径）。
-- 图标和 OG 图都由代码画出（`share.ts` 的 `drawIcon` / `drawOgImage`）：黑暗中一双龙眼 + 一排暗砖、正中一块烛光数字砖。改了画法后在开发服务器里跑 `__game.exportAssets()` 重新写入 `public/`。
-- Service Worker 在构建时由 `vite.config.ts` 的插件生成 `dist/sw.js`：预缓存全部产物和 `public/` 文件（OG 图除外），缓存名随文件列表变化，旧缓存在激活时清掉。页面导航走网络优先、离线回落缓存；其余同源请求走缓存优先，匹配时忽略查询串和 `Vary`（Vite 的模块脚本请求带 `Origin` 头）。只在生产构建注册。
-- 不接入任何统计（用户决定，保持「运行时不请求外部资源」）。
+- `public/` 只有 `favicon.png`（192，自带圆角）和 `og.png`（1200×630）。`index.html` 带 `og:*` 与 `twitter:card`。`og:image` 是相对路径，部署到固定域名后应改成绝对 URL（部分抓取方不解析相对路径）。
+- 两张图都由代码画出（`share.ts` 的 `drawIcon` / `drawOgImage`）：黑暗中一双龙眼 + 一排暗砖、正中一块烛光数字砖。改了画法后在开发服务器里跑 `__game.exportAssets()` 重新写入 `public/`。
+- **不做 PWA**：没有 manifest、Service Worker 和主屏图标。早先版本注册过 Service Worker，`main.ts` 启动时会注销所有注册，并删掉 `aircade.dungeon-sweeper.` 前缀的缓存。
 
 ### 6.11 成就
 
@@ -777,11 +776,11 @@ Canvas 里的数字全部预烘焙进**字形图集**（每档颜色 × 0–9，
 
 ```
 games/dungeon-sweeper/
-├─ index.html              # 视口 meta、manifest / 图标 / OG meta、DOM 覆盖层骨架（无外链）
+├─ index.html              # 视口 meta、图标 / OG meta、DOM 覆盖层骨架（无外链）
 ├─ package.json / pnpm-lock.yaml / tsconfig.json / tsconfig.node.json
-├─ vite.config.ts          # 构建时生成 sw.js；开发时 /__asset 写入 public/（§6.10）
+├─ vite.config.ts          # 开发时 /__asset 写入 public/（§6.10）
 ├─ scripts/sim.ts          # pnpm sim：难度 × 机器人画像的胜率、贪心曲线、目标检查（§3.8 / §3.9）
-├─ public/                 # manifest、图标、OG 图（代码生成，§6.10）
+├─ public/                 # favicon、OG 图（代码生成，§6.10）
 └─ src/
    ├─ main.ts              # 启动：读 URL 参数，建画布，加载字体（带超时），创建 App，启动主循环
    ├─ config.ts            # ★ 全部玩法数值和时序常量（§3.6）
@@ -905,7 +904,7 @@ URL 参数：
 | `perf()` | 近 120 帧的帧时间统计 |
 | `shareCard()` | 在页面上叠一张本局分享卡预览（再调一次或点击关闭） |
 | `dragonSheet(bg?)` | 叠一张巨龙烘焙图总览：巢中本体、余烬层、战斗形态、白闪剪影（`bg` 为底色，默认深灰；再调一次或点击关闭） |
-| `exportAssets()` | 仅开发服务器：把图标与 OG 图 POST 到 `/__asset`，写进 `public/`，返回写入的文件名 |
+| `exportAssets()` | 仅开发服务器：把 favicon 与 OG 图 POST 到 `/__asset`，写进 `public/`，返回写入的文件名 |
 
 ---
 
@@ -1035,6 +1034,7 @@ URL 参数：
 | 巨龙美术 | §4.6：新文件 `view/dragonArt.ts`；`shapes.ts` 里的 `DRAGON_LAIR` / `DRAGON_CRACKS` / `DRAGON_RISE` 删除 | 原先巢中是看不出形状的黑团加随机橙色弧线，战斗形态像卡通猫 |
 | 苏醒效果 | 巢外的金红光圈改为身下暖光加升起的余烬 | 光圈糊成一片米色，盖住龙 |
 | 调试 | `__game.dragonSheet()` | 调龙的造型时不用打到屠龙 |
+| 废弃 PWA | §6.10：删去 manifest、Service Worker、主屏图标和 `apple-mobile-web-app-*` meta；保留 favicon 与 OG 图；启动时注销旧 Service Worker 并清缓存 | 不再支持安装到主屏 / 离线 |
 | 中文标题字体 | 系统黑体 900 → 马善政毛笔楷书（§4.3），标题页和分享卡都用 | 系统黑体太普通；对比过马善政、志莽行、龙藏、站酷小薇、站酷庆科黄油、思源宋体 Black，毛笔字最贴暗黑地牢气质且仍好认 |
 
 ---
