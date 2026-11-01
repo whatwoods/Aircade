@@ -9,6 +9,7 @@ import { Spring } from '../core/spring.ts';
 import { settings } from '../core/storage.ts';
 import { Rolling, ease } from '../core/tween.ts';
 import type { ReceiptLine } from '../game/economy.ts';
+import { battleReport, type SideReport } from '../game/report.ts';
 import { clearRun, saveRun, saveable } from '../game/save.ts';
 import { clearScore } from '../game/score.ts';
 import { enemyBag, enemyFor } from '../game/enemies.ts';
@@ -38,7 +39,7 @@ import { BattleController } from './battleController.ts';
 import { describe } from './describe.ts';
 import { Guide } from './guide.ts';
 import { HALF_PI, ItemView, stashCell } from './itemView.ts';
-import { ConfirmPanel, DetailPanel, DrawerPanel, Overlays, PausePanel, RoutePanel, SettingsPanel } from './overlays.ts';
+import { ConfirmPanel, DetailPanel, DrawerPanel, Overlays, PausePanel, ReportPanel, RoutePanel, SettingsPanel } from './overlays.ts';
 import { factories, gotoScene, type EndingData, type Scene } from './sceneManager.ts';
 
 export type GPhase = 'receipt' | 'arrange' | 'toBattle' | 'battle' | 'result' | 'toArrange';
@@ -104,6 +105,10 @@ export class GameScene implements Scene {
   lockB: Button;
   speedB: Button;
   contB: Button;
+  reportB: Button;
+  /** 刚打完这场的战报（结算时可看） */
+  report: [SideReport, SideReport] | null = null;
+  private battleItems: ItemInst[] = [];
   nextB: Button;
   pressed: Button | null = null;
   private pressedHud: 'round' | 'enemy' | null = null;
@@ -135,6 +140,8 @@ export class GameScene implements Scene {
     this.contB = new Button('btn.continue', { x: 95, y: 732, w: 200, h: 60 }, '继续 ›', 'plank', 11);
     this.contB.glyph = '✦';
     this.contB.visible = false;
+    this.reportB = new Button('btn.report', { x: 302, y: 740, w: 72, h: 44 }, '战报', 'tag', 13);
+    this.reportB.visible = false;
     this.nextB = new Button('btn.tutNext', { x: 150, y: 470, w: 90, h: 34 }, '下一步', 'tag', 12);
     this.nextB.visible = false;
     this.ac = new ArrangeController(this);
@@ -204,6 +211,7 @@ export class GameScene implements Scene {
     this.refreshB.r = L.refresh;
     this.lockB.r = L.lock;
     this.speedB.r = B.speed;
+    this.reportB.r = { x: B.speed.x, y: B.cont.y + (B.cont.h - 44) / 2, w: B.speed.w, h: 44 };
     this.contB.r = B.cont;
     this.nextB.r = { x: 150, y: L.bubbleY - 70, w: 90, h: 34 };
     // 桌边装备的像素位置跟着布局
@@ -424,6 +432,8 @@ export class GameScene implements Scene {
     this.recompute(false);
     this.battleRound = this.run.round;
     const res = startBattle(this.run);
+    this.battleItems = this.run.bag.map((it) => ({ ...it }));
+    this.report = null;
     // 存"打完之后"的状态：战斗中关掉页面也不能换装重打
     if (saveable(this.run)) {
       const after = structuredClone(this.run);
@@ -501,6 +511,8 @@ export class GameScene implements Scene {
     this.contB.alpha = 0;
     this.contB.visible = true;
     this.speedB.visible = false;
+    this.report = battleReport(res, [this.battleItems, enemyBag(this.battleRound)]);
+    this.reportB.visible = !out.ending;
   }
 
   continueFromResult(): void {
@@ -519,6 +531,7 @@ export class GameScene implements Scene {
     this.tt = 0;
     this.outcome = null;
     this.contB.visible = false;
+    this.reportB.visible = false;
     this.bc.leave();
     this.collapse.target = 0;
     for (const v of this.views.values()) v.gray = 0;
@@ -585,6 +598,12 @@ export class GameScene implements Scene {
         },
       }),
     );
+  }
+
+  openReport(): void {
+    if (!this.report) return;
+    const e = enemyFor(this.battleRound);
+    this.ov.open(new ReportPanel(stage.H, this.report, e.title));
   }
 
   resume(): void {
@@ -789,6 +808,12 @@ export class GameScene implements Scene {
     }
     if (this.speedB.visible) this.drawSpeed(ctx, time, real);
     if (this.contB.visible) this.contB.draw(ctx, time, real);
+    if (this.reportB.visible && this.phase === 'result') {
+      ctx.save();
+      ctx.globalAlpha *= this.contB.alpha;
+      this.reportB.draw(ctx, time, real);
+      ctx.restore();
+    }
     this.bc.drawEffects(ctx, time);
     drawParticles(ctx, false);
     drawPopups(ctx, false);
@@ -1015,6 +1040,7 @@ export class GameScene implements Scene {
     }
     if (this.speedB.visible && this.phase === 'battle') out.push(this.speedB);
     if (this.phase === 'result' && this.contB.visible && this.contB.alpha > 0.5) out.push(this.contB);
+    if (this.phase === 'result' && this.reportB.visible && this.contB.alpha > 0.5) out.push(this.reportB);
     return out;
   }
 
@@ -1024,6 +1050,7 @@ export class GameScene implements Scene {
     else if (b === this.fightB) this.tryFight();
     else if (b === this.contB) this.continueFromResult();
     else if (b === this.speedB) this.cycleSpeed();
+    else if (b === this.reportB) this.openReport();
     else if (b === this.skipB) {
       markTutorialDone();
       this.tut.stop();
@@ -1293,6 +1320,7 @@ export class GameScene implements Scene {
     this.receipt = null;
     this.outcome = null;
     this.contB.visible = false;
+    this.reportB.visible = false;
     this.run.round = n;
     this.run.attempt = 1;
     this.run.phase = 'result';

@@ -6,12 +6,13 @@ import { BATTLE, ENEMIES, ITEMS, RARITY_NAMES, ROUNDS, TAG_NAMES } from '../conf
 import { saveSettings, settings } from '../core/storage.ts';
 import { ease } from '../core/tween.ts';
 import { enemyBag } from '../game/enemies.ts';
+import { rowTotal, type ReportRow, type SideReport } from '../game/report.ts';
 import { shapeOf } from '../game/shapes.ts';
 import type { Derived, EnemyDef, ItemId, Lv, Placed } from '../game/types.ts';
 import { C, RARITY_COLOR, TAG_COLOR, drawGoldCoin } from '../render/kit.ts';
 import type { Rect } from '../render/layout.ts';
 import { drawEnemyBadge } from '../render/portraits.ts';
-import { drawItem } from '../render/sprites.ts';
+import { drawItem, drawItemAt } from '../render/sprites.ts';
 import { HAND, measure, text, wrap } from '../render/text.ts';
 import { rgba } from '../render/textures.ts';
 import { Button, Toggle, drawPanel, titleText, type UiEl } from '../render/ui/widgets.ts';
@@ -314,6 +315,128 @@ export class RulesPanel extends Panel {
       y += Math.max(1, lines.length) * 22 + 22;
     });
     text(ctx, '拖拽中：第二根手指轻点 / R / 右键 / 滚轮 = 旋转', 195, r.y + r.h - 40, { size: 11, weight: 700, color: C.inkSoft });
+    this.closeB.draw(ctx, time, real);
+  }
+}
+
+// ---------- 战报 ----------
+
+const REPORT_PARTS: { key: 'dmg' | 'broke' | 'poison' | 'shield' | 'heal' | 'block'; label: string; color: string }[] = [
+  { key: 'dmg', label: '伤害', color: C.hp },
+  { key: 'broke', label: '破盾', color: '#d98a6a' },
+  { key: 'poison', label: '中毒', color: C.poison },
+  { key: 'shield', label: '护盾', color: C.shield },
+  { key: 'heal', label: '回复', color: C.heal },
+  { key: 'block', label: '减伤', color: C.shieldLight },
+];
+const REPORT_MAX_ROWS = 12;
+
+/** 一场战斗里每件装备做了多少事：伤害 / 破盾 / 中毒 / 护盾 / 回复，按贡献排序 */
+export class ReportPanel extends Panel {
+  readonly kind = 'ReportPanel';
+  private H: number;
+  private side: 0 | 1 = 0;
+  private rep: [SideReport, SideReport];
+  private names: [string, string];
+  private scale: number;
+  private closeB: Button;
+  private tabs: [Button, Button];
+  constructor(H: number, rep: [SideReport, SideReport], enemyName: string) {
+    super();
+    this.H = H;
+    this.rep = rep;
+    this.names = ['我方', enemyName];
+    let mx = 1;
+    for (const sr of rep) for (const r of sr.rows) mx = Math.max(mx, rowTotal(r));
+    this.scale = mx;
+    this.closeB = new Button('report.close', R(0, 0, 40, 40), '', 'coin', 61);
+    this.closeB.icon = 'close';
+    this.tabs = [new Button('report.me', R(0, 0, 110, 34), '我方', 'tag', 62), new Button('report.enemy', R(0, 0, 110, 34), '对手', 'tag', 63)];
+    this.buttons = [this.closeB, ...this.tabs];
+    this.layout();
+  }
+  private rows(): ReportRow[] {
+    return this.rep[this.side].rows.slice(0, REPORT_MAX_ROWS);
+  }
+  private h(): number {
+    const n = Math.max(this.rep[0].rows.length, this.rep[1].rows.length, 3);
+    return 150 + Math.min(n, REPORT_MAX_ROWS) * 40 + 40;
+  }
+  private layout(): void {
+    const r = this.rect();
+    this.closeB.r = R(r.x + r.w - 48, r.y + 8, 40, 40);
+    this.tabs[0].r = R(80, r.y + 66, 110, 34);
+    this.tabs[1].r = R(200, r.y + 66, 110, 34);
+  }
+  rect(): Rect {
+    const h = this.h();
+    return R(16, Math.max(20, (this.H - h) / 2), 358, h);
+  }
+  activate(b: Button): void {
+    if (b === this.closeB) this.close();
+    else this.side = b === this.tabs[0] ? 0 : 1;
+  }
+  key(code: string): void {
+    if (code === 'Escape') this.close();
+    else if (code === 'ArrowLeft' || code === 'ArrowRight') this.side = this.side === 0 ? 1 : 0;
+  }
+  drawBody(ctx: CanvasRenderingContext2D, time: number, real: number): void {
+    const r = this.rect();
+    drawPanel(ctx, r, 25);
+    titleText(ctx, '战报', 195, r.y + 40, 26);
+    this.tabs.forEach((b, i) => {
+      b.tint = i === this.side ? '#f3d88a' : '';
+      b.draw(ctx, time, real);
+    });
+    const sr = this.rep[this.side];
+    const x0 = r.x + 18;
+    const x1 = r.x + r.w - 18;
+    let y = r.y + 128;
+    for (const row of this.rows()) {
+      const def = ITEMS[row.id];
+      const sh = shapeOf(row.id, 0);
+      const cell = Math.min(15, 32 / sh.w, 32 / sh.h);
+      drawItemAt(ctx, row.id, row.lv, 0, x0 + 16, y + 6, cell, 'tile', true);
+      text(ctx, def.name + (row.lv > 1 ? ' ' + '★'.repeat(row.lv) : ''), x0 + 40, y, { size: 14, weight: 800, align: 'left' });
+      const total = rowTotal(row);
+      if (total === 0) {
+        const why = def.tag === 'tool' ? '加成相邻装备' : row.fires === 0 ? '没有出手' : '没起作用';
+        text(ctx, why, x1, y, { size: 12, weight: 700, color: C.pencil, align: 'right' });
+      } else {
+        const parts = REPORT_PARTS.filter((p) => row[p.key] > 0).map((p) => p.label + ' ' + row[p.key]);
+        text(ctx, parts.join(' · '), x1, y, { size: 12, weight: 700, color: C.inkSoft, align: 'right' });
+        // 贡献条（全场统一比例，两边可比）
+        let bx = x0 + 40;
+        const bw = x1 - bx;
+        ctx.fillStyle = 'rgba(43,29,20,0.1)';
+        ctx.fillRect(bx, y + 11, bw, 7);
+        for (const p of REPORT_PARTS) {
+          const w = (row[p.key] / this.scale) * bw;
+          if (w <= 0) continue;
+          ctx.fillStyle = p.color;
+          ctx.fillRect(bx, y + 11, w, 7);
+          bx += w;
+        }
+      }
+      y += 40;
+    }
+    // 合计 + 装备以外的伤害
+    const sum = (k: (typeof REPORT_PARTS)[number]['key']): number => sr.rows.reduce((a, x) => a + x[k], 0);
+    const foot: string[] = [];
+    const dmg = sum('dmg') + sum('poison');
+    if (dmg) foot.push('伤害 ' + dmg);
+    if (sum('shield')) foot.push('护盾 ' + sum('shield'));
+    if (sum('heal')) foot.push('回复 ' + sum('heal'));
+    if (sum('block')) foot.push('减伤 ' + sum('block'));
+    if (sr.traitDmg) foot.push('首领特性 ' + sr.traitDmg);
+    if (this.rep[this.side].storm) foot.push('受风暴 ' + this.rep[this.side].storm);
+    ctx.strokeStyle = 'rgba(43,29,20,0.35)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x0, r.y + r.h - 46);
+    ctx.lineTo(x1, r.y + r.h - 46);
+    ctx.stroke();
+    text(ctx, this.names[this.side] + ' 合计　' + (foot.join(' · ') || '—'), 195, r.y + r.h - 26, { size: 13, weight: 800, color: C.ink });
     this.closeB.draw(ctx, time, real);
   }
 }

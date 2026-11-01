@@ -213,7 +213,9 @@ export interface EnemyDef {
 
 export type BattleEventType =
   | 'start' | 'fire' | 'hit' | 'shield' | 'heal' | 'poisonApply' | 'poisonTick' | 'cleanse'
-  | 'stun' | 'lowHp' | 'revive' | 'phase' | 'fatigue' | 'storm' | 'end' | 'overheal';
+  | 'stun' | 'lowHp' | 'revive' | 'phase' | 'fatigue' | 'storm' | 'end' | 'overheal'
+  /** 减伤装备挡下的伤害（只给战报用，回放忽略） */
+  | 'block';
 
 export interface BattleEvent {
   t: number;

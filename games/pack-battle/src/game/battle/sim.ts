@@ -27,6 +27,8 @@ interface Fighter {
   stun: number;
   immune: number;
   reduce: number;
+  /** 各件减伤装备（战报按它们的减伤值分摊挡下的伤害） */
+  reducers: Derived[];
   speedBonus: number;
   units: Unit[];
   potions: Derived[];
@@ -45,16 +47,18 @@ function makeFighter(side: Side, inp: FighterInput): Fighter {
   const phoenix: Derived[] = [];
   const starts: Derived[] = [];
   let reduce = 0;
+  const reducers: Derived[] = [];
   sorted.forEach((it, i) => {
     const d = syn.derived.get(it.uid)!;
     reduce += d.reduce;
+    if (d.reduce > 0) reducers.push(d);
     if (d.trigger === 'cooldown' && d.cd > 0) units.push({ d, timer: 0, order: i });
     if (d.trigger === 'lowHp') potions.push(d);
     if (d.trigger === 'death') phoenix.push(d);
     if (d.trigger === 'start' && d.startShield > 0) starts.push(d);
   });
   return {
-    side, maxHp: inp.maxHp, hp: inp.maxHp, shield: 0, poison: 0, poisonT: 0, stun: 0, immune: 0, reduce,
+    side, maxHp: inp.maxHp, hp: inp.maxHp, shield: 0, poison: 0, poisonT: 0, stun: 0, immune: 0, reduce, reducers,
     speedBonus: 0, units, potions, phoenix, starts, traits: inp.traits ?? [], traitFired: (inp.traits ?? []).map(() => false),
     dead: false,
   };
@@ -153,6 +157,8 @@ export function simulate(player: FighterInput, enemy: FighterInput): BattleResul
     D.hp -= raw;
     if (A.side === 0 && total > bestHit) bestHit = total;
     push('hit', A.side, { uid: d.uid, amount: raw, absorbed, second, links: d.linkIds });
+    const blocked = d.dmg - total;
+    if (blocked > 0) for (const r of D.reducers) push('block', D.side, { uid: r.uid, amount: (blocked * r.reduce) / D.reduce });
     if (d.poison > 0) {
       D.poison += d.poison;
       push('poisonApply', D.side, { uid: d.uid, amount: d.poison });
