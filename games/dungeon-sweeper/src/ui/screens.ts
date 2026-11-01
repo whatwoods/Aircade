@@ -186,31 +186,31 @@ export class Screens {
   // ---------------------------------------------------------------- 标题
   showTitle(rec: Records, hasRun: boolean, daily: DailyInfo, diff: DiffId): void {
     this.title.classList.remove('hidden', 'out');
+    // 有存档时【新的冒险】与【每日挑战】半宽并排，日期省略
+    const half = hasRun;
     const dl =
       daily.state === 'done'
-        ? `<button class="btn btn-ghost btn-daily done" disabled id="btn-daily">今日 <b>${fmtInt(daily.score)}</b>${daily.won ? ' · 屠龙' : ''}</button>`
+        ? `<button class="btn btn-ghost btn-daily done" disabled id="btn-daily">今日 <b>${fmtInt(daily.score)}</b>${daily.won && !half ? ' · 屠龙' : ''}</button>`
         : daily.state === 'playing'
           ? ''
-          : `<button class="btn btn-ghost btn-daily" data-act="daily" id="btn-daily">每日挑战 · ${dayLabel(daily.key)}</button>`;
+          : `<button class="btn btn-ghost btn-daily" data-act="daily" id="btn-daily">每日挑战${half ? '' : ` · ${dayLabel(daily.key)}`}</button>`;
     const seg = DIFF_IDS.map(
       (d) => `<button class="${d === diff ? 'on' : ''}" data-act="diff:${d}" role="radio" aria-checked="${d === diff}">${diffParams(d).name}</button>`,
     ).join('');
+    const start = `<button class="btn ${hasRun ? 'btn-ghost' : 'btn-main'}" data-act="start" id="btn-start">${hasRun ? '新的冒险' : '开始冒险'}</button>`;
     this.menu.innerHTML = `
       ${hasRun ? `<button class="btn btn-main" data-act="continue" id="btn-continue">继续冒险</button>` : ''}
       <div class="seg" role="radiogroup" id="diff">${seg}</div>
-      <div class="row alt">
-        <button class="btn ${hasRun ? 'btn-ghost btn-wide' : 'btn-main'}" data-act="start" id="btn-start">${hasRun ? '新的冒险' : '开始冒险'}</button>
-        ${dl}
-      </div>
-      <div class="row tools">
-        <button class="btn btn-ghost" data-act="settings" id="btn-settings">⚙ 设置</button>
-        <button class="btn btn-ghost" data-act="achievements" id="btn-ach">★ 成就</button>
-        <button class="btn btn-ghost" data-act="howto" id="btn-howto">❖ 玩法</button>
+      ${hasRun ? `<div class="pair${dl ? '' : ' solo'}">${start}${dl}</div>` : `${start}${dl}`}
+      <div class="tools">
+        <button class="link" data-act="settings" id="btn-settings">设置</button>
+        <button class="link" data-act="achievements" id="btn-ach">成就</button>
+        <button class="link" data-act="howto" id="btn-howto">玩法</button>
       </div>`;
     this.menu.appendChild(this.plaque);
     if (rec.plays > 0) {
       this.plaque.classList.remove('hidden');
-      this.plaque.innerHTML = `最高分 <b>${fmtInt(rec.best)}</b> · 屠龙 <b>${rec.wins}</b> 次${rec.bestTime ? ` · 最快 <b>${fmtTime(rec.bestTime)}</b>` : ''}`;
+      this.plaque.innerHTML = `<span>最高分 <b>${fmtInt(rec.best)}</b> · 屠龙 <b>${rec.wins}</b> 次${rec.bestTime ? ` · 最快 <b>${fmtTime(rec.bestTime)}</b>` : ''}</span>`;
     } else this.plaque.classList.add('hidden');
   }
   hideTitle(): void {

@@ -1,7 +1,8 @@
 import { Rng } from '../core/rng';
 import { type Sprite, makeCanvas, rgba, sprite } from './gfx';
 import { EYE, PAL } from './palette';
-import { DRAGON_CRACKS, DRAGON_LAIR, DRAGON_RISE, SHAPES, type ShapeDef } from './shapes';
+import { LAIR_EYES, RISE_EYES, RISE_OUTLINE, paintLair, paintLairGlow, paintRise, paintRiseGlow } from './dragonArt';
+import { SHAPES, type ShapeDef } from './shapes';
 
 export interface Shard {
   c: HTMLCanvasElement;
@@ -32,7 +33,7 @@ export class Silhouettes {
   mon: Sil[] = [];
   rise!: Sil;
   lairBody!: Sprite;
-  lairCracks!: Sprite;
+  lairGlow!: Sprite;
   lairSize = 0;
   dpr = 1;
   private baked = '';
@@ -44,7 +45,7 @@ export class Silhouettes {
     this.dpr = dpr;
     this.mon = [];
     for (let l = 1; l <= 9; l++) this.mon[l] = this.bakeSil(SHAPES[l], 64, EYE[l], 4, 4, 1000 + l);
-    this.rise = this.bakeSil(DRAGON_RISE, 300, EYE[13], 7, 6, 77);
+    this.rise = this.bakeRise(300, EYE[13]);
     this.lairSize = cell * 3;
     this.bakeLair(cell * 3);
   }
@@ -135,6 +136,24 @@ export class Silhouettes {
         c.fill();
       }
     });
+    const inside = (test: CanvasRenderingContext2D, x: number, y: number): boolean => {
+      if (test.isPointInPath(P.fill, x, y)) return true;
+      for (const st of P.strokes) {
+        test.lineWidth = st.w;
+        if (test.isPointInStroke(st.p, x, y)) return true;
+      }
+      return false;
+    };
+    return this.finishSil(normal, inside, cssSize, gx, gy, seed);
+  }
+
+  /** 由烘好的正常版生成受击白版与碎片。inside 在恒等变换下判定单位坐标是否落在剪影内 */
+  private finishSil(normal: Sprite, inside: (test: CanvasRenderingContext2D, x: number, y: number) => boolean, cssSize: number, gx: number, gy: number, seed: number): Sil {
+    const d = this.dpr;
+    const unitPx = cssSize * d;
+    const total = normal.w;
+    const off = unitPx * PAD;
+    const sc = unitPx / 100;
     const white = sprite(total, total, (c) => {
       c.drawImage(normal.c, 0, 0);
       c.globalCompositeOperation = 'source-in';
@@ -156,14 +175,6 @@ export class Silhouettes {
         pts.push([x0 + (i * span) / (gx - 1) + jx, y0 + (j * span) / (gy - 1) + jy]);
       }
     const [, test] = makeCanvas(4, 4);
-    const inside = (x: number, y: number): boolean => {
-      if (test.isPointInPath(P.fill, x, y)) return true;
-      for (const s of P.strokes) {
-        test.lineWidth = s.w;
-        if (test.isPointInStroke(s.p, x, y)) return true;
-      }
-      return false;
-    };
     const shards: Shard[] = [];
     const cssPer = cssSize / 100;
     for (let j = 0; j < gy - 1; j++)
@@ -181,7 +192,7 @@ export class Silhouettes {
           const samples: [number, number][] = [[cxu, cyu]];
           for (const v of t) samples.push([(v[0] * 2 + cxu) / 3, (v[1] * 2 + cyu) / 3]);
           for (let q = 0; q < 3; q++) samples.push([(t[q][0] + t[(q + 1) % 3][0] + cxu) / 3, (t[q][1] + t[(q + 1) % 3][1] + cyu) / 3]);
-          for (const [sx, sy] of samples) if (inside(sx, sy)) hit = true;
+          for (const [sx, sy] of samples) if (inside(test, sx, sy)) hit = true;
           if (!hit) continue;
           const minX = Math.min(t[0][0], t[1][0], t[2][0]);
           const maxX = Math.max(t[0][0], t[1][0], t[2][0]);
@@ -218,69 +229,76 @@ export class Silhouettes {
     return { normal, white, shards, size: total / d, unit: cssSize };
   }
 
+  /** 屠龙战斗形态：dragonArt 画本体，整体向左上偏移着色得到轮廓光，叠上发光细节与眼睛 */
+  private bakeRise(cssSize: number, eye: string): Sil {
+    const d = this.dpr;
+    const unitPx = cssSize * d;
+    const total = Math.ceil(unitPx * (1 + PAD * 2));
+    const off = unitPx * PAD;
+    const sc = unitPx / 100;
+    const [body, bc] = makeCanvas(total, total);
+    bc.setTransform(sc, 0, 0, sc, off, off);
+    paintRise(bc);
+    const rimPx = 1.6 * d;
+    const normal = sprite(total, total, (c) => {
+      // 轮廓光：本体的琥珀色剪影，向左上与右上各偏一点，只露出边缘
+      const [rim, rc] = makeCanvas(total, total);
+      rc.drawImage(body, -rimPx, -rimPx);
+      rc.drawImage(body, rimPx * 0.6, -rimPx);
+      rc.globalCompositeOperation = 'source-in';
+      rc.fillStyle = rgba(PAL.amber, 0.9);
+      rc.fillRect(0, 0, total, total);
+      c.drawImage(rim, 0, 0);
+      c.drawImage(body, 0, 0);
+      c.setTransform(sc, 0, 0, sc, off, off);
+      paintRiseGlow(c, 4 * d);
+      for (const [x, y, rx, ry] of RISE_EYES) {
+        c.shadowColor = eye;
+        c.shadowBlur = 8 * d;
+        c.fillStyle = eye;
+        c.beginPath();
+        c.moveTo(x - rx, y - ry * 0.2);
+        c.quadraticCurveTo(x, y - ry * 1.4, x + rx, y + ry * 0.4 * (x < 50 ? 1 : -1));
+        c.quadraticCurveTo(x, y + ry * 1.1, x - rx, y - ry * 0.2);
+        c.fill();
+        c.shadowBlur = 0;
+        c.fillStyle = 'rgba(255,255,235,0.95)';
+        c.beginPath();
+        c.ellipse(x, y, rx * 0.22, ry * 0.75, 0, 0, Math.PI * 2);
+        c.fill();
+      }
+    });
+    const inside = (test: CanvasRenderingContext2D, x: number, y: number) => test.isPointInPath(RISE_OUTLINE, x, y);
+    return this.finishSil(normal, inside, cssSize, 7, 6, 77);
+  }
+
+  /** 巢中睡龙：本体（光照之下）+ 发光层（光照之后叠加） */
   private bakeLair(css: number): void {
     const d = this.dpr;
     const px = Math.round(css * d);
     const sc = px / 100;
-    const P = this.paths(DRAGON_LAIR);
-    const rimOff = (1.2 * d) / sc;
+    const [body, bc] = makeCanvas(px, px);
+    bc.setTransform(sc, 0, 0, sc, 0, 0);
+    paintLair(bc);
     this.lairBody = sprite(px, px, (c) => {
-      c.setTransform(sc, 0, 0, sc, -rimOff * sc, -rimOff * sc);
-      this.shape(c, P, rgba('#B0502A', 0.55));
-      c.setTransform(sc, 0, 0, sc, 0, 0);
-      const g = c.createLinearGradient(0, 0, 0, 100);
-      g.addColorStop(0, '#1C1620');
-      g.addColorStop(1, '#0A0910');
-      this.shape(c, P, g);
-      // 鳞片：暗上加暗的菱形纹理
-      c.save();
-      c.clip(P.fill);
-      c.strokeStyle = 'rgba(0,0,0,0.55)';
-      c.lineWidth = 0.5;
-      for (let y = -6; y < 106; y += 4.2) {
-        c.beginPath();
-        for (let x = -6; x < 106; x += 4.2) {
-          c.moveTo(x, y + 2.1);
-          c.lineTo(x + 2.1, y);
-          c.lineTo(x + 4.2, y + 2.1);
-        }
-        c.stroke();
-      }
-      c.strokeStyle = 'rgba(80,60,90,0.12)';
-      c.translate(0.6, 0.6);
-      for (let y = -6; y < 106; y += 4.2) {
-        c.beginPath();
-        for (let x = -6; x < 106; x += 4.2) {
-          c.moveTo(x, y + 2.1);
-          c.lineTo(x + 2.1, y);
-        }
-        c.stroke();
-      }
-      c.restore();
-      // 鼻孔
-      c.fillStyle = '#000';
-      c.beginPath();
-      c.ellipse(47.5, 86, 1.2, 0.8, 0, 0, Math.PI * 2);
-      c.ellipse(52.5, 86, 1.2, 0.8, 0, 0, Math.PI * 2);
-      c.fill();
+      // 下缘受巢中余烬映照的暖色轮廓
+      const rimPx = 1.1 * d;
+      const [rim, rc] = makeCanvas(px, px);
+      rc.drawImage(body, 0, rimPx);
+      rc.globalCompositeOperation = 'source-in';
+      rc.fillStyle = 'rgba(214,96,48,0.7)';
+      rc.fillRect(0, 0, px, px);
+      c.drawImage(rim, 0, 0);
+      c.drawImage(body, 0, 0);
     });
-    this.lairCracks = sprite(px, px, (c) => {
+    this.lairGlow = sprite(px, px, (c) => {
       c.setTransform(sc, 0, 0, sc, 0, 0);
-      c.lineCap = 'round';
-      c.shadowColor = PAL.dragonFire;
-      c.shadowBlur = 5 * d;
-      c.strokeStyle = 'rgba(255,90,40,0.95)';
-      c.lineWidth = 1.1;
-      for (const s of DRAGON_CRACKS) c.stroke(new Path2D(s));
-      c.shadowBlur = 0;
-      c.strokeStyle = 'rgba(255,220,150,0.9)';
-      c.lineWidth = 0.4;
-      for (const s of DRAGON_CRACKS) c.stroke(new Path2D(s));
+      paintLairGlow(c, 4 * d);
     });
   }
 
   /** 巢中巨龙眼睛位置（单位坐标） */
   get lairEyes(): [number, number, number, number][] {
-    return DRAGON_LAIR.eyes;
+    return LAIR_EYES;
   }
 }

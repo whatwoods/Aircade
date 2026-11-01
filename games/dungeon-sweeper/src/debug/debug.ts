@@ -188,6 +188,33 @@ export function installDebug(app: App): void {
       if (app.state === 'result') app.replay();
       else app.newGame(false, true);
     },
+    /** 巨龙 sprite 一览：巢中本体、发光层、战斗形态、受击白版（再调一次关闭；bg 为底色） */
+    dragonSheet(bg = '#2a2a2e') {
+      const old = document.getElementById('debug-dragon');
+      if (old) {
+        old.remove();
+        return;
+      }
+      const s = app.sil;
+      const wrap = document.createElement('div');
+      wrap.id = 'debug-dragon';
+      wrap.style.cssText = `position:fixed;inset:0;z-index:99;background:${bg};display:flex;flex-wrap:wrap;gap:10px;padding:10px;align-content:flex-start;justify-content:center;overflow:auto`;
+      for (const [src, w] of [
+        [s.lairBody.c, 170],
+        [s.lairGlow.c, 170],
+        [s.rise.normal.c, 360],
+        [s.rise.white.c, 170],
+      ] as [HTMLCanvasElement, number][]) {
+        const k = document.createElement('canvas');
+        k.width = src.width;
+        k.height = src.height;
+        k.getContext('2d')!.drawImage(src, 0, 0);
+        k.style.cssText = `width:${w}px;outline:1px solid #555`;
+        wrap.appendChild(k);
+      }
+      wrap.onclick = () => wrap.remove();
+      document.body.appendChild(wrap);
+    },
     /** 预览本局分享卡（再调一次关闭） */
     shareCard() {
       const old = document.getElementById('debug-card');
