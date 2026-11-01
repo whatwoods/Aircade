@@ -3,6 +3,8 @@ import { NUMBER_TIERS, PAL } from './palette';
 
 export const FONT_NUM = "'Cinzel', 'Trajan Pro', 'Times New Roman', serif";
 export const FONT_DECO = "'Cinzel Decorative', 'Cinzel', 'Times New Roman', serif";
+/** 标题「地牢扫雷」专用毛笔字（马善政楷书，只子集化这四个字） */
+export const FONT_TITLE = "'Ma Shan Zheng'";
 export const FONT_CN = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC","Source Han Sans SC",sans-serif';
 
 export interface GlyphOpts {

@@ -1,7 +1,7 @@
-import { CONFIG } from '../config';
-import { N, NEIGHBORS } from './board';
-import type { Game } from './rules';
-import { Kind } from './types';
+import { CONFIG } from '../config.ts';
+import { N, NEIGHBORS } from './board.ts';
+import type { Game } from './rules.ts';
+import { Kind } from './types.ts';
 
 /**
  * 只看可见信息的求解机器人（生成期校验用，文档 §3.7 / §11）。
@@ -174,23 +174,54 @@ export interface SolveResult {
   actions: number;
 }
 
-/** 用机器人把一局下完（会修改传入的 Game） */
-export function solveGame(g: Game, maxNodes: number = CONFIG.solver.maxNodes): SolveResult {
-  MAX_NODES = maxNodes;
+/** 机器人画像（pnpm sim 用来模拟不同水平的玩家；生成期校验用默认值） */
+export interface BotOpts {
+  /** 每次回溯分析的节点上限：越小推理越浅，超限的连通块只剩「上限」信息 */
+  maxNodes: number;
+  /** 每步随手点开一个「不一定致死」的前沿格的概率（误读数字） */
+  slip: number;
+  /** 每步计入的游戏时长（模拟迅捷分） */
+  msPerAction?: number;
+  /** 最低挑战血量（不同难度不同） */
+  minHp: number;
+  /** 血量 ≥ stopHp 时立刻屠龙；之前继续清图，无必活动作且够血时也屠龙（贪心程度，≥ minHp） */
+  stopHp: number;
+  /** slip 用的随机数 [0,1) */
+  rand?: () => number;
+}
+
+const BOT_DEFAULT: BotOpts = { maxNodes: CONFIG.solver.maxNodes, slip: 0, minHp: 0, stopHp: 0 };
+
+/** 用默认（专家、够血即屠龙）机器人把一局下完（会修改传入的 Game） */
+export function solveGame(g: Game, maxNodes: number = CONFIG.solver.maxNodes, minHp: number = g.diff.minHp): SolveResult {
+  return playBot(g, { ...BOT_DEFAULT, maxNodes, minHp, stopHp: minHp });
+}
+
+export function playBot(g: Game, o: BotOpts): SolveResult {
+  MAX_NODES = o.maxNodes;
   g.start();
   let deadly = 0;
   let actions = 0;
   const lair = g.lairCell();
+  const rand = o.rand ?? Math.random;
   for (let step = 0; step < 400 && g.phase === 'playing'; step++) {
     actions++;
+    g.timeMs += o.msPerAction ?? 0;
     const p = g.player;
-    if (p.hp >= CONFIG.dragon.minHpToChallenge) {
+    const ready = p.hp >= o.minHp;
+    if (ready && p.hp >= o.stopHp) {
       g.tap(lair, true);
       continue;
     }
     const { count } = analyze(g);
     const xpLeft = g.xpToNext - p.xp;
     let pick = -1;
+    // 0. 失手：随手点开一个不一定致死的前沿格
+    if (o.slip > 0 && count > 0 && rand() < o.slip) {
+      const cand: number[] = [];
+      for (let a = 0; a < count; a++) if (minOf(possMask[frontier[a]]) < p.hp) cand.push(frontier[a]);
+      if (cand.length) pick = cand[Math.floor(rand() * cand.length)];
+    }
     // 1. 必定为空
     for (let a = 0; a < count && pick < 0; a++) if (possMask[frontier[a]] === 1) pick = frontier[a];
     // 2. 能升级的宝箱（未满血时）
@@ -232,6 +263,10 @@ export function solveGame(g: Game, maxNodes: number = CONFIG.solver.maxNodes): S
       }
     if (pick < 0)
       for (let i = 0; i < N && pick < 0; i++) if (g.revealed[i] && !g.collected[i] && g.b.kind[i] === Kind.Chest) pick = i;
+    if (pick < 0 && ready) {
+      g.tap(lair, true);
+      continue;
+    }
     // 6. 被迫猜测
     if (pick < 0) {
       let bs = 1e9;

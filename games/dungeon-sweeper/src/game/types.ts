@@ -25,6 +25,8 @@ export interface PlayerState {
 export interface ScoreBreakdown {
   kills: number;
   killScore: number;
+  /** 巨龙觉醒后的击杀分（已含倍率） */
+  rage: number;
   gold: number;
   dragon: number;
   hpLeft: number;
@@ -45,6 +47,9 @@ export type GameEvent =
       hpBefore: number;
       hpAfter: number;
       lethal: boolean;
+      /** 本次击杀得分（含龙怒倍率） */
+      score: number;
+      rage: boolean;
     }
   | { t: 'xp'; amount: number; from: number; source: 'monster' | 'chest' }
   | { t: 'levelUp'; from: number; to: number; maxHp: number }

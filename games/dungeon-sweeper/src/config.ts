@@ -62,7 +62,7 @@ export const CONFIG = {
       weightByDist: [0, 1, 1, 0.8, 0.5, 0.3],
     },
     potion: {
-      count: 3,
+      /** 数量见 difficulty.*.potionCount */
       heal: 5,
       weightByDist: [0, 0.3, 0.8, 1, 1, 0.8],
     },
@@ -80,9 +80,47 @@ export const CONFIG = {
     /** 随机种子但 Worker 预取未就绪时的主线程兜底预算（ms） */
     fallbackMs: 60,
   },
+  /** 死亡复盘：亮出剩余怪物（文档 §5.4b） */
+  review: {
+    /** 死亡后多久开始显出（真实时间 ms） */
+    startMs: 900,
+    /** 以致死格为中心，每格距离的延迟 */
+    stepMs: 45,
+    fadeMs: 320,
+    silScale: 0.7,
+    silAlpha: 1,
+    /** 结算面板推迟出现，先让玩家看清全盘 */
+    holdMs: 1200,
+  },
+  /** 每日挑战与分享（文档 §6.9） */
+  daily: {
+    /** 日期 → 种子的哈希盐：改它会让所有日期换图 */
+    salt: 0x5eed0d5,
+    /** 本地保留的每日成绩天数 */
+    keepDays: 60,
+  },
+  /**
+   * 难度档（文档 §3.8）：在上面的基础数值上覆盖。每日挑战和引导局固定用 normal。
+   * 各档胜率目标与 pnpm sim 实测见文档 §3.8。
+   */
+  difficulty: {
+    easy: { name: '学徒', countsDelta: {} as Record<number, number>, potionCount: 4, dragonLevel: 11, minHpToChallenge: 12 },
+    normal: { name: '冒险者', countsDelta: {} as Record<number, number>, potionCount: 3, dragonLevel: 13, minHpToChallenge: 14 },
+    hard: { name: '英雄', countsDelta: {} as Record<number, number>, potionCount: 3, dragonLevel: 15, minHpToChallenge: 16 },
+  },
+  defaultDifficulty: 'normal' as 'easy' | 'normal' | 'hard',
+
+  /** 成就门槛（文档 §6.11） */
+  achievements: {
+    rageScore: 300,
+    speedSec: 180,
+    seerMarks: 10,
+    dailyCount: 7,
+    veteranWins: 10,
+    gloryScore: 4000,
+  },
+
   dragon: {
-    level: 13,
-    minHpToChallenge: 14,
     confirmIfMonstersLeft: true,
     /** 玩家达到该等级时巨龙睁开一只眼（纯视觉） */
     oneEyeAtLevel: 7,
@@ -91,10 +129,12 @@ export const CONFIG = {
   score: {
     perMonsterLevel: 10,
     dragonBonus: 1000,
-    hpLeftBonus: 30,
+    hpLeftBonus: 60,
     timeBonusBaseSec: 600,
     timeBonusPerSec: 1,
     fullClearBonus: 300,
+    /** 龙怒：巨龙觉醒之后的击杀分倍率（够血之后继续清图的回报，文档 §3.9） */
+    awakeKillMult: 2,
   },
 
   rules: {
@@ -206,14 +246,17 @@ export function xpToNextLevel(level: number): number {
 /** 静态断言：经验总量足够屠龙 */
 export function validateConfig(): string[] {
   const errs: string[] = [];
-  let pool = 0;
-  for (let l = 1; l <= 9; l++) pool += (CONFIG.monsters.counts[l] ?? 0) * l * CONFIG.monsters.xpPerLevel;
-  let need = 0;
-  let lv = 1;
-  while (maxHpForLevel(lv) < CONFIG.dragon.minHpToChallenge) {
-    need += xpToNextLevel(lv);
-    lv++;
+  for (const [id, d] of Object.entries(CONFIG.difficulty)) {
+    let pool = 0;
+    for (let l = 1; l <= 9; l++) pool += Math.max(0, (CONFIG.monsters.counts[l] ?? 0) + (d.countsDelta[l] ?? 0)) * l * CONFIG.monsters.xpPerLevel;
+    let need = 0;
+    let lv = 1;
+    while (maxHpForLevel(lv) < d.minHpToChallenge) {
+      need += xpToNextLevel(lv);
+      lv++;
+    }
+    if (pool < need) errs.push(`${id}：经验池 ${pool} < 屠龙所需 ${need}`);
+    if (d.minHpToChallenge <= d.dragonLevel) errs.push(`${id}：挑战血量须大于巨龙等级`);
   }
-  if (pool < need) errs.push(`经验池 ${pool} < 屠龙所需 ${need}`);
   return errs;
 }

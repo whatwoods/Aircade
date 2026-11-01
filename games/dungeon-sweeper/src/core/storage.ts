@@ -18,6 +18,14 @@ export function save(key: string, value: unknown): void {
   }
 }
 
+export function remove(key: string): void {
+  try {
+    localStorage.removeItem(PREFIX + key);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function clearAll(): void {
   try {
     const keys: string[] = [];
@@ -60,6 +68,7 @@ export function loadSettings(): Settings {
   return { ...defaultSettings(), ...load<Partial<Settings>>('settings', {}) };
 }
 
-export function loadRecords(): Records {
-  return { best: 0, bestTime: 0, wins: 0, plays: 0, ...load<Partial<Records>>('records', {}) };
+/** key：每档难度一份记录（见 game/score.ts recordsKey） */
+export function loadRecords(key = 'records'): Records {
+  return { best: 0, bestTime: 0, wins: 0, plays: 0, ...load<Partial<Records>>(key, {}) };
 }

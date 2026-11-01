@@ -1,6 +1,7 @@
-import { CONFIG, maxHpForLevel, xpToNextLevel } from '../config';
-import { type BoardData, generateBoard, N, NEIGHBORS, START_CELL } from './board';
-import { solveGame } from './solver';
+import { CONFIG, maxHpForLevel, xpToNextLevel } from '../config.ts';
+import { type BoardData, generateBoard, N, NEIGHBORS, START_CELL } from './board.ts';
+import { type DiffId, type DiffParams, diffParams } from './difficulty.ts';
+import { solveGame } from './solver.ts';
 import {
   type GameEvent,
   Kind,
@@ -11,7 +12,7 @@ import {
   type Phase,
   type PlayerState,
   type ScoreBreakdown,
-} from './types';
+} from './types.ts';
 
 /**
  * 纯逻辑：不依赖 DOM / Canvas。每个操作同步结算并返回事件列表，
@@ -21,6 +22,7 @@ export class Game {
   readonly b: BoardData;
   readonly seed: number;
   readonly isTutorial: boolean;
+  readonly diff: DiffParams;
   readonly revealed = new Uint8Array(N);
   readonly collected = new Uint8Array(N);
   readonly mark = new Int8Array(N);
@@ -34,6 +36,10 @@ export class Game {
   gold = 0;
   kills = 0;
   killXp = 0;
+  /** 巨龙觉醒之后击杀的等级和（龙怒加成） */
+  awakeKillXp = 0;
+  /** 是否有过「战斗后只剩 1 点生命」 */
+  closeCall = false;
   correctMarks = 0;
   fullCleared = false;
   dragonAwake = false;
@@ -41,11 +47,14 @@ export class Game {
   breakdown: ScoreBreakdown | null = null;
   deathCell = -1;
   marksPlaced = 0;
+  /** 每日挑战的日期键（YYYY-MM-DD）；普通局为 null */
+  daily: string | null = null;
 
   constructor(seed: number, tutorial = false, board?: BoardData) {
     this.seed = seed;
     this.isTutorial = tutorial;
     this.b = board ?? pickBoard(seed, tutorial);
+    this.diff = diffParams(this.b.diff);
     const lv = 1;
     this.player = { level: lv, hp: maxHpForLevel(lv), maxHp: maxHpForLevel(lv), xp: 0 };
     for (let i = 0; i < N; i++) {
@@ -66,7 +75,8 @@ export class Game {
     return xpToNextLevel(this.player.level);
   }
   get score(): number {
-    return this.killXp * CONFIG.score.perMonsterLevel + this.gold + (this.fullCleared ? CONFIG.score.fullClearBonus : 0);
+    const S = CONFIG.score;
+    return (this.killXp + this.awakeKillXp * (S.awakeKillMult - 1)) * S.perMonsterLevel + this.gold + (this.fullCleared ? S.fullClearBonus : 0);
   }
   /** 已翻开的信息格（显示数字的格子） */
   isInfo(i: number): boolean {
@@ -76,7 +86,7 @@ export class Game {
     return this.revealed[i] === 0;
   }
   canChallengeDragon(): boolean {
-    return this.player.hp >= CONFIG.dragon.minHpToChallenge;
+    return this.player.hp >= this.diff.minHp;
   }
   revealedCount(): number {
     let n = 0;
@@ -205,7 +215,7 @@ export class Game {
       return;
     }
     const before = this.player.hp;
-    this.player.hp -= CONFIG.dragon.level;
+    this.player.hp -= this.diff.dragonLevel;
     ev.push({ t: 'dragonFight', hpBefore: before, hpAfter: this.player.hp });
     this.phase = 'won';
     this.breakdown = this.computeBreakdown(true);
@@ -263,7 +273,8 @@ export class Game {
     // 翻开（标记结果在战斗事件之前给出）
     const tmp: number[] = [];
     this.markReveal(i, tmp, ev);
-    ev.push({ t: 'fight', cell: i, level: L, hpBefore: before, hpAfter: Math.max(0, p.hp), lethal });
+    const score = L * CONFIG.score.perMonsterLevel * (this.dragonAwake ? CONFIG.score.awakeKillMult : 1);
+    ev.push({ t: 'fight', cell: i, level: L, hpBefore: before, hpAfter: Math.max(0, p.hp), lethal, score, rage: this.dragonAwake });
     if (lethal) {
       p.hp = 0;
       this.phase = 'lost';
@@ -272,8 +283,10 @@ export class Game {
       ev.push({ t: 'defeat', breakdown: this.breakdown, cell: i, level: L });
       return;
     }
+    if (p.hp === 1) this.closeCall = true;
     this.kills++;
     this.killXp += L;
+    if (this.dragonAwake) this.awakeKillXp += L;
     this.alive[L]--;
     this.totalAlive--;
     this.gainXp(L * CONFIG.monsters.xpPerLevel, i, 'monster', ev);
@@ -321,7 +334,7 @@ export class Game {
       p.maxHp = maxHpForLevel(p.level);
       p.hp = p.maxHp;
       ev.push({ t: 'levelUp', from: startLevel, to: p.level, maxHp: p.maxHp });
-      if (!this.dragonAwake && p.maxHp >= CONFIG.dragon.minHpToChallenge) {
+      if (!this.dragonAwake && p.maxHp >= this.diff.minHp) {
         this.dragonAwake = true;
         ev.push({ t: 'dragonAwake' });
       }
@@ -331,7 +344,8 @@ export class Game {
   computeBreakdown(won: boolean): ScoreBreakdown {
     const S = CONFIG.score;
     const timeSec = Math.floor(this.timeMs / 1000);
-    const killScore = this.killXp * S.perMonsterLevel;
+    const killScore = (this.killXp - this.awakeKillXp) * S.perMonsterLevel;
+    const rage = this.awakeKillXp * S.perMonsterLevel * S.awakeKillMult;
     const dragon = won ? S.dragonBonus : 0;
     const hpLeft = won ? Math.max(0, this.player.hp) : 0;
     const hpScore = hpLeft * S.hpLeftBonus;
@@ -340,6 +354,7 @@ export class Game {
     return {
       kills: this.kills,
       killScore,
+      rage,
       gold: this.gold,
       dragon,
       hpLeft,
@@ -347,9 +362,77 @@ export class Game {
       timeSec,
       timeScore,
       fullClear,
-      total: killScore + this.gold + dragon + hpScore + timeScore + fullClear,
+      total: killScore + rage + this.gold + dragon + hpScore + timeScore + fullClear,
       won,
     };
+  }
+
+  // ---------------------------------------------------------------- 存档
+  /** 中途存档：盘面由 seed + regen 重建，只存玩家改变过的状态 */
+  toSave(): RunSave {
+    const bits = (a: Uint8Array) => Array.from(a).join('');
+    return {
+      v: SAVE_VERSION,
+      seed: this.seed,
+      regen: this.b.regen,
+      tutorial: this.isTutorial,
+      daily: this.daily,
+      revealed: bits(this.revealed),
+      collected: bits(this.collected),
+      mark: Array.from(this.mark),
+      player: { ...this.player },
+      gold: this.gold,
+      kills: this.kills,
+      killXp: this.killXp,
+      awakeKillXp: this.awakeKillXp,
+      closeCall: this.closeCall,
+      diff: this.b.diff,
+      correctMarks: this.correctMarks,
+      fullCleared: this.fullCleared,
+      dragonAwake: this.dragonAwake,
+      timeMs: Math.floor(this.timeMs),
+      marksPlaced: this.marksPlaced,
+    };
+  }
+
+  /** 从存档恢复；数据不符（版本、长度、盘面校验）时返回 null */
+  static fromSave(s: RunSave): Game | null {
+    if (!s || s.v !== SAVE_VERSION || s.revealed?.length !== N || s.collected?.length !== N || s.mark?.length !== N) return null;
+    const board = generateBoard(s.seed, s.tutorial, s.regen, s.diff ?? 'normal');
+    if (board.regen !== s.regen) return null;
+    const g = new Game(s.seed, s.tutorial, board);
+    g.daily = s.daily ?? null;
+    for (let i = 0; i < N; i++) {
+      g.revealed[i] = s.revealed.charCodeAt(i) === 49 || board.kind[i] === Kind.Lair ? 1 : 0;
+      g.collected[i] = s.collected.charCodeAt(i) === 49 ? 1 : 0;
+      g.mark[i] = g.revealed[i] ? MARK_NONE : s.mark[i] | 0;
+    }
+    // 由翻开状态重算数字与存活数
+    g.number.fill(0);
+    g.alive.fill(0);
+    g.totalAlive = 0;
+    for (let i = 0; i < N; i++) {
+      if (board.kind[i] !== Kind.Monster || g.revealed[i]) continue;
+      const L = board.level[i];
+      g.alive[L]++;
+      g.totalAlive++;
+      for (let k = 0; k < 8; k++) {
+        const j = NEIGHBORS[i * 8 + k];
+        if (j >= 0) g.number[j] += L;
+      }
+    }
+    g.player = { ...s.player };
+    g.gold = s.gold;
+    g.kills = s.kills;
+    g.killXp = s.killXp;
+    g.awakeKillXp = s.awakeKillXp ?? 0;
+    g.closeCall = s.closeCall ?? false;
+    g.correctMarks = s.correctMarks;
+    g.fullCleared = s.fullCleared;
+    g.dragonAwake = s.dragonAwake;
+    g.timeMs = s.timeMs;
+    g.marksPlaced = s.marksPlaced;
+    return g;
   }
 
   // ---------------------------------------------------------------- debug
@@ -370,7 +453,7 @@ export class Game {
     p.xp = 0;
     const ev: GameEvent[] = [];
     if (p.level !== from) ev.push({ t: 'levelUp', from, to: p.level, maxHp: p.maxHp });
-    if (!this.dragonAwake && p.maxHp >= CONFIG.dragon.minHpToChallenge) {
+    if (!this.dragonAwake && p.maxHp >= this.diff.minHp) {
       this.dragonAwake = true;
       ev.push({ t: 'dragonAwake' });
     }
@@ -421,21 +504,49 @@ export class Game {
   }
 }
 
+const SAVE_VERSION = 1;
+
+export interface RunSave {
+  v: number;
+  seed: number;
+  regen: number;
+  tutorial: boolean;
+  daily: string | null;
+  /** 每格一位 '0' / '1' */
+  revealed: string;
+  collected: string;
+  mark: number[];
+  player: PlayerState;
+  gold: number;
+  kills: number;
+  killXp: number;
+  /** 以下三项后加，旧存档缺省 0 / false / normal */
+  awakeKillXp?: number;
+  closeCall?: boolean;
+  diff?: DiffId;
+  correctMarks: number;
+  fullCleared: boolean;
+  dragonAwake: boolean;
+  timeMs: number;
+  marksPlaced: number;
+}
+
 /**
  * 选盘：在满足开局翻开范围的候选里，取第一个「机器人无需致命猜测即可通关」的盘面。
  * 候选按 seed + k 确定性递增，同一种子永远得到同一盘面（时间预算只在极慢设备上生效）。
  */
-export function pickBoard(seed: number, tutorial: boolean, budgetMs: number = CONFIG.solver.budgetMs): BoardData {
-  const first = generateBoard(seed, tutorial);
+export function pickBoard(seed: number, tutorial: boolean, budgetMs: number = CONFIG.solver.budgetMs, diff: DiffId = 'normal'): BoardData {
+  const first = generateBoard(seed, tutorial, 0, diff);
+  const minHp = diffParams(first.diff).minHp;
   const S = CONFIG.solver;
   if (tutorial || !S.enabled) return first;
   const t0 = performance.now();
   let b = first;
   for (let n = 0; n < S.maxTries; n++) {
-    const r = solveGame(new Game(seed, false, b));
+    const r = solveGame(new Game(seed, false, b), CONFIG.solver.maxNodes, minHp);
     if (r.won && r.deadly === 0) return b;
     if (performance.now() - t0 > budgetMs) break;
-    b = generateBoard(seed, false, b.regen + 1);
+    b = generateBoard(seed, false, b.regen + 1, diff);
   }
   return first;
 }

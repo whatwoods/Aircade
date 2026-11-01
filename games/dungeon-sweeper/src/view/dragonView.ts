@@ -1,4 +1,5 @@
 import { CONFIG } from '../config';
+import { RISE_MOUTH } from './dragonArt';
 import { backOut, clamp01, cubicOut } from '../core/ease';
 import { P, type Fx } from './fx';
 import type { Mat } from './gfx';
@@ -111,7 +112,7 @@ export class DragonView {
     ctx.globalAlpha = alpha * (this.awake ? 0.55 + 0.45 * b : 0.25 + 0.5 * b);
     const sc = 1 + 0.012 * b;
     const w = r.s * sc;
-    ctx.drawImage(this.sil.lairCracks.c, r.x + (r.s - w) / 2, r.y + (r.s - w) / 2 - (w - r.s) * 0.3, w, w);
+    ctx.drawImage(this.sil.lairGlow.c, r.x + (r.s - w) / 2, r.y + (r.s - w) / 2 - (w - r.s) * 0.3, w, w);
     ctx.globalCompositeOperation = 'source-over';
     // 眼睛
     const u = w / 100;
@@ -130,12 +131,23 @@ export class DragonView {
       if (k === 1) open = Math.max(open, disturbOpen);
       calls_eye(ctx, this.tex, x, y, rx * u, open, alpha, b);
     }
-    // 苏醒：巢边金红光圈
+    // 苏醒：身下炉火般的暖光 + 从鳞缝升起的余烬
     if (this.awake) {
       ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = alpha * (0.35 + 0.35 * b);
-      const rs = r.s * 1.25;
-      ctx.drawImage(this.tex.ringGold.c, r.x + r.s / 2 - rs / 2, r.y + r.s / 2 - rs / 2, rs, rs);
+      ctx.globalAlpha = alpha * (0.3 + 0.25 * b);
+      const gw = r.s * 1.5;
+      const gh = r.s * 0.7;
+      ctx.drawImage(this.tex.flameGlow.c, r.x + r.s / 2 - gw / 2, r.y + r.s * 0.78 - gh / 2, gw, gh);
+      const es = r.s * 0.032;
+      for (let k = 0; k < 9; k++) {
+        const life = 2600 + 400 * (k % 3);
+        const p = ((real + k * 977) % life) / life;
+        const x0 = r.x + r.s * (0.2 + 0.6 * ((k * 0.618) % 1));
+        const x = x0 + Math.sin(p * 5 + k) * r.s * 0.04;
+        const y = r.y + r.s * (0.8 - 0.75 * p);
+        ctx.globalAlpha = alpha * Math.sin(p * Math.PI) * 0.9;
+        ctx.drawImage(this.tex.ember.c, x - es / 2, y - es / 2, es, es);
+      }
       ctx.globalCompositeOperation = 'source-over';
     }
     ctx.globalAlpha = 1;
@@ -167,7 +179,7 @@ export class DragonView {
     ctx.setTransform(base.a, base.b, base.c, base.d, base.e, base.f);
     // 口中光核
     const mx = pos.x;
-    const my = pos.y + (34 - 50) * (sil.unit / 100) * sy;
+    const my = pos.y + (RISE_MOUTH[1] - 50) * (sil.unit / 100) * sy;
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.6 + 0.4 * Math.sin(world * 0.02);
     const cs = 26 * sy;
@@ -194,7 +206,7 @@ export class DragonView {
     BP.y = y;
     BP.s = s;
     BP.mouthX = x;
-    BP.mouthY = y + (34 - 50) * (unit / 100) * s;
+    BP.mouthY = y + (RISE_MOUTH[1] - 50) * (unit / 100) * s;
     return BP;
   }
 

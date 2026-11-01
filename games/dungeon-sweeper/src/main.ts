@@ -1,5 +1,6 @@
 import cinzelUrl from '@fontsource-variable/cinzel/files/cinzel-latin-wght-normal.woff2?url';
 import decoUrl from '@fontsource/cinzel-decorative/files/cinzel-decorative-latin-700-normal.woff2?url';
+import titleUrl from './assets/fonts/ma-shan-zheng-title.woff2?url';
 import './ui/styles.css';
 import { App } from './app';
 import { validateConfig } from './config';
@@ -12,12 +13,16 @@ function param(name: string): string | null {
   }
 }
 
+/** 最多为字体等待的时间：首屏预算 300ms；字体迟到时回调重烘字形，不阻塞首屏 */
+const FONT_WAIT_MS = 300;
+
 /** FontFace 加载（带超时）；迟到时回调重烘字形 */
 function loadFonts(onLate: () => void): Promise<void> {
   const faces: FontFace[] = [];
   try {
     faces.push(new FontFace('Cinzel', `url(${cinzelUrl}) format('woff2')`, { weight: '400 900', display: 'swap' }));
     faces.push(new FontFace('Cinzel Decorative', `url(${decoUrl}) format('woff2')`, { weight: '700', display: 'swap' }));
+    faces.push(new FontFace('Ma Shan Zheng', `url(${titleUrl}) format('woff2')`, { display: 'swap' }));
   } catch {
     return Promise.resolve();
   }
@@ -38,7 +43,7 @@ function loadFonts(onLate: () => void): Promise<void> {
     window.setTimeout(() => {
       timedOut = true;
       res();
-    }, 1500),
+    }, FONT_WAIT_MS),
   );
   return Promise.race([all, timeout]);
 }
@@ -63,6 +68,20 @@ async function boot(): Promise<void> {
     const m = await import('./debug/debug');
     m.installDebug(app);
   }
+}
+
+// PWA 已废弃：注销早先版本注册的 Service Worker，并删掉它的缓存
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker
+    .getRegistrations()
+    .then((rs) => rs.forEach((r) => void r.unregister()))
+    .catch(() => undefined);
+}
+if ('caches' in window) {
+  caches
+    .keys()
+    .then((ks) => ks.filter((k) => k.startsWith('aircade.dungeon-sweeper.')).forEach((k) => void caches.delete(k)))
+    .catch(() => undefined);
 }
 
 void boot();

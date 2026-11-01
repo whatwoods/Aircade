@@ -1,8 +1,11 @@
 import type { App } from '../app';
 import { maxHpForLevel } from '../config';
-import { clearAll } from '../core/storage';
+import { clearAll, loadRecords, save } from '../core/storage';
 import { COLS, N, ROWS, cx, cy, idx } from '../game/board';
+import { type DiffId, isDiff } from '../game/difficulty';
+import { recordsKey } from '../game/score';
 import { Kind } from '../game/types';
+import { drawIcon, drawOgImage, drawShareCard } from '../ui/share';
 import { P } from '../view/fx';
 
 /** ?debug=1：FPS 浮层 + window.__game（文档 §8） */
@@ -47,6 +50,9 @@ export function installDebug(app: App): void {
         phase: g.phase,
         appState: app.state,
         seed: g.seed,
+        diff: g.diff.id,
+        titleDiff: app.diff,
+        awakeKillXp: g.awakeKillXp,
         hp: g.player.hp,
         maxHp: g.player.maxHp,
         level: g.player.level,
@@ -159,10 +165,85 @@ export function installDebug(app: App): void {
     newGame(seed?: number) {
       if (seed !== undefined) app.opts.seed = seed >>> 0;
       if (app.state === 'title') app.startFromTitle();
+      else if (app.state === 'result') app.replay();
       else app.newGame(false, true);
     },
+    /** 设置下一局的难度（easy / normal / hard），同标题页的三段选择 */
+    difficulty(d: DiffId) {
+      if (!isDiff(d)) return app.diff;
+      app.diff = d;
+      save('difficulty', d);
+      app.records = loadRecords(recordsKey(d));
+      return d;
+    },
+    /** 已解锁成就（id → 时间）；reset=true 清空 */
+    achievements(reset = false) {
+      if (reset) {
+        app.ach = {};
+        save('achievements', {});
+      }
+      return { ...app.ach };
+    },
     restart() {
-      app.newGame(false, true);
+      if (app.state === 'result') app.replay();
+      else app.newGame(false, true);
+    },
+    /** 巨龙 sprite 一览：巢中本体、发光层、战斗形态、受击白版（再调一次关闭；bg 为底色） */
+    dragonSheet(bg = '#2a2a2e') {
+      const old = document.getElementById('debug-dragon');
+      if (old) {
+        old.remove();
+        return;
+      }
+      const s = app.sil;
+      const wrap = document.createElement('div');
+      wrap.id = 'debug-dragon';
+      wrap.style.cssText = `position:fixed;inset:0;z-index:99;background:${bg};display:flex;flex-wrap:wrap;gap:10px;padding:10px;align-content:flex-start;justify-content:center;overflow:auto`;
+      for (const [src, w] of [
+        [s.lairBody.c, 170],
+        [s.lairGlow.c, 170],
+        [s.rise.normal.c, 360],
+        [s.rise.white.c, 170],
+      ] as [HTMLCanvasElement, number][]) {
+        const k = document.createElement('canvas');
+        k.width = src.width;
+        k.height = src.height;
+        k.getContext('2d')!.drawImage(src, 0, 0);
+        k.style.cssText = `width:${w}px;outline:1px solid #555`;
+        wrap.appendChild(k);
+      }
+      wrap.onclick = () => wrap.remove();
+      document.body.appendChild(wrap);
+    },
+    /** 预览本局分享卡（再调一次关闭） */
+    shareCard() {
+      const old = document.getElementById('debug-card');
+      if (old) {
+        old.remove();
+        return;
+      }
+      const g = app.game;
+      const img = document.createElement('img');
+      img.id = 'debug-card';
+      img.src = drawShareCard(g, g.breakdown ?? g.computeBreakdown(false)).toDataURL();
+      img.style.cssText = 'position:fixed;inset:0;margin:auto;max-width:100%;max-height:100%;z-index:98';
+      img.onclick = () => img.remove();
+      document.body.appendChild(img);
+    },
+    /** 开发服务器专用：把图标与 OG 图写进 public/（vite.config.ts 的 /__asset 中间件） */
+    async exportAssets() {
+      const out: Record<string, HTMLCanvasElement> = {
+        'favicon.png': drawIcon(192),
+        'og.png': drawOgImage(),
+      };
+      const done: string[] = [];
+      for (const [name, c] of Object.entries(out)) {
+        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'));
+        if (!blob) continue;
+        const res = await fetch(`/__asset?name=${encodeURIComponent(name)}`, { method: 'POST', body: blob });
+        if (res.ok) done.push(name);
+      }
+      return done;
     },
     startTutorial() {
       if (app.state === 'title') app.startFromTitle(true);
