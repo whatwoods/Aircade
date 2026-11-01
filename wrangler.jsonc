@@ -1,0 +1,10 @@
+{
+  // 纯静态站点：scripts/build-site.sh 生成 site/，部署到 games.wayai.cc
+  "name": "aircade",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./site",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  }
+}

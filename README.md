@@ -83,6 +83,23 @@ for g in games/*/; do (cd "$g" && pnpm install --frozen-lockfile && pnpm build) 
 
 ## 部署
 
+### 线上站点（Cloudflare Workers）
+
+`games.wayai.cc` 由 Cloudflare Workers 托管静态文件，推送到 `main` 后 Cloudflare 的 Git 集成自动构建部署：
+
+| 路径 | 游戏 |
+|---|---|
+| `/` | 入口页（`site-root/index.html`） |
+| `/sweeper/` | dungeon-sweeper |
+| `/battle/` | pack-battle |
+
+- `scripts/build-site.sh` 依次构建上线的游戏，生成 `site/`；增减游戏改脚本里的 `GAMES`，并同步入口页链接。
+- `wrangler.jsonc` 把 `site/` 作为静态资源目录，没有 Worker 代码。
+- Cloudflare 后台设置：构建命令 `bash scripts/build-site.sh`，部署命令 `npx wrangler deploy`，生产分支 `main`，自定义域名 `games.wayai.cc`。Node 版本由 `.node-version` 指定。
+- 本地预览：`bash scripts/build-site.sh && npx wrangler dev`。
+
+### 其他静态托管
+
 把每个游戏的 `dist/` 目录上传到任意静态托管即可，不需要服务端，也不需要额外配置路由（单页、无前端路由）。
 
 - **任意静态服务器 / 对象存储（Nginx、S3、OSS、COS 等）**：把 `games/<游戏名>/dist/` 的内容上传到某个目录，例如 `https://example.com/aircade/sling-merge/`。建议给 `assets/` 下的带哈希文件设置长缓存，`index.html` 不缓存。
@@ -110,6 +127,9 @@ done
 ```
 .
 ├── CLAUDE.md             # 给 Claude 会话的共用约定
+├── wrangler.jsonc        # Cloudflare Workers 部署配置
+├── scripts/build-site.sh # 构建线上站点 site/
+├── site-root/            # 线上站点入口页
 ├── .claude/launch.json   # 各游戏开发服务器（预览用）
 ├── docs/                 # 各游戏的设计文档（规则、数值、美术、动效清单、界面流程、模块划分）
 └── games/
