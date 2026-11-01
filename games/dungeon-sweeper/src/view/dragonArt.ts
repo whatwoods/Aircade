@@ -175,8 +175,16 @@ function horn(c: CanvasRenderingContext2D, pts: Pt[], w0: number, base: string, 
   return T;
 }
 
-/** 爪子：小掌 + 三根弯钩 */
-function claw(c: CanvasRenderingContext2D, x: number, y: number, s: number, dir: number, body: string, nail: string): void {
+/** 爪子：小掌 + 三根弯钩（rot 弧度，0 = 爪尖朝下） */
+function claw(c: CanvasRenderingContext2D, x: number, y: number, s: number, dir: number, body: string, nail: string, rot = 0): void {
+  if (rot) {
+    c.save();
+    c.translate(x, y);
+    c.rotate(rot);
+    claw(c, 0, 0, s, dir, body, nail);
+    c.restore();
+    return;
+  }
   c.fillStyle = body;
   c.beginPath();
   c.ellipse(x, y, 2.6 * s, 2 * s, 0, 0, Math.PI * 2);
@@ -491,7 +499,7 @@ const RISE = (() => {
   ];
   const shoulder: Pt = [41, 46];
   const elbow: Pt = [27, 33];
-  const hip: Pt = [39, 63];
+  const hip: Pt = [40.5, 62];
   const mirror = (p: Pt): Pt => [100 - p[0], p[1]];
   const wingPath = (m: (p: Pt) => Pt): Path2D => {
     const P = new Path2D();
@@ -521,70 +529,70 @@ const RISE = (() => {
   const id = (p: Pt) => p;
   const wingL = wingPath(id);
   const wingR = wingPath(mirror);
+  // 细长的 S 形颈：根部宽、贴着胸口，向上收细接到下颌
   const neck = tube(
     spline(
       [
         [50, 50],
-        [49, 42],
-        [51.5, 34],
-        [50, 26],
+        [47.6, 44],
+        [51.8, 37.5],
+        [50, 29],
       ],
-      8,
+      10,
     ),
-    (t) => lerp(12, 7.5, t),
+    (t) => lerp(10.5, 6.2, smooth(t)),
   );
   // 有棱角的龙头：宽眉板、颧骨外凸、下颌收窄
   const head = new Path2D(
     'M42.5 15.5 L46 11.3 L54 11.3 L57.5 15.5 L61.2 18.2 L59.2 21.6 L57.2 23.4 L56.1 28.4 C55.1 31.6 52.8 33.6 50 33.6 C47.2 33.6 44.9 31.6 43.9 28.4 L42.8 23.4 L40.8 21.6 L38.8 18.2 Z',
   );
+  // 倒三角躯干：宽胸、收腰、骨盆略放
   const torso = new Path2D(
-    'M39.5 48 C42 45 58 45 60.5 48 C63.5 53 63.5 61 61.5 68 C60 74 57.5 79 55.5 83 L44.5 83 C42.5 79 40 74 38.5 68 C36.5 61 36.5 53 39.5 48 Z',
+    'M38 48 C41 44.6 59 44.6 62 48 C64.8 51.5 64.2 56.5 61 60.5 C58.6 63.6 56.6 66 56.6 69 C57.6 72 58.6 75 57 78 C55 80.6 45 80.6 43 78 C41.4 75 42.4 72 43.4 69 C43.4 66 41.4 63.6 39 60.5 C35.8 56.5 35.2 51.5 38 48 Z',
   );
-  // 反关节后腿：大腿外鼓、膝在前、小腿收回到脚踝
-  const thighL = new Path2D('M42 69 C36.5 70 32.5 75 33 81 C33.3 85 35.5 87.5 37.5 88.5 L36.8 93.5 L41.2 93.5 L42.2 87 C43.6 82 43.8 76 43 72 Z');
-  const thighR = new Path2D('M58 69 C63.5 70 67.5 75 67 81 C66.7 85 64.5 87.5 62.5 88.5 L63.2 93.5 L58.8 93.5 L57.8 87 C56.4 82 56.2 76 57 72 Z');
-  const armL = tube(
-    spline(
-      [
-        [40, 51],
-        [34, 57.5],
-        [33.2, 64.5],
-        [35.5, 68.5],
-      ],
-      8,
-    ),
-    (t) => lerp(5.6, 3, t),
-  );
-  const armR = tube(
-    spline(
-      [
-        [60, 51],
-        [66, 57.5],
-        [66.8, 64.5],
-        [64.5, 68.5],
-      ],
-      8,
-    ),
-    (t) => lerp(5.6, 3, t),
-  );
+  // 后腿（左；右腿镜像）：粗壮大腿向外下 → 膝 → 小腿收回到跗关节 → 跖骨着地（趾行）
+  const legPts = {
+    thigh: [[44.5, 71], [39.5, 75.5], [34.8, 80]] as Pt[],
+    shin: [[34.8, 80], [35.6, 84.5], [37.6, 88.2]] as Pt[],
+    foot: [[37.6, 88.2], [36.8, 91.5], [36.2, 94]] as Pt[],
+  };
+  const leg = (m: (p: Pt) => Pt) => ({
+    thigh: tube(spline(legPts.thigh.map(m), 8), (t) => lerp(10.5, 6, t)),
+    shin: tube(spline(legPts.shin.map(m), 8), (t) => lerp(5.6, 3.2, t)),
+    foot: tube(spline(legPts.foot.map(m), 6), (t) => lerp(3.2, 3.6, t)),
+  });
+  const legL = leg(id);
+  const legR = leg(mirror);
+  // 前臂：肘向外下撑开，前臂抬起，爪尖朝上朝外
+  const armPts = {
+    upper: [[40.5, 50.5], [35, 55.5], [31.6, 60.5]] as Pt[],
+    fore: [[31.6, 60.5], [29.6, 56.5], [28.6, 52]] as Pt[],
+  };
+  const arm = (m: (p: Pt) => Pt) => ({
+    upper: tube(spline(armPts.upper.map(m), 8), (t) => lerp(6.2, 4.2, t)),
+    fore: tube(spline(armPts.fore.map(m), 8), (t) => lerp(4.4, 3, t)),
+  });
+  const armL = arm(id);
+  const armR = arm(mirror);
   const tail = tube(
     spline(
       [
-        [55, 82],
-        [68, 90],
-        [82, 92],
-        [92, 86],
-        [95, 76],
-        [92, 70],
+        [54, 76],
+        [64, 86],
+        [78, 91],
+        [90, 87],
+        [95, 77],
+        [92, 69],
       ],
-      10,
+      12,
     ),
-    (t) => lerp(8, 1.4, Math.pow(t, 0.85)),
+    (t) => lerp(9, 1.3, Math.pow(t, 0.8)),
   );
   // 剪影外形（碎片取样与受击闪白用）
   const outline = new Path2D();
-  for (const p of [wingL, wingR, neck.path, head, torso, thighL, thighR, armL.path, armR.path, tail.path]) outline.addPath(p);
-  return { wingL, wingR, neck, head, torso, thighL, thighR, armL, armR, tail, outline, tips, wrist, elbow, shoulder, mirror };
+  const limbs = [legL, legR, armL, armR].flatMap((l) => Object.values(l) as Tube[]);
+  for (const p of [wingL, wingR, neck.path, head, torso, tail.path, ...limbs.map((t) => t.path)]) outline.addPath(p);
+  return { wingL, wingR, neck, head, torso, legL, legR, armL, armR, tail, outline, tips, wrist, elbow, shoulder, mirror };
 })();
 
 export const RISE_OUTLINE: Path2D = RISE.outline;
@@ -606,6 +614,7 @@ export function paintRise(c: CanvasRenderingContext2D): void {
   c.fillStyle = body(70, 96);
   c.fill(R.tail.path);
   scales(c, R.tail, 2.4, 1.2, 0, 1, 'rgba(0,0,0,0.6)', 'rgba(255,140,90,0.1)');
+  spikes(c, R.tail, 0.18, 0.8, 7, 2.2, '#120c12', 'rgba(255,170,110,0.18)');
   const tt = at(R.tail, 1);
   c.fillStyle = '#1a1218';
   c.beginPath();
@@ -676,28 +685,55 @@ export function paintRise(c: CanvasRenderingContext2D): void {
     c.closePath();
     c.fill();
   }
-  // 后腿
-  for (const t of [R.thighL, R.thighR]) {
-    c.fillStyle = body(70, 92);
-    c.fill(t);
+  // 后腿：先画小腿和跖骨，再压上大腿（膝盖盖住小腿上端）
+  for (const [L, dir] of [
+    [R.legL, -1],
+    [R.legR, 1],
+  ] as const) {
+    c.fillStyle = body(80, 95);
+    c.fill(L.foot.path);
+    c.fill(L.shin.path);
+    // 跗关节后的骨刺
+    const h = at(L.shin, 1);
+    c.fillStyle = '#120c12';
+    c.beginPath();
+    c.moveTo(h.p[0] - dir * 1.2, h.p[1] - 1.2);
+    c.lineTo(h.p[0] - dir * 4.2, h.p[1] - 0.2);
+    c.lineTo(h.p[0] - dir * 1, h.p[1] + 1.3);
+    c.closePath();
+    c.fill();
+    const tg = c.createLinearGradient(0, 70, 0, 84);
+    tg.addColorStop(0, '#2a1f2c');
+    tg.addColorStop(1, '#120d14');
+    c.fillStyle = tg;
+    c.fill(L.thigh.path);
+    scales(c, L.thigh, 2.2, 1, 0.15, 1, 'rgba(0,0,0,0.5)', 'rgba(255,150,100,0.1)');
+    // 大腿肌肉的高光棱
+    const k = at(L.thigh, 0.55);
+    c.strokeStyle = 'rgba(255,170,120,0.14)';
+    c.lineWidth = 0.6;
+    c.beginPath();
+    c.moveTo(k.p[0] + k.n[0] * k.w * 0.3 * -dir, k.p[1] - 2.4);
+    c.quadraticCurveTo(k.p[0] + dir * -3, k.p[1] + 1, at(L.thigh, 1).p[0] + dir * 1.2, at(L.thigh, 1).p[1] + 1.6);
+    c.stroke();
+    const f = at(L.foot, 1);
+    claw(c, f.p[0], f.p[1] + 0.4, 1.2, dir, '#140e14', '#b9a685');
   }
-  claw(c, 38.6, 94, 1.15, -1, '#140e14', '#b9a685');
-  claw(c, 61.4, 94, 1.15, 1, '#140e14', '#b9a685');
   // 躯干
   c.fillStyle = body(45, 85);
   c.fill(R.torso);
   c.save();
   c.clip(R.torso);
   // 腹甲：一节一节的横向骨板
-  for (let y = 52; y < 85; y += 4.2) {
-    const k = (y - 52) / 33;
-    const hw = lerp(7.4, 4.6, k);
+  for (let y = 51; y < 79; y += 3.8) {
+    const k = (y - 51) / 28;
+    const hw = lerp(7.6, 5, k);
     c.fillStyle = 'rgba(70,42,46,0.55)';
     c.beginPath();
     c.moveTo(50 - hw, y);
     c.quadraticCurveTo(50, y + 1.6, 50 + hw, y);
-    c.lineTo(50 + hw * 0.95, y + 3.2);
-    c.quadraticCurveTo(50, y + 4.8, 50 - hw * 0.95, y + 3.2);
+    c.lineTo(50 + hw * 0.95, y + 2.9);
+    c.quadraticCurveTo(50, y + 4.5, 50 - hw * 0.95, y + 2.9);
     c.closePath();
     c.fill();
   }
@@ -708,13 +744,27 @@ export function paintRise(c: CanvasRenderingContext2D): void {
   c.ellipse(57.5, 53, 4.2, 3, -0.5, 0, Math.PI * 2);
   c.fill();
   c.restore();
-  // 前臂（抬起的爪）
-  for (const a of [R.armL, R.armR]) {
-    c.fillStyle = body(50, 72);
-    c.fill(a.path);
+  // 前臂：肘外撑、前臂抬起，爪尖朝上
+  for (const [A, dir] of [
+    [R.armL, -1],
+    [R.armR, 1],
+  ] as const) {
+    c.fillStyle = body(48, 62);
+    c.fill(A.fore.path);
+    c.fill(A.upper.path);
+    scales(c, A.upper, 1.9, 0.85, 0.2, 1, 'rgba(0,0,0,0.5)', 'rgba(255,150,100,0.1)');
+    // 肘刺
+    const e = at(A.upper, 1);
+    c.fillStyle = '#120c12';
+    c.beginPath();
+    c.moveTo(e.p[0] + dir * 0.6, e.p[1] - 1.6);
+    c.lineTo(e.p[0] + dir * 3.6, e.p[1] + 2.2);
+    c.lineTo(e.p[0] - dir * 0.8, e.p[1] + 1.6);
+    c.closePath();
+    c.fill();
+    const w = at(A.fore, 1);
+    claw(c, w.p[0], w.p[1] - 0.8, 1.15, dir, '#140e14', '#c9b48f', Math.PI + dir * 0.35);
   }
-  claw(c, 36, 69.8, 0.95, -1, '#140e14', '#c9b48f');
-  claw(c, 64, 69.8, 0.95, 1, '#140e14', '#c9b48f');
   // 颈
   c.fillStyle = body(26, 50);
   c.fill(R.neck.path);
@@ -734,9 +784,9 @@ export function paintRise(c: CanvasRenderingContext2D): void {
   // 背刺（颈两侧露出来的）
   c.fillStyle = '#120c12';
   for (let k = 0; k < 4; k++) {
-    const y = 30 + k * 4.6;
+    const y = 33 + k * 3.8;
     for (const sx of [-1, 1]) {
-      const { p, w } = at(R.neck, 1 - (y - 26) / 24);
+      const { p, w } = at(R.neck, 1 - (y - 29) / 21);
       c.beginPath();
       c.moveTo(p[0] + (sx * w) / 2, y - 1.2);
       c.lineTo(p[0] + sx * (w / 2 + 2.4), y - 2.6);
@@ -817,9 +867,9 @@ export function paintRiseGlow(c: CanvasRenderingContext2D, shadowBlur: number): 
   // 腹甲缝里的火：体内熔炉
   c.save();
   c.clip(R.torso);
-  for (let y = 55.2; y < 85; y += 4.2) {
-    const k = (y - 52) / 33;
-    const hw = lerp(6.9, 4.2, k);
+  for (let y = 54; y < 79; y += 3.8) {
+    const k = (y - 51) / 28;
+    const hw = lerp(7, 4.5, k);
     c.strokeStyle = `rgba(255,${Math.round(lerp(120, 70, k))},40,${lerp(0.85, 0.35, k).toFixed(2)})`;
     c.lineWidth = 0.7;
     c.beginPath();
