@@ -9,6 +9,8 @@ import { Spring } from '../core/spring.ts';
 import { settings } from '../core/storage.ts';
 import { Rolling, ease } from '../core/tween.ts';
 import type { ReceiptLine } from '../game/economy.ts';
+import { clearRun, saveRun, saveable } from '../game/save.ts';
+import { clearScore } from '../game/score.ts';
 import { enemyBag, enemyFor } from '../game/enemies.ts';
 import {
   applyResult, beginArrange, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, type Outcome, type SellRecord,
@@ -37,7 +39,7 @@ import { describe } from './describe.ts';
 import { Guide } from './guide.ts';
 import { HALF_PI, ItemView, stashCell } from './itemView.ts';
 import { ConfirmPanel, DetailPanel, DrawerPanel, Overlays, PausePanel, RoutePanel, SettingsPanel } from './overlays.ts';
-import { factories, gotoScene, type Scene } from './sceneManager.ts';
+import { factories, gotoScene, type EndingData, type Scene } from './sceneManager.ts';
 
 export type GPhase = 'receipt' | 'arrange' | 'toBattle' | 'battle' | 'result' | 'toArrange';
 
@@ -109,9 +111,15 @@ export class GameScene implements Scene {
   speedFlip = 1;
   handler: InputHandler;
 
-  constructor(o: { seed?: number; tutorial?: boolean; round?: number }) {
+  /** 读档进入（不重放引导、已在整理阶段时不重发收入） */
+  private resumed = false;
+  private saveT = 0;
+  private lastSave = '';
+
+  constructor(o: { seed?: number; tutorial?: boolean; round?: number; resume?: RunState }) {
     const seed = o.seed ?? (Date.now() % 1000000);
-    this.run = newRun(seed, !!o.tutorial);
+    this.resumed = !!o.resume;
+    this.run = o.resume ?? newRun(seed, !!o.tutorial);
     this.pauseB = new Button('btn.pause', { x: 12, y: 8, w: 44, h: 44 }, '', 'coin', 3);
     this.pauseB.icon = 'pause';
     this.fightB = new Button('btn.fight', { x: 95, y: 732, w: 200, h: 60 }, '开战', 'plank', 5);
@@ -143,7 +151,7 @@ export class GameScene implements Scene {
   enter(): void {
     this.layout(true);
     const goldBefore = this.run.gold;
-    const lines = beginArrange(this.run);
+    const lines = this.run.phase === 'arrange' ? [] : beginArrange(this.run);
     this.recompute(false);
     this.syncViews(true);
     this.shopV.setInstant(this.run.shop);
@@ -154,7 +162,8 @@ export class GameScene implements Scene {
     this.tr.open = 0;
     this.phase = 'arrange';
     if (lines.length) this.startReceipt(lines, goldBefore);
-    if (this.run.tutorial && this.run.round === 1) this.tut.start();
+    if (this.run.tutorial && this.run.round === 1 && !this.resumed) this.tut.start();
+    this.persist();
     setMusic('arrange');
     this.speedB.label = settings.speed + '×';
     this.bc.speed = settings.speed;
@@ -166,7 +175,17 @@ export class GameScene implements Scene {
   }
 
   autoPause(): void {
+    this.persist();
     if (!this.paused) this.openPause();
+  }
+
+  /** 整理阶段存档（内容没变就不写） */
+  persist(): void {
+    if (this.run.phase !== 'arrange' || !saveable(this.run)) return;
+    const s = JSON.stringify(this.run);
+    if (s === this.lastSave) return;
+    this.lastSave = s;
+    saveRun(this.run);
   }
 
   // ---------- 布局 ----------
@@ -405,6 +424,13 @@ export class GameScene implements Scene {
     this.recompute(false);
     this.battleRound = this.run.round;
     const res = startBattle(this.run);
+    // 存"打完之后"的状态：战斗中关掉页面也不能换装重打
+    if (saveable(this.run)) {
+      const after = structuredClone(this.run);
+      applyResult(after, res);
+      saveRun(after);
+      this.lastSave = '';
+    }
     this.bc.begin(res);
     this.phase = 'toBattle';
     this.tt = 0;
@@ -481,16 +507,8 @@ export class GameScene implements Scene {
     if (this.phase !== 'result' || !this.outcome) return;
     const out = this.outcome;
     if (out.ending) {
-      const run = this.run;
-      const e = enemyFor(run.round);
-      factories.ending &&
-        gotoScene(() =>
-          factories.ending({
-            cleared: run.cleared, round: run.round, score: run.score, roundScores: run.stats.roundScores.slice(), clearBonus: out.clearBonus,
-            hearts: run.hearts, seed: run.seed, bestHit: run.stats.bestHit, merges: run.stats.merges, spent: run.stats.spent,
-            killer: run.cleared ? null : e.portrait, killerName: `${e.title}「${e.name}」`,
-          }),
-        );
+      const data = endingData(this.run);
+      factories.ending && gotoScene(() => factories.ending(data));
       return;
     }
     this.goArrange();
@@ -558,6 +576,7 @@ export class GameScene implements Scene {
           ),
         restart: () => {
           this.ov.closeAll();
+          clearRun();
           gotoScene(() => factories.game({ tutorial: false }));
         },
         title: () => {
@@ -585,6 +604,11 @@ export class GameScene implements Scene {
     if (this.paused) {
       if (!this.ov.has(PausePanel)) this.paused = false;
       return;
+    }
+    this.saveT += raw;
+    if (this.saveT >= 0.5) {
+      this.saveT = 0;
+      this.persist();
     }
     this.time += dt;
     this.gold.update(dt);
@@ -711,7 +735,8 @@ export class GameScene implements Scene {
     }
     // 连线：整理时全亮；战斗中变暗，被用到时闪
     const dim = this.phase === 'battle' || this.phase === 'result' || this.phase === 'toBattle' ? 0.32 : 1;
-    if (!this.ac.drag || !this.ac.previewing()) this.links.draw(ctx, g, time, dim, hide);
+    const focus = this.phase === 'arrange' || this.phase === 'receipt' ? this.ac.focusUid() : -1;
+    if (!this.ac.drag || !this.ac.previewing()) this.links.draw(ctx, g, time, dim, hide, focus);
     else this.ac.drawPreviewLinks(ctx, g, time);
     // 号角 / 长弓（整理阶段）
     if (this.phase === 'arrange' || this.phase === 'receipt') {
@@ -952,9 +977,12 @@ export class GameScene implements Scene {
     if (!h) return;
     const k = Math.min(1, (3.4 - h.t) / 0.25);
     const a = h.t < 0.3 ? h.t / 0.3 : 1;
-    const y = this.phase === 'arrange' || this.phase === 'receipt' ? this.L.bubbleY - 36 : this.B.band.y + this.B.band.h + (this.phase === 'result' ? 42 : 32);
+    // 整理阶段放在桌边那一排上，不压背包格子；拖拽时淡下去
+    const st = this.L.stash[0];
+    const arranging = this.phase === 'arrange' || this.phase === 'receipt';
+    const y = arranging ? st.y + st.h / 2 : this.B.band.y + this.B.band.h + (this.phase === 'result' ? 42 : 32);
     ctx.save();
-    ctx.globalAlpha *= a;
+    ctx.globalAlpha *= a * (arranging && this.ac.drag ? 0.3 : 1);
     drawBubble(ctx, '💡 ' + h.s, 195, y, 330, null, k);
     ctx.restore();
   }
@@ -1294,6 +1322,17 @@ export class GameScene implements Scene {
   inputState(): { dragging: boolean } {
     return { dragging: input.dragging };
   }
+}
+
+/** 一局结束时交给结局页的数据（读档进入结局时也用） */
+export function endingData(run: RunState): EndingData {
+  const e = enemyFor(run.round);
+  return {
+    cleared: run.cleared, round: run.round, score: run.score, roundScores: run.stats.roundScores.slice(),
+    clearBonus: run.cleared ? clearScore(run.hearts) : 0, hearts: run.hearts, seed: run.seed, bestHit: run.stats.bestHit,
+    merges: run.stats.merges, spent: run.stats.spent, killer: run.cleared ? null : e.portrait, killerName: `${e.title}「${e.name}」`,
+    debug: run.debug,
+  };
 }
 
 function shapeMouth(it: ItemInst): { mouth: [number, number]; dir: [number, number] } | null {

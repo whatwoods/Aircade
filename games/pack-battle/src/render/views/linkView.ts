@@ -37,6 +37,8 @@ export interface LinkAnim {
   fade: number;
   dying: boolean;
   flash: number;
+  /** 出现后经过的秒数（新连线先全亮一会儿） */
+  age: number;
 }
 
 export function linkKey(l: Link): string {
@@ -171,7 +173,7 @@ export class LinkLayer {
       const ex = this.anims.find((a) => a.key === key && !a.dying);
       if (ex) ex.link = l;
       else {
-        this.anims.push({ key, link: l, grow: animate ? 0 : 1, fade: 1, dying: false, flash: 0 });
+        this.anims.push({ key, link: l, grow: animate ? 0 : 1, fade: 1, dying: false, flash: 0, age: animate ? 0 : 99 });
         added.push(l);
       }
     }
@@ -200,6 +202,7 @@ export class LinkLayer {
     for (let i = this.anims.length - 1; i >= 0; i--) {
       const a = this.anims[i];
       if (a.grow < 1) a.grow = Math.min(1, a.grow + dt / 0.25);
+      a.age += dt;
       if (a.flash > 0) a.flash = Math.max(0, a.flash - dt);
       if (a.dying) {
         a.fade -= dt / 0.2;
@@ -208,15 +211,23 @@ export class LinkLayer {
     }
   }
 
-  /** dim：战斗中平时变暗 */
-  draw(ctx: CanvasRenderingContext2D, g: BagRect, time: number, dim: number, hideUid = 0): void {
+  /**
+   * dim：战斗中平时变暗。
+   * focus：-1 全亮；0 没有选中（全部半透明、不流光）；>0 只突出与这件相连的，其余压暗。
+   * 满背包时连线太多会糊成一团，所以整理阶段只突出正在看的那件；刚连上的线先全亮 1.5 秒。
+   */
+  draw(ctx: CanvasRenderingContext2D, g: BagRect, time: number, dim: number, hideUid = 0, focus = -1): void {
     for (const a of this.anims) {
       if (hideUid && (a.link.from === hideUid || a.link.to === hideUid)) continue;
       const f = a.flash > 0 ? 1 : 0;
-      const alpha = a.fade * (dim + (1 - dim) * f) * (a.grow < 1 ? 1 : 1);
-      // 生长完成时闪一下
-      const pop = a.grow >= 1 ? 0 : 0;
-      drawLinkCurve(ctx, g, a.link, time, Math.min(1, alpha + pop), f ? 1.5 : 1, a.grow, false, dim > 0.9 || f > 0);
+      let fk = 1;
+      let sparks = dim > 0.9 || f > 0;
+      if (focus >= 0 && a.age > 1.5 && !f && !(focus > 0 && (a.link.from === focus || a.link.to === focus))) {
+        fk = focus > 0 ? 0.15 : 0.45;
+        sparks = false;
+      }
+      const alpha = a.fade * (dim + (1 - dim) * f) * fk;
+      drawLinkCurve(ctx, g, a.link, time, Math.min(1, alpha), f ? 1.5 : 1, a.grow, false, sparks);
     }
   }
 }

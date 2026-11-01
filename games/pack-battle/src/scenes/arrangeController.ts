@@ -182,6 +182,17 @@ export class ArrangeController {
     return z && z.kind === 'stash' ? z.slot : -1;
   }
 
+  /** 加成连线要突出的装备：鼠标悬停的背包装备，否则轻点选中的那件 */
+  focusUid(): number {
+    const run = this.gs.run;
+    if (!input.touch && this.hoverKey.startsWith('u')) {
+      const it = find(run, Number(this.hoverKey.slice(1)));
+      if (it && it.zone === 'bag') return it.uid;
+    }
+    const it = this.selected ? find(run, this.selected) : null;
+    return it && it.zone === 'bag' ? it.uid : 0;
+  }
+
   selectedBow(): number {
     if (this.drag || !this.selected) return 0;
     const it = find(this.gs.run, this.selected);

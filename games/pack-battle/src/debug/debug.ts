@@ -13,6 +13,7 @@ import { popup } from '../render/fx/popups.ts';
 import { tier } from '../render/fx/shake.ts';
 import { C } from '../render/kit.ts';
 import { rectCss, stage } from '../render/stage.ts';
+import { EndingScene } from '../scenes/endingScene.ts';
 import { GameScene } from '../scenes/gameScene.ts';
 import { factories, gotoScene, setScene, sm } from '../scenes/sceneManager.ts';
 import { buildFor } from '../../scripts/balance-builds.ts';
@@ -32,6 +33,16 @@ function safe<A extends unknown[], R>(fn: (...a: A) => R): (...a: A) => R | Fail
       return fail(e instanceof Error ? e.message : String(e));
     }
   };
+}
+
+/** 改状态的接口：标记本局为调试局（不存档、不计最高分） */
+function mut<A extends unknown[], R>(fn: (...a: A) => R): (...a: A) => R | Fail {
+  return safe((...a: A) => {
+    const r = fn(...a);
+    const g = game();
+    if (g) g.run.debug = true;
+    return r;
+  });
 }
 
 function css(r: { x: number; y: number; w: number; h: number } | null | undefined) {
@@ -172,32 +183,32 @@ export function installDebug(): void {
       if (!g) return fail('不在游戏中');
       return css(g.itemRect(uid)) ?? fail('装备不存在');
     }),
-    addGold: safe((n: number) => {
+    addGold: mut((n: number) => {
       const g = game();
       if (!g) return fail('不在游戏中');
       g.run.gold = Math.max(0, g.run.gold + n);
       g.gold.set(g.run.gold);
       return g.run.gold;
     }),
-    setGold: safe((n: number) => {
+    setGold: mut((n: number) => {
       const g = game();
       if (!g) return fail('不在游戏中');
       g.run.gold = Math.max(0, n);
       g.gold.set(g.run.gold);
       return g.run.gold;
     }),
-    setHearts: safe((n: number) => {
+    setHearts: mut((n: number) => {
       const g = game();
       if (!g) return fail('不在游戏中');
       g.run.hearts = Math.max(1, Math.min(3, n));
       return g.run.hearts;
     }),
-    gotoRound: safe(gotoRound),
-    boss: safe((n: 5 | 10) => {
+    gotoRound: mut(gotoRound),
+    boss: mut((n: 5 | 10) => {
       if (n !== 5 && n !== 10) return fail('只能是 5 或 10');
       return gotoRound(n, 'mid');
     }),
-    give: safe((id: ItemId, lv: Lv = 1, where: 'stash' | 'bag' | { x: number; y: number; rot?: Rot } = 'stash') => {
+    give: mut((id: ItemId, lv: Lv = 1, where: 'stash' | 'bag' | { x: number; y: number; rot?: Rot } = 'stash') => {
       const g = game();
       if (!g) return fail('不在游戏中');
       if (!ITEMS[id]) return fail('没有这件装备');
@@ -208,7 +219,7 @@ export function installDebug(): void {
       g.recompute(true);
       return { ok: true, uid: r.uid };
     }),
-    place: safe((id: ItemId, x: number, y: number, rot: Rot = 0, lv: Lv = 1) => {
+    place: mut((id: ItemId, x: number, y: number, rot: Rot = 0, lv: Lv = 1) => {
       const g = game();
       if (!g) return fail('不在游戏中');
       if (!ITEMS[id]) return fail('没有这件装备');
@@ -219,7 +230,7 @@ export function installDebug(): void {
       g.recompute(true);
       return r.uid;
     }),
-    clearBag: safe(() => {
+    clearBag: mut(() => {
       const g = game();
       if (!g) return fail('不在游戏中');
       if (g.phase !== 'arrange') return fail('只能在整理阶段');
@@ -228,7 +239,7 @@ export function installDebug(): void {
       g.rebuild();
       return true;
     }),
-    clearStash: safe(() => {
+    clearStash: mut(() => {
       const g = game();
       if (!g) return fail('不在游戏中');
       if (g.phase !== 'arrange') return fail('只能在整理阶段');
@@ -237,7 +248,7 @@ export function installDebug(): void {
       g.rebuild();
       return true;
     }),
-    setShop: safe((ids: (ItemId | null)[]) => {
+    setShop: mut((ids: (ItemId | null)[]) => {
       const g = game();
       if (!g) return fail('不在游戏中');
       if (g.phase !== 'arrange') return fail('只能在整理阶段');
@@ -250,7 +261,7 @@ export function installDebug(): void {
       g.shopV.setInstant(g.run.shop);
       return true;
     }),
-    reroll: safe(() => {
+    reroll: mut(() => {
       const g = game();
       if (!g) return fail('不在游戏中');
       if (g.phase !== 'arrange') return fail('只能在整理阶段');
@@ -266,12 +277,12 @@ export function installDebug(): void {
       g.goBattle();
       return true;
     }),
-    winBattle: safe(() => {
+    winBattle: mut(() => {
       const g = game();
       if (!g) return fail('不在游戏中');
       return forceResult(g, true);
     }),
-    loseBattle: safe(() => {
+    loseBattle: mut(() => {
       const g = game();
       if (!g) return fail('不在游戏中');
       return forceResult(g, false);
@@ -281,13 +292,13 @@ export function installDebug(): void {
       const run = g?.run;
       const hearts = run?.hearts ?? 3;
       const scores = run ? run.stats.roundScores.slice() : [];
-      while (scores.length < ROUNDS) scores.push(110 + scores.length * 30);
+      for (let i = 0; i < ROUNDS; i++) scores[i] ??= 110 + i * 30;
       const clearBonus = SCORE.clearBonus + SCORE.heartBonus * hearts;
-      const score = scores.reduce((a, b) => a + b, 0) + clearBonus;
+      const score = scores.reduce<number>((a, b) => a + (b ?? 0), 0) + clearBonus;
       gotoScene(() =>
         factories.ending({
           cleared: true, round: ROUNDS, score, roundScores: scores, clearBonus, hearts, seed: run?.seed ?? 0,
-          bestHit: run?.stats.bestHit ?? 0, merges: run?.stats.merges ?? 0, spent: run?.stats.spent ?? 0, killer: null, killerName: '',
+          bestHit: run?.stats.bestHit ?? 0, merges: run?.stats.merges ?? 0, spent: run?.stats.spent ?? 0, killer: null, killerName: '', debug: true,
         }),
       );
       return true;
@@ -301,10 +312,17 @@ export function installDebug(): void {
         factories.ending({
           cleared: false, round, score: run?.score ?? 0, roundScores: run ? run.stats.roundScores.slice() : [], clearBonus: 0, hearts: 0,
           seed: run?.seed ?? 0, bestHit: run?.stats.bestHit ?? 0, merges: run?.stats.merges ?? 0, spent: run?.stats.spent ?? 0,
-          killer: e.portrait, killerName: `${e.title}「${e.name}」`,
+          killer: e.portrait, killerName: `${e.title}「${e.name}」`, debug: true,
         }),
       );
       return true;
+    }),
+    /** 结局页：返回分享图（dataURL）和尺寸 */
+    cert: safe(() => {
+      const e = sm.cur;
+      if (!(e instanceof EndingScene)) return fail('不在结局页');
+      const c = e.renderCert();
+      return { w: c.width, h: c.height, url: c.toDataURL('image/png') };
     }),
     simulate: safe(() => {
       const g = game();

@@ -101,7 +101,8 @@ export interface RunStats {
   bestHit: number;
   merges: number;
   spent: number;
-  roundScores: number[];
+  /** 按轮次下标（第 r 轮在 r−1），没赢过的轮为空 */
+  roundScores: (number | null)[];
   wins: number;
 }
 
@@ -130,6 +131,8 @@ export interface RunState {
   cleared: boolean;
   stats: RunStats;
   nextUid: number;
+  /** 被调试接口改过：不存档、不计最高分 */
+  debug?: boolean;
 }
 
 export type LinkKind = 'speed' | 'dmg' | 'shield' | 'heal' | 'poison' | 'boost' | 'hourglass' | 'reduce';

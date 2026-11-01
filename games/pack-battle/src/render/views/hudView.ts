@@ -99,7 +99,8 @@ export function drawGold(ctx: CanvasRenderingContext2D, r: Rect, gold: Rolling, 
   ctx.translate(r.x + 44, r.y + r.h / 2 + 1);
   ctx.scale(s, s);
   const col = f > 0 ? C.goldLight : f < 0 ? '#ff8a70' : C.paper;
-  text(ctx, String(gold.int), 0, 0, { size: 28, family: HAND, color: col, stroke: C.ink, strokeW: 4.5, align: 'left' });
+  // 数字用无衬线粗体：Patrick Hand 的 7 像「ʔ」、4 像「ч」
+  text(ctx, String(gold.int), 0, 0, { size: 24, weight: 900, color: col, stroke: C.ink, strokeW: 4.5, align: 'left' });
   ctx.restore();
 }
 

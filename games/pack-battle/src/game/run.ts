@@ -272,7 +272,7 @@ export function applyResult(run: RunState, res: BattleResult): Outcome {
     run.lastHpRatio = ratio;
     gain = winScore(run.round, ratio);
     run.score += gain;
-    run.stats.roundScores.push(gain);
+    run.stats.roundScores[run.round - 1] = gain;
     run.stats.wins++;
     run.lastResult = 'win';
     if (run.round >= ROUNDS) {
