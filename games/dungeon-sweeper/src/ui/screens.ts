@@ -61,7 +61,6 @@ export class Screens {
   private plaque: HTMLElement;
   private menu: HTMLElement;
   private reviewBar: HTMLElement;
-  private hint: HTMLElement;
   private pauseBtn: HTMLElement;
   private bubble: HTMLElement;
   private bubbleText: HTMLElement;
@@ -90,8 +89,6 @@ export class Screens {
     this.menu = this.title.querySelector('.menu') as HTMLElement;
     this.plaque = h('div', 'plaque hidden');
     this.title.appendChild(this.plaque);
-    this.hint = h('div', 'sound-hint', '点击任意处开启声音');
-    this.title.appendChild(this.hint);
     root.appendChild(this.title);
     // 暂停钮
     this.pauseBtn = h('button', 'hidden', '<span><i></i><i></i></span>');
@@ -180,7 +177,7 @@ export class Screens {
   }
 
   // ---------------------------------------------------------------- 标题
-  showTitle(rec: Records, soundHint: boolean, hasRun: boolean, daily: DailyInfo): void {
+  showTitle(rec: Records, hasRun: boolean, daily: DailyInfo): void {
     this.title.classList.remove('hidden', 'out');
     const dl =
       daily.state === 'done'
@@ -203,14 +200,10 @@ export class Screens {
       this.plaque.classList.remove('hidden');
       this.plaque.innerHTML = `最高分 <b>${fmtInt(rec.best)}</b> · 屠龙 <b>${rec.wins}</b> 次${rec.bestTime ? ` · 最快 <b>${fmtTime(rec.bestTime)}</b>` : ''}`;
     } else this.plaque.classList.add('hidden');
-    this.hint.classList.toggle('hidden', !soundHint);
   }
   hideTitle(): void {
     this.title.classList.add('out');
     window.setTimeout(() => this.title.classList.add('hidden'), 320);
-  }
-  hideSoundHint(): void {
-    this.hint.classList.add('hidden');
   }
   setGlow(v: number): void {
     this.title.style.setProperty('--glow', v.toFixed(3));
@@ -256,6 +249,13 @@ export class Screens {
     while (this.toasts.children.length > 3) this.toasts.firstChild?.remove();
     window.setTimeout(() => t.classList.add('out'), ms);
     window.setTimeout(() => t.remove(), ms + 320);
+  }
+
+  clearToasts(): void {
+    for (const old of Array.from(this.toasts.children) as HTMLElement[]) {
+      old.classList.add('out');
+      window.setTimeout(() => old.remove(), 320);
+    }
   }
 
   // ---------------------------------------------------------------- 面板

@@ -76,9 +76,11 @@ export class Lighting {
   darkAlpha = 0.76;
   glowAlpha = 0.42;
   /** 已翻开地面的环境底光（挖掉的黑暗比例）：地面约 65% 亮，烛光热点叠到 100% */
-  floorAmbient = 0.46;
-  /** 暗砖额外压暗（source-over）：前沿即使被烛光照满，也只有约 40% 亮，并保持偏冷 */
-  hiddenDim = 0.42;
+  floorAmbient = 0.56;
+  /** 暗砖额外压暗（source-over）：前沿即使被烛光照满也明显暗于已探索地面，并保持偏冷 */
+  hiddenDim = 0.55;
+  /** 暗砖上扣掉的暖色辉光比例：烛光不把前沿暗砖染成地面的暖色 */
+  hiddenGlowCut = 0.85;
   /** 用于其他模块查询：每格最终亮度估计（0..1） */
   readonly bright = new Float32Array(N);
 
@@ -250,14 +252,19 @@ export class Lighting {
     const hd = this.hiddenDim * (1 - dawn);
     if (hd > 0.01) {
       d.fillStyle = 'rgb(6,8,16)';
+      g.globalCompositeOperation = 'destination-out';
+      g.fillStyle = '#000';
       for (let i = 0; i < N; i++) {
         const x = cx(i);
         const y = cy(i);
         if (inLair(x, y)) continue;
-        const h = hd * (1 - Math.min(1, inp.cell[i] / 0.85));
+        const k = 1 - Math.min(1, inp.cell[i] / 0.85);
+        const h = hd * k;
         if (h <= 0.01) continue;
         d.globalAlpha = h;
         d.fillRect((x + MARGIN) * T, (y + MARGIN) * T, T, T);
+        g.globalAlpha = this.hiddenGlowCut * k * (1 - dawn);
+        g.fillRect((x + MARGIN) * T, (y + MARGIN) * T, T, T);
       }
       d.globalAlpha = 1;
     }

@@ -33,8 +33,6 @@ export interface Layout {
   scoreLine: Rect;
   message: Rect;
   roster: Rect;
-  hint: Rect;
-  showHint: boolean;
   safeTop: number;
   safeBottom: number;
   /** 横屏手机：棋盘在左、HUD 在右侧一栏 */
@@ -87,8 +85,6 @@ export function computeLayout(vw: number, vh: number, safeTop: number, safeBotto
   const board: Rect = { x: cl + frame, y: boardOuter.y + frame, w: cell * COLS, h: cell * ROWS };
   const msgY = boardOuter.y + oh + S(GAP3);
   const rosterY = msgY + S(H_MSG + GAP4);
-  const hintY = rosterY + S(H_ROSTER) + S(20);
-  const showHint = hintY + S(24) <= vh - safeBottom - 4;
   return {
     vw,
     vh,
@@ -110,8 +106,6 @@ export function computeLayout(vw: number, vh: number, safeTop: number, safeBotto
     scoreLine: { x: cl + S(6), y: top + S(H_TOP + GAP1), w: ow - S(12), h: S(H_SCORE) },
     message: { x: cl + S(6), y: msgY, w: ow - S(12), h: S(H_MSG) },
     roster: { x: cl + S(6), y: rosterY, w: ow - S(12), h: S(H_ROSTER) },
-    hint: { x: cl + S(6), y: hintY, w: ow - S(12), h: S(24) },
-    showHint,
     safeTop,
     safeBottom,
     landscape: false,
@@ -148,7 +142,6 @@ function landscapeLayout(vw: number, vh: number, safeTop: number, safeBottom: nu
   const top = Math.round(safeTop + Math.max(6, (vh - safeTop - safeBottom - panelH) / 2));
   const msgY = top + S(H_TOP + GAP1 + H_SCORE + GAP2);
   const rosterY = msgY + S(H_MSG + GAP4);
-  const hintY = rosterY + S(H_ROSTER) + S(6);
   return {
     vw,
     vh,
@@ -170,8 +163,6 @@ function landscapeLayout(vw: number, vh: number, safeTop: number, safeBottom: nu
     scoreLine: { x: x0 + S(6), y: top + S(H_TOP + GAP1), w: pw - S(12), h: S(H_SCORE) },
     message: { x: x0 + S(6), y: msgY, w: pw - S(12), h: S(H_MSG) },
     roster: { x: x0 + S(6), y: rosterY, w: pw - S(12), h: S(H_ROSTER) },
-    hint: { x: x0 + S(6), y: hintY, w: pw - S(12), h: S(24) },
-    showHint: hintY + S(24) <= vh - safeBottom - 2,
     safeTop,
     safeBottom,
     landscape: true,

@@ -107,7 +107,6 @@ export class App implements Stage, InputHandler {
   private lowHp = false;
   private heartT = 0;
   private dangerT = 0;
-  private soundHinted = true;
   private ptr: Pointer = { x: -1, y: -1, strength: 0, radius: 1.1 };
   private resizeTimer = 0;
   private safeProbe: HTMLElement;
@@ -183,7 +182,7 @@ export class App implements Stage, InputHandler {
     this.board.reset(this.game, false, 0);
     this.layout();
     this.bindGlobal();
-    this.screens.showTitle(this.records, true, this.hasRun(), this.dailyInfo());
+    this.screens.showTitle(this.records, this.hasRun(), this.dailyInfo());
     this.loop.start();
   }
 
@@ -261,10 +260,6 @@ export class App implements Stage, InputHandler {
   private bindGlobal(): void {
     const unlock = () => {
       this.audio.unlock();
-      if (this.soundHinted) {
-        this.soundHinted = false;
-        this.screens.hideSoundHint();
-      }
     };
     window.addEventListener('pointerdown', unlock, true);
     window.addEventListener('keydown', unlock, true);
@@ -432,7 +427,7 @@ export class App implements Stage, InputHandler {
     const run = mode === 'resume' ? Game.fromSave(load<RunSave | null>('run', null) as RunSave) : null;
     if (mode === 'resume' && !run) {
       remove('run');
-      this.screens.showTitle(this.records, false, false, this.dailyInfo());
+      this.screens.showTitle(this.records, false, this.dailyInfo());
       return;
     }
     this.screens.hideTitle();
@@ -529,7 +524,6 @@ export class App implements Stage, InputHandler {
     this.hud.dragonReady = false;
     this.hud.setBase('巨龙沉睡中 · 需 14 点生命', 'normal');
     this.hud.clearMessage();
-    this.hud.showHint = this.records.plays < 3;
     this.hud.hidden = false;
     this.music.awake = false;
     this.music.title = false;
@@ -624,7 +618,7 @@ export class App implements Stage, InputHandler {
       this.canvas.classList.remove('rblur');
       this.audio.musicFilter(18000);
       this.screens.showPauseBtn(false);
-      this.screens.showTitle(this.records, false, this.hasRun(), this.dailyInfo());
+      this.screens.showTitle(this.records, this.hasRun(), this.dailyInfo());
       this.music.title = true;
       this.music.danger = 0;
       this.screens.fadeTo(false);
@@ -878,7 +872,7 @@ export class App implements Stage, InputHandler {
     const real = this.clock.real;
     while (this.tipQueue.length && this.tipQueue[0].expire < real) this.tipQueue.shift();
     if (!this.tipQueue.length) return;
-    if (this.state !== 'playing' || !this.userActed) return;
+    if (this.state !== 'playing' || !this.userActed || this.game.phase !== 'playing') return;
     if (this.tut.active) return;
     if (this.director.locked || this.screens.modalOpen) return;
     const head = this.tipQueue[0];
@@ -1221,6 +1215,11 @@ export class App implements Stage, InputHandler {
     if (!ev.length) return;
     const r = this.director.play(ev);
     if (r.fight) this.lockUntil = this.clock.real + CONFIG.rules.fightLockMs;
+    if (this.game.phase === 'lost') {
+      // 死亡：排队中的提示作废，已显示的提示收起，不与死亡演出同时出现
+      this.tipQueue.length = 0;
+      this.screens.clearToasts();
+    }
     if (this.state === 'intro') this.state = 'playing';
     if (!this.tut.active) this.timerOn = true;
     this.persist();

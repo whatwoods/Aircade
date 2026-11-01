@@ -12,6 +12,9 @@ function param(name: string): string | null {
   }
 }
 
+/** 最多为字体等待的时间：首屏预算 300ms；字体迟到时回调重烘字形，不阻塞首屏 */
+const FONT_WAIT_MS = 300;
+
 /** FontFace 加载（带超时）；迟到时回调重烘字形 */
 function loadFonts(onLate: () => void): Promise<void> {
   const faces: FontFace[] = [];
@@ -38,7 +41,7 @@ function loadFonts(onLate: () => void): Promise<void> {
     window.setTimeout(() => {
       timedOut = true;
       res();
-    }, 1500),
+    }, FONT_WAIT_MS),
   );
   return Promise.race([all, timeout]);
 }

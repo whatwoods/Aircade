@@ -31,8 +31,6 @@ export class Hud {
   readonly alive = new Array<number>(10).fill(0);
   readonly aliveFlash = new Float64Array(10).fill(-1e9);
   dragonReady = false;
-  showHint = false;
-  hintText = '数字 = 周围怪物等级之和 · 点击翻开 · 长按标记';
   lowHp = false;
   private slotPop = new Float64Array(24).fill(-1e9);
   private healT0 = -1e9;
@@ -178,15 +176,13 @@ export class Hud {
     }
   }
 
-  private lb: { lv: Sprite; xp: Sprite; next: Sprite; score: Sprite; d13: Sprite; ready: Sprite; need: Sprite; hint: Sprite } | null = null;
+  private lb: { lv: Sprite; xp: Sprite; next: Sprite; score: Sprite; d13: Sprite; ready: Sprite; need: Sprite} | null = null;
   private lbS = -1;
   private lbD = -1;
-  private lbHint = '';
   private bakeLabels(L: Layout): void {
-    if (this.lb && L.s === this.lbS && L.dpr === this.lbD && this.hintText === this.lbHint) return;
+    if (this.lb && L.s === this.lbS && L.dpr === this.lbD) return;
     this.lbS = L.s;
     this.lbD = L.dpr;
-    this.lbHint = this.hintText;
     const s = L.s;
     const G = this.gl;
     this.lb = {
@@ -197,7 +193,6 @@ export class Hud {
       d13: G.text.get('13', 11 * s, '#FF8A6A', 700, "'Cinzel', serif"),
       ready: G.text.get('可战', 12 * s, PAL.gold, 700, FONT_CN, { glow: 'rgba(255,181,74,0.8)', glowBlur: 6 }),
       need: G.text.get('需14', 11.5 * s, PAL.ash, 600),
-      hint: G.text.get(this.hintText, 12 * s, 'rgba(156,142,122,0.8)', 500),
     };
   }
 
@@ -479,11 +474,6 @@ export class Hud {
     calls += 2;
     // ---- 图鉴
     calls += this.drawRoster(ctx, L, real, world);
-    // ---- 操作提示
-    if (this.showHint && L.showHint) {
-      drawText(ctx, lb.hint, L.hint.x + L.hint.w / 2, L.hint.y + L.hint.h / 2, 0.5, d);
-      calls++;
-    }
     return calls;
   }
 
