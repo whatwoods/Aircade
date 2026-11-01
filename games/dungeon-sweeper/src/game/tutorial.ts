@@ -5,6 +5,7 @@ export type TutAction = 'tap' | 'mark' | 'auto' | 'button';
 
 export interface TutStep {
   id: string;
+  /** 文案里的 {hold} 按玩家的输入方式换成「长按」或「右键」 */
   text: string;
   /** 高亮格 */
   cells: number[];
@@ -94,7 +95,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
   },
   {
     id: '3',
-    text: '只剩它，必是 3 级怪。先别打，长按（电脑右键）标「3」。',
+    text: '只剩它，必是 3 级怪。先别打，{hold}它标「3」。',
     cells: [idx(7, 10), idx(8, 9)],
     arrow: idx(8, 9),
     hud: [],
@@ -103,7 +104,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     mark: 3,
     ms: 0,
     wrong: '这里必是 3 级怪，在轮盘里选「3」',
-    wrongGesture: '别直接点！长按这块砖（电脑右键），在轮盘里选「3」',
+    wrongGesture: '别直接点！{hold}这块砖，在弹出的轮盘里选「3」',
   },
   {
     id: '3b',
