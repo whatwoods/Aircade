@@ -1,7 +1,7 @@
 /**
  * 巨龙的程序化画法（文档 §4.6）。全部在 100×100 单位坐标里画，由 silhouettes.ts 烘焙成 sprite。
  *
- * - 巢中睡龙（俯视 3/4）：身躯盘成一圈，双翼收拢在背上，头枕在尾巴上、吻部朝向玩家。
+ * - 巢中睡龙（俯视 3/4，参照 art-ref/dragon-lair-ref.png）：双翼像斗篷盖在背上，头枕在交叠的前爪上、朝向玩家，尾巴绕过底部。
  *   本体画得偏亮，因为它在光照层之下，会被黑暗压暗；发光部分（脊背余烬、鼻息）单独一层。
  * - 屠龙战斗形态（正面直立，参照 art-ref/dragon-ref-a.png）：高举的蝠翼、双对角、粗颈宽胸、贯穿颈腹的熔火人字纹、举起的利爪、粗壮后腿、铲尾。
  *   与小怪一致的「暗色剪影 + 轮廓光」风格，但细节更多。
@@ -175,304 +175,394 @@ function horn(c: CanvasRenderingContext2D, pts: Pt[], w0: number, base: string, 
   return T;
 }
 
-/** 爪子：小掌 + 三根弯钩（rot 弧度，0 = 爪尖朝下） */
-function claw(c: CanvasRenderingContext2D, x: number, y: number, s: number, dir: number, body: string, nail: string, rot = 0): void {
-  if (rot) {
-    c.save();
-    c.translate(x, y);
-    c.rotate(rot);
-    claw(c, 0, 0, s, dir, body, nail);
-    c.restore();
-    return;
-  }
-  c.fillStyle = body;
-  c.beginPath();
-  c.ellipse(x, y, 2.6 * s, 2 * s, 0, 0, Math.PI * 2);
-  c.fill();
-  c.strokeStyle = nail;
-  c.lineCap = 'round';
-  c.lineWidth = 0.75 * s;
-  for (let k = -1; k <= 1; k++) {
-    const bx = x + k * 1.6 * s;
-    const by = y + 1.2 * s;
-    c.beginPath();
-    c.moveTo(bx, by);
-    c.quadraticCurveTo(bx + k * 0.6 * s + dir * 0.3 * s, by + 1.8 * s, bx + k * 0.2 * s - dir * 0.4 * s, by + 2.6 * s);
-    c.stroke();
-  }
-}
-
-// ------------------------------------------------------------------ 巢中睡龙
+// ------------------------------------------------------------------ 巢中睡龙（参照 art-ref/dragon-lair-ref.png）
 
 /** 睡龙的眼睛（单位坐标 [x, y, rx, ry]），DragonView 在光后层画开合 */
 export const LAIR_EYES: [number, number, number, number][] = [
-  [44.2, 68.5, 3, 1.1],
-  [55.8, 68.5, 3, 1.1],
+  [44.4, 68.4, 2.6, 1],
+  [55.6, 68.4, 2.6, 1],
 ];
 /** 鼻孔（鼻息烟雾与余烬的位置） */
 export const LAIR_NOSTRILS: Pt[] = [
-  [47.6, 84.2],
-  [52.4, 84.2],
+  [48.3, 77.2],
+  [51.7, 77.2],
 ];
 
 const LAIR = (() => {
-  // 身躯：从头下的颈根出发，逆时针绕一圈到右后方，尾巴从右侧绕到前方、经下巴下面伸向左
-  const body = spline(
-    [
-      [50, 64],
-      [37, 63],
-      [27, 54],
-      [25, 41],
-      [32, 30],
-      [45, 24],
-      [58, 25],
-      [70, 32],
-      [76, 45],
-      [75, 58],
-      [69, 69],
-      [60, 79],
-      [48, 87],
-      [34, 90],
-      [22, 87],
-      [15, 79],
-      [16, 70],
-      [21, 66],
-    ],
-    10,
+  const mirror = (p: Pt): Pt => [100 - p[0], p[1]];
+  // 收拢的翼（左；右镜像）：腕在顶上，翼膜像斗篷一样向外下垂成穹顶
+  const wingPath = (m: (p: Pt) => Pt): Path2D => {
+    const pts: Pt[] = [
+      [48, 40],
+      [34, 8],
+      [24, 12],
+      [15, 20],
+      [9, 30],
+      [5, 42],
+      [4.5, 54],
+      [8, 64],
+      [22, 60],
+    ];
+    const P = new Path2D();
+    const q = pts.map(m);
+    P.moveTo(q[0][0], q[0][1]);
+    P.lineTo(q[1][0], q[1][1]);
+    for (let i = 2; i < q.length - 1; i++) {
+      // 外缘在两根指骨之间微微内凹
+      const a = q[i - 1];
+      const b = q[i];
+      const mid: Pt = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      const pull = m([40, 36]);
+      P.quadraticCurveTo(lerp(mid[0], pull[0], 0.08), lerp(mid[1], pull[1], 0.08), b[0], b[1]);
+    }
+    P.lineTo(q[q.length - 1][0], q[q.length - 1][1]);
+    P.closePath();
+    return P;
+  };
+  const wingArm = (m: (p: Pt) => Pt) => tube(spline(([[47.5, 44], [45.5, 27], [40, 14], [34, 9]] as Pt[]).map(m), 8), (t) => lerp(6.4, 3.6, t));
+  const fingers: Pt[] = [
+    [15, 20],
+    [5, 42],
+    [8, 64],
+  ];
+  // 背：横跨顶部的一段身躯，被两翼盖住大半
+  const back = tube(
+    spline(
+      [
+        [16, 52],
+        [24, 32],
+        [50, 24],
+        [76, 32],
+        [84, 52],
+      ],
+      12,
+    ),
+    () => 17,
   );
-  // 0..0.62 是躯干，之后是尾巴
-  const bodyT = tube(body, (t) => {
-    if (t < 0.08) return lerp(13, 16, t / 0.08);
-    if (t < 0.4) return 17;
-    if (t < 0.62) return lerp(17, 11, smooth((t - 0.4) / 0.22));
-    return lerp(11, 1.2, Math.pow((t - 0.62) / 0.38, 0.9));
-  });
-  // 收拢的双翼盖住盘圈中央：前缘沿身躯外侧，后缘三道扇贝收到中线
-  const wingL = new Path2D('M47 62 C38 56 29 48 25 38 C22 31 21 24 20.5 17 C24 21 27 23 30 24 Q33 28.5 38 26 Q42 30.5 46 29.5 Q47.5 32 50.5 34 L50.5 58 Z');
-  const wingR = new Path2D('M53 62 C62 56 71 48 75 38 C78 31 79 24 79.5 17 C76 21 73 23 70 24 Q67 28.5 62 26 Q58 30.5 54 29.5 Q52.5 32 49.5 34 L49.5 58 Z');
-  const head = new Path2D(
-    'M41 61 C42 56 58 56 59 61 C61 64 61.5 67 60 71 C58.5 76 56 80 55.2 84 C54.6 87 52.5 89 50 89 C47.5 89 45.4 87 44.8 84 C44 80 41.5 76 40 71 C38.5 67 39 64 41 61 Z',
+  // 头后的颈：从背上绕下来，浅色腹面朝外
+  const neck = tube(
+    spline(
+      [
+        [62, 28],
+        [68, 42],
+        [64, 56],
+        [54, 62],
+      ],
+      10,
+    ),
+    (t) => lerp(15, 17, t),
   );
-  return { bodyT, wingL, wingR, head };
+  // 尾巴：从左侧绕过底部到右下，腹面朝向观者
+  const tail = tube(
+    spline(
+      [
+        [22, 42],
+        [11, 58],
+        [16, 76],
+        [32, 88.5],
+        [52, 92],
+        [70, 88],
+        [82, 79],
+      ],
+      14,
+    ),
+    (t) => lerp(18, 9, Math.pow(t, 1.1)),
+  );
+  // 尾尖铲形鳍
+  const fin = new Path2D('M81 80 C84 76 88 73.5 92.5 73 C91 75.5 91.4 77.4 93.6 78.6 C90.6 79.2 89.4 81 89.6 83.8 C87.6 82 85.6 81.6 83 83.4 C83.6 82.2 83.2 81 81 80 Z');
+  const head = new Path2D('M50 51.5 L54.8 54 L59 58 L61 63 L60 67.6 L57.6 72 L55.4 77.2 C54.4 80.2 52.4 81.6 50 81.6 C47.6 81.6 45.6 80.2 44.6 77.2 L42.4 72 L40 67.6 L39 63 L41 58 L45.2 54 Z');
+  return { mirror, wingL: wingPath((p) => p), wingR: wingPath(mirror), armL: wingArm((p) => p), armR: wingArm(mirror), fingers, back, neck, tail, fin, head };
 })();
+
+const LAIR_BONE = '#d4c19c';
 
 /** 睡龙本体（光照层之下） */
 export function paintLair(c: CanvasRenderingContext2D): void {
-  const { bodyT, wingL, wingR, head } = LAIR;
-  const SKIN = '#40292c';
-  const SKIN_DK = '#24161a';
+  const L = LAIR;
+  const id = (p: Pt) => p;
+  const body = (y0: number, y1: number) => {
+    const g = c.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, '#3a2a33');
+    g.addColorStop(1, '#1e1419');
+    return g;
+  };
+  c.lineCap = 'round';
+  c.lineJoin = 'round';
   // 投影
   c.fillStyle = 'rgba(0,0,0,0.45)';
   c.save();
   c.translate(1.2, 2);
-  c.fill(bodyT.path);
+  c.fill(L.wingL);
+  c.fill(L.wingR);
+  c.fill(L.tail.path);
   c.restore();
-  // 躯干与尾巴
-  const g = c.createRadialGradient(50, 58, 4, 50, 58, 44);
-  g.addColorStop(0, SKIN_DK);
-  g.addColorStop(0.55, SKIN);
-  g.addColorStop(1, '#4e3230');
-  c.fillStyle = g;
-  c.fill(bodyT.path);
-  scales(c, bodyT, 2.6, 1.35, 0, 1, 'rgba(0,0,0,0.38)', 'rgba(255,170,140,0.09)');
-  // 腹侧（外缘）受巢中余烬映照
+  // 盘圈中央的身躯（填满翼、颈、尾之间的空隙）
+  const mass = new Path2D();
+  mass.ellipse(50, 56, 31, 22, 0, 0, Math.PI * 2);
+  c.fillStyle = body(34, 78);
+  c.fill(mass);
   c.save();
-  c.clip(bodyT.path);
-  const ug = c.createLinearGradient(0, 40, 0, 100);
-  ug.addColorStop(0, 'rgba(255,110,50,0)');
-  ug.addColorStop(1, 'rgba(255,110,50,0.22)');
-  c.fillStyle = ug;
-  c.fillRect(0, 0, 100, 100);
+  c.clip(mass);
+  c.strokeStyle = 'rgba(0,0,0,0.45)';
+  c.lineWidth = 0.4;
+  for (let y = 35; y < 79; y += 2.4) {
+    for (let x = 19 + ((y / 2.4) % 2) * 1.2; x < 82; x += 2.4) {
+      c.beginPath();
+      c.arc(x, y, 1.15, 0.15 * Math.PI, 0.85 * Math.PI);
+      c.stroke();
+    }
+  }
   c.restore();
-  // 尾巴末端的骨刺尖
-  const tail = at(bodyT, 1);
-  c.fillStyle = '#6a4436';
-  c.beginPath();
-  c.moveTo(tail.p[0] + tail.n[0] * 2.2, tail.p[1] + tail.n[1] * 2.2);
-  c.lineTo(tail.p[0] + tail.tg[0] * 4.5, tail.p[1] + tail.tg[1] * 4.5);
-  c.lineTo(tail.p[0] - tail.n[0] * 2.2, tail.p[1] - tail.n[1] * 2.2);
-  c.closePath();
-  c.fill();
-  // 背脊刺（翅膀盖住的部分跳过）
-  const under = (q: Pt) => c.isPointInPath(wingL, q[0], q[1]) || c.isPointInPath(wingR, q[0], q[1]);
-  spikes(c, bodyT, 0.05, 0.95, 26, 2.4, '#1e0f11', 'rgba(255,150,110,0.35)', (p) => underUnit(c, under, p));
-  // 收拢的双翼
-  for (const [w, sx] of [
-    [wingL, -1],
-    [wingR, 1],
-  ] as [Path2D, number][]) {
-    const wg = c.createLinearGradient(50, 55, 50 + sx * 30, 20);
-    wg.addColorStop(0, '#24141a');
-    wg.addColorStop(1, '#3a2226');
+  // 背（被两翼盖住大半）
+  c.fillStyle = body(16, 60);
+  c.fill(L.back.path);
+  scales(c, L.back, 2.5, 1.25, 0, 1, 'rgba(0,0,0,0.45)', 'rgba(255,160,120,0.1)');
+  spikes(c, L.back, 0.08, 0.92, 15, 2.6, '#1a1015', 'rgba(255,140,90,0.3)');
+  // 翼膜：像斗篷一样盖在背上
+  for (const [w, m] of [
+    [L.wingL, id],
+    [L.wingR, L.mirror],
+  ] as [Path2D, (p: Pt) => Pt][]) {
+    const wr = m([34, 8]);
+    const g = c.createRadialGradient(wr[0], wr[1], 4, wr[0], wr[1] + 20, 56);
+    g.addColorStop(0, '#3a1a20');
+    g.addColorStop(0.5, '#7a2420');
+    g.addColorStop(1, '#a8361e');
     c.fillStyle = 'rgba(0,0,0,0.4)';
     c.save();
     c.translate(0.8, 1.4);
     c.fill(w);
     c.restore();
-    c.fillStyle = wg;
+    c.fillStyle = g;
     c.fill(w);
     c.save();
     c.clip(w);
-    // 翼膜褶皱：从肩部放射
-    c.strokeStyle = 'rgba(20,8,10,0.55)';
-    c.lineWidth = 0.7;
-    for (const [tx, ty] of [
-      [50 + sx * 20, 24.5],
-      [50 + sx * 12, 26.5],
-      [50 + sx * 4, 30],
-    ] as Pt[]) {
+    c.strokeStyle = 'rgba(25,8,12,0.6)';
+    c.lineWidth = 2.6;
+    for (const f of L.fingers) {
+      const t = m(f);
       c.beginPath();
-      c.moveTo(sx < 0 ? 46 : 54, 59);
-      c.quadraticCurveTo(lerp(sx < 0 ? 46 : 54, tx, 0.5) + sx * 3, lerp(59, ty, 0.5), tx, ty);
+      c.moveTo(wr[0], wr[1]);
+      c.lineTo(t[0], t[1]);
       c.stroke();
     }
     c.restore();
-    // 前缘翼骨（外侧边）
-    c.strokeStyle = '#6c4038';
-    c.lineWidth = 1.6;
-    c.lineCap = 'round';
+    c.strokeStyle = '#24171d';
+    c.lineWidth = 1.2;
+    for (const f of L.fingers) {
+      const t = m(f);
+      c.beginPath();
+      c.moveTo(wr[0], wr[1]);
+      c.lineTo(t[0], t[1]);
+      c.stroke();
+    }
+  }
+  // 翼臂与腕钩
+  for (const [A, m] of [
+    [L.armL, id],
+    [L.armR, L.mirror],
+  ] as [Tube, (p: Pt) => Pt][]) {
+    c.fillStyle = body(8, 42);
+    c.fill(A.path);
+    scales(c, A, 1.9, 0.9, 0, 1, 'rgba(0,0,0,0.5)', 'rgba(255,160,120,0.1)');
+    hook(c, [m([34.4, 9.4]), m([33, 4.6]), m([36.4, 1.8]), m([40.4, 3])], 3.4);
+  }
+  // 颈与浅色腹面
+  c.fillStyle = body(28, 62);
+  c.fill(L.neck.path);
+  scales(c, L.neck, 2.3, 1.1, 0, 1, 'rgba(0,0,0,0.45)', 'rgba(255,160,120,0.1)');
+  c.save();
+  c.clip(L.neck.path);
+  for (let i = 0; i < L.neck.c.length; i++) {
+    const { c: C, n, w } = L.neck;
+    const q: Pt = [C[i][0] - n[i][0] * w[i] * 0.2, C[i][1] - n[i][1] * w[i] * 0.2];
+    c.fillStyle = '#5a3a32';
     c.beginPath();
-    c.moveTo(sx < 0 ? 47 : 53, 62);
-    c.bezierCurveTo(sx < 0 ? 38 : 62, 56, sx < 0 ? 29 : 71, 48, sx < 0 ? 25 : 75, 38);
-    c.bezierCurveTo(sx < 0 ? 22 : 78, 31, sx < 0 ? 21 : 79, 24, sx < 0 ? 20.5 : 79.5, 18);
-    c.stroke();
-    c.strokeStyle = 'rgba(255,180,140,0.35)';
-    c.lineWidth = 0.45;
-    c.stroke();
-    // 腕爪
-    c.fillStyle = '#c9b48f';
-    c.beginPath();
-    c.moveTo(sx < 0 ? 19 : 81, 15);
-    c.lineTo(sx < 0 ? 22.2 : 77.8, 19.5);
-    c.lineTo(sx < 0 ? 19.2 : 80.8, 19.8);
-    c.closePath();
+    c.arc(q[0], q[1], w[i] * 0.32, 0, Math.PI * 2);
     c.fill();
   }
-  // 前爪：搭在头两侧
-  claw(c, 38.5, 80.5, 1, -1, '#4e2c2c', '#cbb894');
-  claw(c, 61.5, 80.5, 1, 1, '#4e2c2c', '#cbb894');
-  // 角（压在背上，朝后）
-  horn(c, [[44, 60.5], [40, 55], [35.5, 51.5], [31, 50]], 3.4, '#c8b38c', '#4a3a2e');
-  horn(c, [[56, 60.5], [60, 55], [64.5, 51.5], [69, 50]], 3.4, '#c8b38c', '#4a3a2e');
+  c.restore();
+  // 尾巴：上半是鳞背，下半是朝向观者的浅色腹面
+  c.fillStyle = body(40, 96);
+  c.fill(L.tail.path);
+  scales(c, L.tail, 2.5, 1.25, 0, 1, 'rgba(0,0,0,0.45)', 'rgba(255,160,120,0.1)');
+  const bellyBand = tube(
+    L.tail.c.map((p, i) => [p[0] - L.tail.n[i][0] * L.tail.w[i] * 0.22, p[1] - L.tail.n[i][1] * L.tail.w[i] * 0.22] as Pt),
+    (t) => lerp(18, 9, Math.pow(t, 1.1)) * 0.5,
+  );
+  c.save();
+  c.clip(L.tail.path);
+  const bg = c.createLinearGradient(0, 60, 0, 96);
+  bg.addColorStop(0, '#4a3030');
+  bg.addColorStop(1, '#6a4436');
+  c.fillStyle = bg;
+  c.fill(bellyBand.path);
+  // 腹面横纹
+  c.strokeStyle = 'rgba(20,8,10,0.45)';
+  c.lineWidth = 0.4;
+  for (let i = 2; i < bellyBand.c.length; i += 3) {
+    const { p, n, w } = at(bellyBand, i / (bellyBand.c.length - 1));
+    c.beginPath();
+    c.moveTo(p[0] + (n[0] * w) / 2, p[1] + (n[1] * w) / 2);
+    c.lineTo(p[0] - (n[0] * w) / 2, p[1] - (n[1] * w) / 2);
+    c.stroke();
+  }
+  c.restore();
+  spikes(c, L.tail, 0.1, 0.9, 12, 2.2, '#1a1015', 'rgba(255,140,90,0.3)');
+  const fg = c.createLinearGradient(81, 82, 93, 73);
+  fg.addColorStop(0, '#3a1418');
+  fg.addColorStop(1, '#a8361e');
+  c.fillStyle = fg;
+  c.fill(L.fin);
+  // 角：主角向上内卷，副角短，颊角向外
+  for (const m of [id, L.mirror]) {
+    horn(c, [m([44.6, 56.5]), m([38.6, 50]), m([36.4, 43.6]), m([39.4, 39])], 3.4, LAIR_BONE, '#8a7656');
+    horn(c, [m([46.8, 55]), m([44.4, 50.4]), m([45.6, 46.6])], 2.2, LAIR_BONE, '#8a7656');
+    horn(c, [m([41, 62.5]), m([35.4, 62]), m([32.4, 64.6])], 2.2, LAIR_BONE, '#8a7656');
+  }
   // 头
   c.fillStyle = 'rgba(0,0,0,0.45)';
   c.save();
   c.translate(0.8, 1.6);
-  c.fill(head);
+  c.fill(L.head);
   c.restore();
-  const hg = c.createLinearGradient(0, 56, 0, 89);
-  hg.addColorStop(0, '#3a2022');
-  hg.addColorStop(0.6, '#5a3432');
-  hg.addColorStop(1, '#6e4238');
+  const hg = c.createLinearGradient(0, 51, 0, 82);
+  hg.addColorStop(0, '#3e2c34');
+  hg.addColorStop(1, '#22161b');
   c.fillStyle = hg;
-  c.fill(head);
-  c.save();
-  c.clip(head);
-  // 眉骨
-  c.fillStyle = 'rgba(15,6,8,0.55)';
-  c.beginPath();
-  c.ellipse(44.2, 66.6, 4.4, 1.8, 0.25, 0, Math.PI * 2);
-  c.ellipse(55.8, 66.6, 4.4, 1.8, -0.25, 0, Math.PI * 2);
-  c.fill();
-  // 吻部中脊与鳞纹
-  c.strokeStyle = 'rgba(255,170,130,0.28)';
-  c.lineWidth = 0.6;
-  c.beginPath();
-  c.moveTo(50, 60);
-  c.lineTo(50, 82);
-  c.stroke();
-  c.strokeStyle = 'rgba(15,6,8,0.45)';
-  c.lineWidth = 0.4;
-  for (let y = 72; y < 84; y += 2.4) {
+  c.fill(L.head);
+  // 头顶冠刺
+  c.fillStyle = '#1a1015';
+  for (const [x, h] of [
+    [50, 5],
+    [47.4, 3.2],
+    [52.6, 3.2],
+  ] as const) {
     c.beginPath();
-    c.moveTo(46 + (y - 72) * 0.12, y);
-    c.quadraticCurveTo(50, y + 1.3, 54 - (y - 72) * 0.12, y);
-    c.stroke();
-  }
-  c.restore();
-  // 颊刺
-  c.fillStyle = '#2a1416';
-  for (const sx of [-1, 1]) {
-    c.beginPath();
-    c.moveTo(50 + sx * 10.5, 66);
-    c.lineTo(50 + sx * 14, 70.5);
-    c.lineTo(50 + sx * 9.5, 71);
+    c.moveTo(x - 1.2, 53.4);
+    c.lineTo(x, 53.4 - h);
+    c.lineTo(x + 1.2, 53.4);
     c.closePath();
     c.fill();
   }
+  c.save();
+  c.clip(L.head);
+  // 眉骨压在闭着的眼上
+  c.fillStyle = 'rgba(10,4,6,0.6)';
+  c.beginPath();
+  c.moveTo(40.6, 65.4);
+  c.lineTo(48.6, 67);
+  c.lineTo(48.2, 68.2);
+  c.lineTo(41, 67.4);
+  c.closePath();
+  c.moveTo(59.4, 65.4);
+  c.lineTo(51.4, 67);
+  c.lineTo(51.8, 68.2);
+  c.lineTo(59, 67.4);
+  c.closePath();
+  c.fill();
+  // 吻部中脊与鳞纹
+  c.strokeStyle = 'rgba(255,170,130,0.22)';
+  c.lineWidth = 0.6;
+  c.beginPath();
+  c.moveTo(50, 54);
+  c.lineTo(50, 75);
+  c.stroke();
+  c.strokeStyle = 'rgba(10,4,6,0.45)';
+  c.lineWidth = 0.4;
+  for (let y = 58; y < 66; y += 2.2) {
+    c.beginPath();
+    c.moveTo(44 + (y - 58) * 0.1, y);
+    c.quadraticCurveTo(50, y + 1.4, 56 - (y - 58) * 0.1, y);
+    c.stroke();
+  }
+  c.restore();
   // 鼻孔
   c.fillStyle = '#0c0506';
   for (const [x, y] of LAIR_NOSTRILS) {
     c.beginPath();
-    c.ellipse(x, y, 1, 0.7, 0, 0, Math.PI * 2);
+    c.ellipse(x, y, 0.9, 0.6, 0, 0, Math.PI * 2);
     c.fill();
+  }
+  // 交叠在下巴前的前爪
+  for (const dir of [-1, 1]) {
+    const px = 50 + dir * 5.2;
+    c.fillStyle = '#2a1c22';
+    c.beginPath();
+    c.ellipse(px, 82.5, 4.4, 3, 0, 0, Math.PI * 2);
+    c.fill();
+    for (let k = 0; k < 3; k++) {
+      const bx = px + (k - 1) * 2.6;
+      hook(c, [[bx, 83.4], [bx + (k - 1) * 0.5, 86.4], [bx - dir * 0.8, 88.6]], 1.8);
+    }
   }
 }
 
-/** isPointInPath 用的是当前变换；单位坐标的判定在恒等变换下做 */
-function underUnit(c: CanvasRenderingContext2D, fn: (p: Pt) => boolean, p: Pt): boolean {
-  c.save();
-  c.setTransform(1, 0, 0, 1, 0, 0);
-  const r = fn(p);
-  c.restore();
-  return r;
-}
-
-/** 睡龙的发光层（光照之后、叠加混合）：背脊余烬、喉下炉火、鼻息 */
+/** 睡龙的发光层（光照之后、叠加混合）：背脊余烬、颈腹与尾腹的熔缝、鼻息 */
 export function paintLairGlow(c: CanvasRenderingContext2D, shadowBlur: number): void {
-  const { bodyT, wingL, wingR } = LAIR;
-  const hidden = (p: Pt) => {
+  const L = LAIR;
+  const covered = (p: Pt) => {
     c.save();
     c.setTransform(1, 0, 0, 1, 0, 0);
-    const r = c.isPointInPath(wingL, p[0], p[1]) || c.isPointInPath(wingR, p[0], p[1]) || (p[1] > 58 && Math.abs(p[0] - 50) < 11);
+    const r = c.isPointInPath(L.wingL, p[0], p[1]) || c.isPointInPath(L.wingR, p[0], p[1]) || c.isPointInPath(L.neck.path, p[0], p[1]) || c.isPointInPath(L.tail.path, p[0], p[1]);
     c.restore();
     return r;
   };
   c.lineCap = 'round';
   c.shadowColor = '#FF3B1F';
-  c.shadowBlur = shadowBlur;
-  // 背脊鳞缝里的余烬：沿中线连续的裂缝，亮度起伏不规则
-  const N = 90;
+  // 背脊鳞缝里的余烬：亮度沿脊线不规则起伏
   const heat = (k: number) => Math.max(0, Math.sin(k * 0.37) * 0.6 + Math.sin(k * 0.91 + 1.3) * 0.5 + 0.15);
-  for (const [col, lw, core] of [
-    ['255,84,36', 1, false],
-    ['255,214,150', 0.32, true],
-  ] as [string, number, boolean][]) {
-    c.shadowBlur = core ? 0 : shadowBlur;
-    c.lineWidth = lw;
-    for (let k = 0; k < N - 1; k++) {
-      const t0 = 0.04 + (k / N) * 0.86;
-      const t1 = 0.04 + ((k + 1) / N) * 0.86;
-      const a = at(bodyT, t0).p;
-      const b = at(bodyT, t1).p;
-      if (hidden(a) || hidden(b)) continue;
-      const h = heat(k);
-      const al = core ? Math.max(0, h - 0.45) * 1.6 : Math.min(1, h);
-      if (al < 0.04) continue;
-      c.strokeStyle = `rgba(${col},${al.toFixed(2)})`;
-      c.beginPath();
-      c.moveTo(a[0], a[1]);
-      c.lineTo(b[0], b[1]);
-      c.stroke();
+  const seam = (T: Tube, off: number, from: number, to: number, skip: (p: Pt) => boolean) => {
+    const N = Math.round((to - from) * 80);
+    for (const [col, lw, core] of [
+      ['255,84,36', 0.9, false],
+      ['255,214,150', 0.3, true],
+    ] as [string, number, boolean][]) {
+      c.shadowBlur = core ? 0 : shadowBlur;
+      c.lineWidth = lw;
+      for (let k = 0; k < N; k++) {
+        const pa = at(T, from + ((to - from) * k) / N);
+        const pb = at(T, from + ((to - from) * (k + 1)) / N);
+        const a: Pt = [pa.p[0] + pa.n[0] * pa.w * off, pa.p[1] + pa.n[1] * pa.w * off];
+        const b: Pt = [pb.p[0] + pb.n[0] * pb.w * off, pb.p[1] + pb.n[1] * pb.w * off];
+        if (skip(a) || skip(b)) continue;
+        const h = heat(k);
+        const al = core ? Math.max(0, h - 0.45) * 1.6 : Math.min(1, h);
+        if (al < 0.04) continue;
+        c.strokeStyle = `rgba(${col},${al.toFixed(2)})`;
+        c.beginPath();
+        c.moveTo(a[0], a[1]);
+        c.lineTo(b[0], b[1]);
+        c.stroke();
+      }
     }
-  }
-  c.shadowBlur = 0;
-  // 翼骨关节的暗火
-  c.fillStyle = 'rgba(255,90,40,0.55)';
-  for (const [x, y] of [
-    [31, 28],
-    [69, 28],
-  ] as Pt[]) {
+  };
+  seam(L.back, 0, 0.05, 0.95, covered);
+  // 尾腹与鳞背的交界
+  seam(L.tail, -0.02, 0.04, 0.85, () => false);
+  // 颈腹人字纹
+  c.shadowBlur = shadowBlur * 0.6;
+  c.save();
+  c.clip(L.neck.path);
+  for (let t = 0.12; t < 0.95; t += 0.13) {
+    const { p, n, tg, w } = at(L.neck, t);
+    const q: Pt = [p[0] - n[0] * w * 0.2, p[1] - n[1] * w * 0.2];
+    const hw = w * 0.3;
+    c.strokeStyle = 'rgba(255,130,50,0.5)';
+    c.lineWidth = 0.4;
     c.beginPath();
-    c.arc(x, y, 0.9, 0, Math.PI * 2);
-    c.fill();
+    c.moveTo(q[0] + n[0] * hw - tg[0] * 1.6, q[1] + n[1] * hw - tg[1] * 1.6);
+    c.lineTo(q[0], q[1]);
+    c.lineTo(q[0] - n[0] * hw - tg[0] * 1.6, q[1] - n[1] * hw - tg[1] * 1.6);
+    c.stroke();
   }
+  c.restore();
   // 鼻孔里的火光
   c.shadowBlur = shadowBlur * 0.8;
   c.fillStyle = 'rgba(255,120,50,0.95)';
   for (const [x, y] of LAIR_NOSTRILS) {
     c.beginPath();
-    c.ellipse(x, y, 0.8, 0.5, 0, 0, Math.PI * 2);
+    c.ellipse(x, y, 0.7, 0.45, 0, 0, Math.PI * 2);
     c.fill();
   }
   c.shadowBlur = 0;
