@@ -41,6 +41,8 @@ export class Game {
   breakdown: ScoreBreakdown | null = null;
   deathCell = -1;
   marksPlaced = 0;
+  /** 每日挑战的日期键（YYYY-MM-DD）；普通局为 null */
+  daily: string | null = null;
 
   constructor(seed: number, tutorial = false, board?: BoardData) {
     this.seed = seed;
@@ -352,6 +354,69 @@ export class Game {
     };
   }
 
+  // ---------------------------------------------------------------- 存档
+  /** 中途存档：盘面由 seed + regen 重建，只存玩家改变过的状态 */
+  toSave(): RunSave {
+    const bits = (a: Uint8Array) => Array.from(a).join('');
+    return {
+      v: SAVE_VERSION,
+      seed: this.seed,
+      regen: this.b.regen,
+      tutorial: this.isTutorial,
+      daily: this.daily,
+      revealed: bits(this.revealed),
+      collected: bits(this.collected),
+      mark: Array.from(this.mark),
+      player: { ...this.player },
+      gold: this.gold,
+      kills: this.kills,
+      killXp: this.killXp,
+      correctMarks: this.correctMarks,
+      fullCleared: this.fullCleared,
+      dragonAwake: this.dragonAwake,
+      timeMs: Math.floor(this.timeMs),
+      marksPlaced: this.marksPlaced,
+    };
+  }
+
+  /** 从存档恢复；数据不符（版本、长度、盘面校验）时返回 null */
+  static fromSave(s: RunSave): Game | null {
+    if (!s || s.v !== SAVE_VERSION || s.revealed?.length !== N || s.collected?.length !== N || s.mark?.length !== N) return null;
+    const board = generateBoard(s.seed, s.tutorial, s.regen);
+    if (board.regen !== s.regen) return null;
+    const g = new Game(s.seed, s.tutorial, board);
+    g.daily = s.daily ?? null;
+    for (let i = 0; i < N; i++) {
+      g.revealed[i] = s.revealed.charCodeAt(i) === 49 || board.kind[i] === Kind.Lair ? 1 : 0;
+      g.collected[i] = s.collected.charCodeAt(i) === 49 ? 1 : 0;
+      g.mark[i] = g.revealed[i] ? MARK_NONE : s.mark[i] | 0;
+    }
+    // 由翻开状态重算数字与存活数
+    g.number.fill(0);
+    g.alive.fill(0);
+    g.totalAlive = 0;
+    for (let i = 0; i < N; i++) {
+      if (board.kind[i] !== Kind.Monster || g.revealed[i]) continue;
+      const L = board.level[i];
+      g.alive[L]++;
+      g.totalAlive++;
+      for (let k = 0; k < 8; k++) {
+        const j = NEIGHBORS[i * 8 + k];
+        if (j >= 0) g.number[j] += L;
+      }
+    }
+    g.player = { ...s.player };
+    g.gold = s.gold;
+    g.kills = s.kills;
+    g.killXp = s.killXp;
+    g.correctMarks = s.correctMarks;
+    g.fullCleared = s.fullCleared;
+    g.dragonAwake = s.dragonAwake;
+    g.timeMs = s.timeMs;
+    g.marksPlaced = s.marksPlaced;
+    return g;
+  }
+
   // ---------------------------------------------------------------- debug
   debugAddXp(n: number): GameEvent[] {
     const ev: GameEvent[] = [];
@@ -419,6 +484,29 @@ export class Game {
     for (let i = 0; i < N; i++) if (this.b.kind[i] === Kind.Lair) return i;
     return 0;
   }
+}
+
+const SAVE_VERSION = 1;
+
+export interface RunSave {
+  v: number;
+  seed: number;
+  regen: number;
+  tutorial: boolean;
+  daily: string | null;
+  /** 每格一位 '0' / '1' */
+  revealed: string;
+  collected: string;
+  mark: number[];
+  player: PlayerState;
+  gold: number;
+  kills: number;
+  killXp: number;
+  correctMarks: number;
+  fullCleared: boolean;
+  dragonAwake: boolean;
+  timeMs: number;
+  marksPlaced: number;
 }
 
 /**

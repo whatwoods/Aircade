@@ -10,7 +10,8 @@ export interface RecordResult {
 /** 结算：更新本地记录（最高分、最快通关、通关/总局数）并保存 */
 export function commitRecords(rec: Records, b: ScoreBreakdown): RecordResult {
   const prevBest = rec.best;
-  const newBest = b.total > rec.best && b.total > 0;
+  // 最高分只记胜局：败局分数不与通关比较，也不弹「新纪录」
+  const newBest = b.won && b.total > rec.best;
   rec.plays++;
   if (newBest) rec.best = b.total;
   let newFastest = false;

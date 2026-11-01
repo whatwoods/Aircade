@@ -65,4 +65,11 @@ async function boot(): Promise<void> {
   }
 }
 
+// 离线可玩：只在生产构建注册（开发时不缓存，避免拿到旧代码）
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => undefined);
+  });
+}
+
 void boot();

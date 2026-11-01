@@ -369,6 +369,8 @@ export class Renderer {
       ctx.globalAlpha = 1;
       this.calls += 2;
     }
+    // 死亡复盘：画在去饱和之上，保留颜色
+    if (game && ba > 0.01) this.calls += board.drawReview(ctx, this.base, L, real);
     // 大字
     if (ov.bigText) {
       const t = clamp01((real - ov.bigT0) / 500);

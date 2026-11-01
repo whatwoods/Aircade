@@ -1,10 +1,17 @@
 import type { Layout } from '../view/layout';
 import type { Records, Settings } from '../core/storage';
 import { breakdownRows, fmtInt, fmtTime } from '../game/score';
+import type { DailyInfo } from '../game/daily';
+import type { Game } from '../game/rules';
 import type { ScoreBreakdown } from '../game/types';
 
 export type Action =
   | 'start'
+  | 'continue'
+  | 'daily'
+  | 'review'
+  | 'review-back'
+  | 'share'
   | 'settings'
   | 'howto'
   | 'pause'
@@ -33,7 +40,14 @@ export interface ResultData {
   level: number;
   explored: number;
   marks: number;
+  daily: string | null;
 }
+
+/** 'YYYY-MM-DD' → 'M月D日' */
+export const dayLabel = (key: string): string => {
+  const [, m, d] = key.split('-');
+  return `${+m}月${+d}日`;
+};
 
 /**
  * DOM 覆盖层（文档 §6）：标题 / 暂停 / 设置 / 结算 / 对话框 / Toast / 引导气泡。
@@ -45,6 +59,8 @@ export class Screens {
   onButton: () => void = () => undefined;
   private title: HTMLElement;
   private plaque: HTMLElement;
+  private menu: HTMLElement;
+  private reviewBar: HTMLElement;
   private hint: HTMLElement;
   private pauseBtn: HTMLElement;
   private bubble: HTMLElement;
@@ -70,13 +86,8 @@ export class Screens {
     this.title.id = 'title';
     this.title.innerHTML = `
       <div class="logo"><h1>地牢扫雷</h1><div class="sub">DUNGEON SWEEPER</div></div>
-      <div class="menu">
-        <button class="btn btn-main" data-act="start" id="btn-start">开始冒险</button>
-        <div class="row">
-          <button class="btn btn-ghost" data-act="settings" id="btn-settings">⚙ 设置</button>
-          <button class="btn btn-ghost" data-act="howto" id="btn-howto">❖ 玩法</button>
-        </div>
-      </div>`;
+      <div class="menu"></div>`;
+    this.menu = this.title.querySelector('.menu') as HTMLElement;
     this.plaque = h('div', 'plaque hidden');
     this.title.appendChild(this.plaque);
     this.hint = h('div', 'sound-hint', '点击任意处开启声音');
@@ -112,6 +123,11 @@ export class Screens {
     this.modal = h('div', 'layer hidden');
     this.modal.id = 'modal';
     root.appendChild(this.modal);
+    // 死亡复盘：收起结算后的返回按钮
+    this.reviewBar = h('button', 'btn btn-main hidden', '返回结算');
+    this.reviewBar.id = 'review-back';
+    this.reviewBar.dataset.act = 'review-back';
+    root.appendChild(this.reviewBar);
     this.fade = h('div');
     this.fade.id = 'fade';
     root.appendChild(this.fade);
@@ -164,8 +180,25 @@ export class Screens {
   }
 
   // ---------------------------------------------------------------- 标题
-  showTitle(rec: Records, soundHint: boolean): void {
+  showTitle(rec: Records, soundHint: boolean, hasRun: boolean, daily: DailyInfo): void {
     this.title.classList.remove('hidden', 'out');
+    const dl =
+      daily.state === 'done'
+        ? `<button class="btn btn-ghost btn-daily done" disabled id="btn-daily">今日 <b>${fmtInt(daily.score)}</b>${daily.won ? ' · 屠龙' : ''}</button>`
+        : daily.state === 'playing'
+          ? ''
+          : `<button class="btn btn-ghost btn-daily" data-act="daily" id="btn-daily">每日挑战 · ${dayLabel(daily.key)}</button>`;
+    this.menu.innerHTML = `
+      ${hasRun ? `<button class="btn btn-main" data-act="continue" id="btn-continue">继续冒险</button>` : ''}
+      <div class="row alt">
+        <button class="btn ${hasRun ? 'btn-ghost btn-wide' : 'btn-main'}" data-act="start" id="btn-start">${hasRun ? '新的冒险' : '开始冒险'}</button>
+        ${dl}
+      </div>
+      <div class="row">
+        <button class="btn btn-ghost" data-act="settings" id="btn-settings">⚙ 设置</button>
+        <button class="btn btn-ghost" data-act="howto" id="btn-howto">❖ 玩法</button>
+      </div>`;
+    this.menu.appendChild(this.plaque);
     if (rec.plays > 0) {
       this.plaque.classList.remove('hidden');
       this.plaque.innerHTML = `最高分 <b>${fmtInt(rec.best)}</b> · 屠龙 <b>${rec.wins}</b> 次${rec.bestTime ? ` · 最快 <b>${fmtTime(rec.bestTime)}</b>` : ''}`;
@@ -252,16 +285,18 @@ export class Screens {
     }, 160);
   }
 
-  showPause(seed: number, regen: number, st: Settings): void {
+  showPause(g: Game, st: Settings): void {
     const p = h('div', 'panel');
     p.id = 'panel-pause';
+    const regen = g.b.regen;
+    const tag = g.daily ? `每日挑战 · ${dayLabel(g.daily)}` : `种子 #${g.seed}${regen ? `（第 ${regen} 次重抽）` : ''}`;
     p.innerHTML = `<h2>暂停</h2>
       <button class="btn btn-main" data-act="resume" id="btn-resume">继续</button>
-      <button class="btn btn-ghost" data-act="restart" id="btn-restart">重新开始</button>
+      ${g.daily ? '' : '<button class="btn btn-ghost" data-act="restart" id="btn-restart">重新开始</button>'}
       <button class="btn btn-ghost" data-act="settings" id="btn-psettings">设置</button>
       <button class="btn btn-ghost" data-act="title" id="btn-ptitle">返回标题</button>
       <div class="quick">${this.tog('sfx', '音效', st.sfx)}${this.tog('music', '音乐', st.music)}</div>
-      <div class="seed">种子 #${seed}${regen ? `（第 ${regen} 次重抽）` : ''}</div>`;
+      <div class="seed">${tag}</div>`;
     this.settingsFrom = 'pause';
     this.openModal(p);
   }
@@ -337,12 +372,16 @@ export class Screens {
     const t = h('div', 'tablet');
     t.id = 'panel-result';
     t.innerHTML = `<h2 class="${b.won ? '' : 'lose'}">${b.won ? '屠龙成功' : '你倒下了'}</h2>
-      <div class="en">${b.won ? 'DRAGON SLAIN' : 'YOU FELL'}</div>
+      <div class="en">${d.daily ? `每日挑战 · ${dayLabel(d.daily)}` : b.won ? 'DRAGON SLAIN' : 'YOU FELL'}</div>
       <div class="rows"></div>
       <div class="total">0</div>
       <div class="best">${d.newBest ? (d.prevBest > 0 ? `此前最高 <b>${fmtInt(d.prevBest)}</b>` : '首个纪录') : `历史最高 <b>${fmtInt(d.prevBest)}</b>`}</div>
       <div class="stats">等级 ${d.level} · 探索 ${d.explored}% · 猜中标记 ${d.marks} · 用时 ${fmtTime(b.timeSec)}</div>
       <button class="btn btn-main" data-act="replay" id="btn-replay">再来一局</button>
+      <div class="row">
+        ${b.won ? '' : '<button class="btn btn-ghost" data-act="review" id="btn-review">查看盘面</button>'}
+        <button class="btn btn-ghost" data-act="share" id="btn-share">分享</button>
+      </div>
       <button class="btn btn-text" data-act="title" id="btn-rtitle">返回标题</button>`;
     sc.appendChild(t);
     L.appendChild(sc);
@@ -388,12 +427,23 @@ export class Screens {
     this.countRaf = requestAnimationFrame(step);
   }
 
+  /** 复盘：收起 / 放回结算面板（不重新计数） */
+  setResultHidden(on: boolean): void {
+    this.resultLayer.classList.toggle('peek', on);
+    this.showReviewBar(on);
+  }
+  showReviewBar(on: boolean): void {
+    this.reviewBar.classList.toggle('hidden', !on);
+  }
+
   hideResult(): void {
     cancelAnimationFrame(this.countRaf);
     const t = this.resultLayer.querySelector('.tablet');
     if (t) t.classList.add('out');
+    this.showReviewBar(false);
     window.setTimeout(() => {
       this.resultLayer.classList.add('hidden');
+      this.resultLayer.classList.remove('peek');
       this.resultLayer.innerHTML = '';
     }, 250);
   }

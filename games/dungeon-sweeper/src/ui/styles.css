@@ -194,7 +194,7 @@ body {
 }
 .menu {
   position: absolute;
-  top: 62%;
+  bottom: calc(9% + env(safe-area-inset-bottom));
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -202,15 +202,59 @@ body {
   gap: 14px;
   transition: transform 0.2s ease, opacity 0.2s ease;
 }
-.menu .row {
+.menu .row,
+.tablet .row {
   display: flex;
   gap: 14px;
 }
-.plaque {
+.menu .alt {
+  flex-direction: column;
+  align-items: center;
+}
+.menu .btn-wide,
+.menu .btn-daily {
+  width: 240px;
+  height: 46px;
+}
+.btn-daily b {
+  font-family: var(--latin);
+  color: var(--gold);
+}
+#ui .btn-daily.done {
+  cursor: default;
+  opacity: 0.85;
+  border-color: rgba(232, 176, 75, 0.35) !important;
+}
+.tablet .row {
+  margin-top: 10px;
+}
+.tablet .row .btn-ghost {
+  min-width: 104px;
+}
+/* 复盘：结算面板沉到屏外，只留返回按钮 */
+#result.peek {
+  pointer-events: none;
+}
+#result.peek .tablet {
+  transform: translateY(130%);
+}
+#result.peek .scrim {
+  background: transparent;
+  pointer-events: none;
+}
+#result .tablet {
+  transition: transform 0.3s ease;
+}
+#review-back {
   position: absolute;
-  top: 79%;
   left: 50%;
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 10px));
   transform: translateX(-50%);
+  width: 200px;
+  height: 50px;
+}
+.plaque {
+  margin-top: 4px;
   padding: 6px 16px;
   font-size: 13px;
   color: var(--ash);
@@ -721,4 +765,84 @@ body {
   border-radius: 3px;
   pointer-events: none;
   white-space: pre;
+}
+
+/* 矮屏（手机横屏）：菜单收紧，新冒险与每日挑战并排 */
+@media (max-height: 520px) {
+  .logo {
+    top: 9%;
+  }
+  .logo h1 {
+    font-size: 52px;
+  }
+  .menu {
+    bottom: calc(3% + env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+  .menu .btn-main {
+    height: 44px;
+    font-size: 17px;
+  }
+  .menu .alt {
+    flex-direction: row;
+    gap: 10px;
+  }
+  .menu .alt .btn-main {
+    width: 180px;
+  }
+  .menu .btn-wide,
+  .menu .btn-daily,
+  .menu .row .btn-ghost {
+    width: auto;
+    min-width: 150px;
+    height: 36px;
+  }
+  .plaque {
+    margin-top: 0;
+  }
+  .sound-hint {
+    display: none;
+  }
+  #result .scrim {
+    overflow-y: auto;
+  }
+  .tablet {
+    margin: 6px 0;
+    padding: 10px 18px 6px;
+  }
+  .tablet h2 {
+    font-size: 24px;
+  }
+  .tablet .en {
+    margin: 2px 0 4px;
+  }
+  .rowi {
+    padding: 1px 2px;
+    font-size: 13px;
+  }
+  .rows {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 16px;
+  }
+  .total {
+    margin-top: 4px;
+    font-size: 32px;
+  }
+  .stats {
+    margin: 4px 0 6px;
+  }
+  .tablet .btn-main {
+    height: 42px;
+  }
+  .tablet .row {
+    margin-top: 6px;
+  }
+  .tablet .row .btn-ghost {
+    height: 34px;
+  }
+  .tablet .btn-text {
+    padding: 4px 14px;
+  }
 }

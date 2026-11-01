@@ -580,13 +580,21 @@ export class Director {
     const ox = cell >= 0 ? cx(cell) : 4;
     const oy = cell >= 0 ? cy(cell) : 5;
     for (let i = 0; i < N; i++) s.board.extT0[i] = w + Math.hypot(cx(i) - ox, cy(i) - oy) * 26;
+    // 复盘：亮出剩余怪物、框出致死格
+    this.atReal(r0 + CONFIG.review.startMs, () => {
+      s.board.review = true;
+      s.board.reviewT0 = s.clock.real;
+      s.board.reviewCell = cell;
+      // 致死怪改由复盘层画在自己格里，不再放大盖住 HUD
+      for (const p of s.board.pops) p.on = false;
+    });
     this.atReal(r0 + 500, () => {
       const L = s.L;
       s.ov.bigText = s.gl.text.get('你倒下了', 44 * L.s, '#E0314A', 900, FONT_CN, { glow: 'rgba(200,40,60,0.8)', glowBlur: 14, stroke: 'rgba(20,4,6,0.95)', strokeW: 5 });
       s.ov.bigSub = s.gl.text.get('YOU FELL', 15 * L.s, '#C8283C', 700, FONT_DECO, { spacing: 0.32 });
       s.ov.bigT0 = s.clock.real;
     });
-    this.atReal(r0 + (fromFight ? 2300 : 1800), () => {
+    this.atReal(r0 + (fromFight ? 2300 : 1800) + CONFIG.review.holdMs, () => {
       this.locked = false;
       s.onSequenceEnd(false);
     });

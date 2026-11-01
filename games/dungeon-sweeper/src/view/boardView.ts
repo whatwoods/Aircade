@@ -95,6 +95,10 @@ export class BoardView {
   tutSum: { cell: number; text: string } | null = null;
   /** 致命标记二次确认：格子旁的小气泡（真实时间） */
   lethalTipCell = -1;
+  /** 死亡复盘：亮出未翻开的怪物、框出致死格（真实时间） */
+  review = false;
+  reviewT0 = 0;
+  reviewCell = -1;
   /** 胜利后棋盘数字淡出（真实时间，-1 = 不淡出） */
   numFadeT0 = -1;
   lethalTipT0 = 0;
@@ -134,6 +138,8 @@ export class BoardView {
     this.game = game;
     this.numFadeT0 = -1;
     this.lethalTipCell = -1;
+    this.review = false;
+    this.reviewCell = -1;
     this.face.fill(0);
     this.flipping.fill(0);
     this.flipStarted.fill(0);
@@ -177,6 +183,20 @@ export class BoardView {
     this.hideBoard = false;
     this.version++;
     this.cacheDirty = true;
+  }
+
+  /** 读档：直接落定到逻辑状态（无翻牌演出） */
+  restore(game: Game): void {
+    this.reset(game, false, 0);
+    for (let i = 0; i < N; i++) {
+      this.mark[i] = game.mark[i];
+      if (!game.revealed[i] || game.b.kind[i] === Kind.Lair) continue;
+      this.face[i] = 1;
+      this.light[i] = this.lightFrom[i] = this.lightTo[i] = 0.85;
+      this.num[i] = game.number[i];
+      if (game.b.kind[i] === Kind.Monster) this.decal[i] = game.b.level[i];
+      if (game.collected[i]) this.itemState[i] = 2;
+    }
   }
 
   get dealEnd(): number {
@@ -927,6 +947,63 @@ export class BoardView {
   }
 
   // ------------------------------------------------------------ draw: 致命确认气泡
+  /** 死亡复盘层：从致死格向外依次显出剩余怪物（半透明剪影 + 等级），致死格红框脉动 */
+  drawReview(ctx: CanvasRenderingContext2D, base: Mat, L: Layout, real: number): number {
+    if (!this.review) return 0;
+    const R = CONFIG.review;
+    const g = this.game;
+    const c = L.cell;
+    const ox = this.reviewCell >= 0 ? cx(this.reviewCell) : 4;
+    const oy = this.reviewCell >= 0 ? cy(this.reviewCell) : 5;
+    let calls = 0;
+    ctx.setTransform(base.a, base.b, base.c, base.d, base.e, base.f);
+    const d = this.reviewCell;
+    for (let i = 0; i < N; i++) {
+      if (g.b.kind[i] !== Kind.Monster || (g.revealed[i] && i !== d)) continue;
+      const k = clamp01((real - this.reviewT0 - Math.hypot(cx(i) - ox, cy(i) - oy) * R.stepMs) / R.fadeMs);
+      if (k <= 0) continue;
+      const lv = g.b.level[i];
+      const sil = this.sil.mon[lv];
+      const x = L.board.x + cx(i) * c + c / 2;
+      const y = L.board.y + cy(i) * c + c / 2;
+      ctx.globalAlpha = 0.8 * k;
+      ctx.fillStyle = i === d ? 'rgba(70,8,16,1)' : 'rgba(30,10,16,1)';
+      roundRect(ctx, x - c / 2 + 2, y - c / 2 + 2, c - 4, c - 4, 4);
+      ctx.fill();
+      const sc = (c * R.silScale) / sil.unit;
+      const sz = sil.size * sc;
+      ctx.globalAlpha = R.silAlpha * k;
+      ctx.drawImage(sil.normal.c, x - sz / 2, y - sz / 2 + c * 0.06, sz, sz);
+      const spr = this.gl.lvBadge[lv];
+      const w = spr.w / L.dpr;
+      const h = spr.h / L.dpr;
+      const bx = x + c / 2 - w / 2 + 1;
+      const by = y - c / 2 + h / 2 - 1;
+      ctx.globalAlpha = k;
+      ctx.fillStyle = 'rgba(10,9,16,0.9)';
+      roundRect(ctx, bx - w / 2 + 2, by - 7, w - 4, 14, 4);
+      ctx.fill();
+      ctx.drawImage(spr.c, bx - w / 2, by - h / 2, w, h);
+      calls += 4;
+    }
+    if (d >= 0) {
+      const x = L.board.x + cx(d) * c;
+      const y = L.board.y + cy(d) * c;
+      const pulse = 0.7 + 0.3 * Math.sin(((real - this.reviewT0) / 900) * Math.PI * 2);
+      ctx.globalAlpha = clamp01((real - this.reviewT0) / 300) * pulse;
+      ctx.strokeStyle = PAL.lethal;
+      ctx.lineWidth = 3;
+      ctx.shadowColor = PAL.lethal;
+      ctx.shadowBlur = 10;
+      roundRect(ctx, x + 1.5, y + 1.5, c - 3, c - 3, 5);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      calls++;
+    }
+    ctx.globalAlpha = 1;
+    return calls;
+  }
+
   drawLethalTip(ctx: CanvasRenderingContext2D, base: Mat, L: Layout, real: number): number {
     const c = this.lethalTipCell;
     if (c < 0 || real >= this.lethalTipUntil) return 0;

@@ -8,14 +8,16 @@ import { setHaptics, vibrate } from './core/haptics';
 import { Input, type InputHandler } from './core/input';
 import { Loop } from './core/loop';
 import { randomSeed } from './core/rng';
-import { clearAll, load, loadRecords, loadSettings, type Records, save, type Settings } from './core/storage';
+import { clearAll, load, loadRecords, loadSettings, type Records, remove, save, type Settings } from './core/storage';
 import { Tweens } from './core/tween';
 import { type BoardData, LAIR_DIST, N, cx, cy, generateBoard } from './game/board';
-import { Game, pickBoard } from './game/rules';
+import { Game, pickBoard, type RunSave } from './game/rules';
+import { beginDaily, type DailyInfo, type DailyRec, dailyInfo, dailySeed, finishDaily, todayKey } from './game/daily';
 import { commitRecords } from './game/score';
 import { type TutStep, Tutorial } from './game/tutorial';
 import { type GameEvent, Kind, MARK_NONE, MARK_SAFE, MARK_UNKNOWN } from './game/types';
 import { type Action, Screens } from './ui/screens';
+import { drawShareCard, explored, shareText, toBlob } from './ui/share';
 import { Bg } from './view/bg';
 import { BoardView } from './view/boardView';
 import { Camera } from './view/camera';
@@ -76,6 +78,9 @@ export class App implements Stage, InputHandler {
   settings: Settings;
   records: Records;
   tips: Record<string, boolean>;
+  daily: Record<string, DailyRec>;
+  /** 死亡复盘：结算面板收起、查看全盘 */
+  private reviewing = false;
   private tipQueue: { id: string; text: string; urgent: boolean; expire: number }[] = [];
   private nextTipAt = 0;
   private lastTipAt = -1e9;
@@ -123,6 +128,7 @@ export class App implements Stage, InputHandler {
     this.settings = loadSettings();
     this.records = loadRecords();
     this.tips = load<Record<string, boolean>>('tips', {});
+    this.daily = load<Record<string, DailyRec>>('daily', {});
     this.fx = new Fx(this.tex, this.sil);
     this.board = new BoardView(this.tex, this.gl, this.sil, this.fx, {
       onFlipStart: (i, o) => this.director.onFlipStart(i, o),
@@ -177,7 +183,7 @@ export class App implements Stage, InputHandler {
     this.board.reset(this.game, false, 0);
     this.layout();
     this.bindGlobal();
-    this.screens.showTitle(this.records, true);
+    this.screens.showTitle(this.records, true, this.hasRun(), this.dailyInfo());
     this.loop.start();
   }
 
@@ -268,9 +274,11 @@ export class App implements Stage, InputHandler {
     document.addEventListener('dblclick', (e) => e.preventDefault());
     document.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('blur', () => this.autoPause());
+    window.addEventListener('pagehide', () => this.persist());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         this.autoPause();
+        this.persist();
         this.audio.suspend();
         if (this.state !== 'paused') this.loop.stop();
       } else {
@@ -415,12 +423,18 @@ export class App implements Stage, InputHandler {
   }
 
   // ================================================================== 流程
-  /** 标题 → 游戏 */
-  startFromTitle(forceTutorial = false): void {
+  /** 标题 → 游戏。mode：新局 / 每日挑战 / 读档继续 */
+  startFromTitle(forceTutorial = false, mode: 'new' | 'daily' | 'resume' = 'new'): void {
     if (this.state !== 'title') return;
     const done = load<boolean>('tutorial', false);
-    let tutorial = forceTutorial || !done;
+    let tutorial = forceTutorial || (!done && mode === 'new');
     if (this.opts.tutorial !== null && !forceTutorial) tutorial = this.opts.tutorial;
+    const run = mode === 'resume' ? Game.fromSave(load<RunSave | null>('run', null) as RunSave) : null;
+    if (mode === 'resume' && !run) {
+      remove('run');
+      this.screens.showTitle(this.records, false, false, this.dailyInfo());
+      return;
+    }
     this.screens.hideTitle();
     this.renderer.mode = 'game';
     const w = this.clock.world;
@@ -431,13 +445,44 @@ export class App implements Stage, InputHandler {
     this.tw.set(this.hud.slide, 0);
     this.tw.to(this.hud.slide, 1, 450, w, cubicOut, 350);
     this.music.title = false;
-    this.newGame(tutorial, true);
+    if (run) this.resumeGame(run);
+    else this.newGame(tutorial, true, mode === 'daily' ? todayKey() : null);
+  }
+
+  /** 标题页开新局：有进行中的冒险时先确认放弃 */
+  private startFresh(mode: 'new' | 'daily'): void {
+    if (mode === 'daily') {
+      const d = this.dailyInfo();
+      if (d.state === 'done') return;
+      if (d.state === 'playing') {
+        this.startFromTitle(false, 'resume');
+        return;
+      }
+    }
+    if (!this.hasRun()) {
+      this.startFromTitle(false, mode);
+      return;
+    }
+    const runDaily = load<RunSave | null>('run', null)?.daily;
+    const title = runDaily ? '放弃今天的每日挑战？' : '放弃进行中的冒险？';
+    void this.screens.dialog(title, runDaily ? '每日挑战每天只有一次机会' : '', '放弃', '取消').then((ok) => {
+      if (!ok) return;
+      remove('run');
+      this.startFromTitle(false, mode);
+    });
   }
 
   /** 开新局（同一场景内） */
-  newGame(tutorial: boolean, deal: boolean): void {
+  newGame(tutorial: boolean, deal: boolean, daily: string | null = null): void {
     const pre = this.prefetched;
-    if (!tutorial && this.opts.seed === null && pre) {
+    if (daily) {
+      // 每日挑战：日期派生种子，同一天所有人同一盘面
+      const seed = dailySeed(daily);
+      this.game = new Game(seed, false, pickBoard(seed, false, CONFIG.solver.budgetMs));
+      this.game.daily = daily;
+      beginDaily(this.daily, daily);
+      save('daily', this.daily);
+    } else if (!tutorial && this.opts.seed === null && pre) {
       // 用 Worker 预取好的盘面（已通过无致命猜测校验）
       this.prefetched = null;
       this.game = new Game(pre.seed, false, pre.board);
@@ -447,35 +492,12 @@ export class App implements Stage, InputHandler {
       this.game = tutorial ? new Game(seed, true) : new Game(seed, false, pickBoard(seed, false, this.opts.seed === null ? CONFIG.solver.fallbackMs : CONFIG.solver.budgetMs));
     }
     if (!tutorial) this.prefetchBoard();
-    this.game.chordEnabled = this.settings.chord;
-    this.director.clear();
-    this.fx.clear();
-    this.ov.reset();
-    this.ov.brazier.v = 0;
-    this.tw.set(this.ov.dragonAlpha, deal ? 1 : 0);
-    if (!deal) this.tw.to(this.ov.dragonAlpha, 1, 600, this.clock.world, quadOut);
+    this.resetScene(deal);
     this.board.reset(this.game, deal, this.clock.world);
-    this.dragon.reset();
     const p = this.game.player;
     this.hud.sync(p.level, p.hp, p.xp, 0, this.game.alive);
-    this.hud.dragonReady = false;
-    this.hud.setBase('巨龙沉睡中 · 需 14 点生命', 'normal');
-    this.hud.clearMessage();
-    this.hud.showHint = this.records.plays < 3;
-    this.hud.hidden = false;
     this.tw.set(this.hud.bars, 0);
     this.tw.to(this.hud.bars, 1, 600, this.clock.world, cubicOut, deal ? 600 : 200);
-    this.music.awake = false;
-    this.music.title = false;
-    this.timerOn = false;
-    this.lockUntil = 0;
-    this.lethalCell = -1;
-    this.userActed = false;
-    this.tipQueue.length = 0;
-    this.lastTipAt = -1e9;
-    this.nextTipAt = 0;
-    this.lowHp = false;
-    this.tutEyes = false;
     this.closeRadial();
     this.state = 'intro';
     this.introT0 = this.clock.real;
@@ -491,11 +513,88 @@ export class App implements Stage, InputHandler {
       this.clearTutVisual();
       this.timerOn = true;
     }
+    this.persist();
+  }
+
+  /** 新局与读档共用：清空演出、覆盖层、HUD 与运行时状态 */
+  private resetScene(deal: boolean): void {
+    this.game.chordEnabled = this.settings.chord;
+    this.director.clear();
+    this.fx.clear();
+    this.ov.reset();
+    this.ov.brazier.v = 0;
+    this.tw.set(this.ov.dragonAlpha, deal ? 1 : 0);
+    if (!deal) this.tw.to(this.ov.dragonAlpha, 1, 600, this.clock.world, quadOut);
+    this.dragon.reset();
+    this.hud.dragonReady = false;
+    this.hud.setBase('巨龙沉睡中 · 需 14 点生命', 'normal');
+    this.hud.clearMessage();
+    this.hud.showHint = this.records.plays < 3;
+    this.hud.hidden = false;
+    this.music.awake = false;
+    this.music.title = false;
+    this.timerOn = false;
+    this.lockUntil = 0;
+    this.lethalCell = -1;
+    this.userActed = false;
+    this.tipQueue.length = 0;
+    this.lastTipAt = -1e9;
+    this.nextTipAt = 0;
+    this.lowHp = false;
+    this.tutEyes = false;
+    this.reviewing = false;
+    this.board.review = false;
+  }
+
+  /** 读档：盘面直接落定，HUD 与巨龙状态对齐逻辑 */
+  private resumeGame(g: Game): void {
+    this.game = g;
+    this.prefetchBoard();
+    this.resetScene(false);
+    this.board.restore(g);
+    const p = g.player;
+    this.hud.sync(p.level, p.hp, p.xp, g.score, g.alive);
+    this.tw.set(this.hud.bars, 0);
+    this.tw.to(this.hud.bars, 1, 600, this.clock.world, cubicOut, 200);
+    this.tw.to(this.ov.brazier, 1, 450, this.clock.world, cubicOut, 200);
+    if (g.dragonAwake) {
+      this.dragon.awake = true;
+      this.dragon.eyes = 2;
+      this.hud.dragonReady = true;
+      this.hud.setBase('巨龙已醒——点击龙巢挑战', 'gold');
+      this.music.awake = true;
+    }
+    this.tut.stop();
+    this.clearTutVisual();
+    this.closeRadial();
+    this.state = 'intro';
+    this.introT0 = this.clock.real;
+    this.screens.showPauseBtn(true);
+    this.timerOn = true;
+  }
+
+  /** 中途存档：进行中的正式局写入，结束或引导中则清除 */
+  persist(): void {
+    const g = this.game;
+    if (this.state === 'title' || this.tut.active) return;
+    if (g.phase === 'playing') save('run', g.toSave());
+    else remove('run');
+  }
+
+  private hasRun(): boolean {
+    return load<RunSave | null>('run', null) !== null;
+  }
+
+  private dailyInfo(): DailyInfo {
+    const key = todayKey();
+    const run = load<RunSave | null>('run', null);
+    return dailyInfo(this.daily, key, run?.daily === key);
   }
 
   /** 结算 → 新局：翻回暗砖后重开 */
   replay(): void {
     if (this.state !== 'result') return;
+    this.reviewing = false;
     this.screens.hideResult();
     this.canvas.classList.remove('rblur');
     this.state = 'intro';
@@ -506,6 +605,9 @@ export class App implements Stage, InputHandler {
   }
 
   backToTitle(): void {
+    this.persist();
+    this.reviewing = false;
+    this.screens.showReviewBar(false);
     this.screens.closeModal();
     this.screens.hideResult();
     this.screens.hideBubble();
@@ -522,7 +624,7 @@ export class App implements Stage, InputHandler {
       this.canvas.classList.remove('rblur');
       this.audio.musicFilter(18000);
       this.screens.showPauseBtn(false);
-      this.screens.showTitle(this.records, false);
+      this.screens.showTitle(this.records, false, this.hasRun(), this.dailyInfo());
       this.music.title = true;
       this.music.danger = 0;
       this.screens.fadeTo(false);
@@ -540,8 +642,9 @@ export class App implements Stage, InputHandler {
     this.board.pressCell = -1;
     this.sfx.pause();
     this.audio.musicFilter(500);
+    this.persist();
     this.canvas.classList.add('blur');
-    this.screens.showPause(this.game.seed, this.game.b.regen, this.settings);
+    this.screens.showPause(this.game, this.settings);
     this.screens.showPauseBtn(false);
     // 画一帧后停止 RAF（暂停时画布不重绘）
     window.setTimeout(() => {
@@ -567,6 +670,11 @@ export class App implements Stage, InputHandler {
     const g = this.game;
     const b = g.breakdown ?? g.computeBreakdown(won);
     const r = commitRecords(this.records, b);
+    if (g.daily) {
+      finishDaily(this.daily, g.daily, b);
+      save('daily', this.daily);
+    }
+    remove('run');
     this.state = 'result';
     this.ov.bigOutT0 = this.clock.real;
     // HUD 分数滚到结算总分；场景虚化压暗；胜利后棋盘数字淡出
@@ -582,9 +690,57 @@ export class App implements Stage, InputHandler {
       prevBest: r.prevBest,
       newBest: r.newBest,
       level: g.player.level,
-      explored: Math.round((g.revealedCount() / Math.max(1, g.playableCount())) * 100),
+      explored: explored(g),
       marks: g.correctMarks,
+      daily: g.daily,
     });
+  }
+
+  /** 死亡复盘：收起结算面板、取消虚化，看清全盘 */
+  private toggleReview(on: boolean): void {
+    if (this.state !== 'result' || this.reviewing === on) return;
+    this.reviewing = on;
+    this.canvas.classList.toggle('rblur', !on);
+    this.screens.setResultHidden(on);
+    this.ov.bigOutT0 = this.clock.real;
+  }
+
+  /** 分享：优先带图的系统分享，其次纯文字分享，最后复制到剪贴板 */
+  private async share(): Promise<void> {
+    const g = this.game;
+    const b = g.breakdown;
+    if (!b) return;
+    const url = location.origin + location.pathname + (g.daily ? '' : `?seed=${g.seed}`);
+    const text = shareText(g, b, url);
+    const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+    let blob: Blob | null = null;
+    try {
+      blob = await toBlob(drawShareCard(g, b));
+      const file = blob ? new File([blob], 'dungeon-sweeper.png', { type: 'image/png' }) : null;
+      if (file && nav.canShare?.({ files: [file] })) {
+        await nav.share({ files: [file], text });
+        return;
+      }
+      if (nav.share) {
+        await nav.share({ text });
+        return;
+      }
+    } catch (e) {
+      if ((e as DOMException)?.name === 'AbortError') return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      this.screens.toast('战绩已复制到剪贴板', 2200, true);
+    } catch {
+      // 剪贴板也不可用：保存分享图
+      if (!blob) return;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'dungeon-sweeper.png';
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      this.screens.toast('已保存战绩图', 2200, true);
+    }
   }
 
   private recordFx(): void {
@@ -601,7 +757,22 @@ export class App implements Stage, InputHandler {
   private action(a: Action): void {
     switch (a) {
       case 'start':
-        this.startFromTitle();
+        this.startFresh('new');
+        break;
+      case 'daily':
+        this.startFresh('daily');
+        break;
+      case 'continue':
+        this.startFromTitle(false, 'resume');
+        break;
+      case 'review':
+        this.toggleReview(true);
+        break;
+      case 'review-back':
+        this.toggleReview(false);
+        break;
+      case 'share':
+        void this.share();
         break;
       case 'howto':
         this.startFromTitle(true);
@@ -610,7 +781,7 @@ export class App implements Stage, InputHandler {
         this.screens.showSettings(this.settings, this.state === 'title' ? 'title' : 'pause');
         break;
       case 'close-settings':
-        if (this.screens.settingsReturn === 'pause' && this.state === 'paused') this.screens.showPause(this.game.seed, this.game.b.regen, this.settings);
+        if (this.screens.settingsReturn === 'pause' && this.state === 'paused') this.screens.showPause(this.game, this.settings);
         else this.screens.closeModal();
         break;
       case 'pause':
@@ -622,7 +793,7 @@ export class App implements Stage, InputHandler {
       case 'restart':
         void this.screens.dialog('重新开始？', '本局进度将会丢失', '重新开始', '取消').then((ok) => {
           if (!ok) {
-            this.screens.showPause(this.game.seed, this.game.b.regen, this.settings);
+            this.screens.showPause(this.game, this.settings);
             return;
           }
           this.canvas.classList.remove('blur');
@@ -788,6 +959,7 @@ export class App implements Stage, InputHandler {
     this.clearTutVisual();
     save('tutorial', true);
     this.timerOn = true;
+    this.persist();
     this.hud.message('冒险开始！推理数字，击败巨龙', 'gold', this.clock.real, 2400);
   }
 
@@ -976,7 +1148,10 @@ export class App implements Stage, InputHandler {
     const g = this.game;
     if (cell < 0 || g.revealed[cell]) return;
     const ev = g.setMark(cell, m);
-    if (ev.length) this.director.play(ev);
+    if (ev.length) {
+      this.director.play(ev);
+      this.persist();
+    }
     if (this.tut.active) {
       const s = this.tut.cur;
       if (s && s.action === 'mark' && cell === s.target) {
@@ -1048,6 +1223,7 @@ export class App implements Stage, InputHandler {
     if (r.fight) this.lockUntil = this.clock.real + CONFIG.rules.fightLockMs;
     if (this.state === 'intro') this.state = 'playing';
     if (!this.tut.active) this.timerOn = true;
+    this.persist();
   }
 
   // ================================================================== 键盘
@@ -1065,7 +1241,10 @@ export class App implements Stage, InputHandler {
     }
     if (this.state === 'title') {
       if (k === 'Enter' || k === ' ') {
-        if (!this.screens.modalOpen) this.startFromTitle();
+        if (!this.screens.modalOpen) {
+          if (this.hasRun()) this.startFromTitle(false, 'resume');
+          else this.startFresh('new');
+        }
         e.preventDefault();
       } else if (k === 'Escape' && this.screens.modalOpen) this.screens.closeModal();
       return;

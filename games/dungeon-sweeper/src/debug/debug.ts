@@ -3,6 +3,7 @@ import { maxHpForLevel } from '../config';
 import { clearAll } from '../core/storage';
 import { COLS, N, ROWS, cx, cy, idx } from '../game/board';
 import { Kind } from '../game/types';
+import { drawIcon, drawOgImage, drawShareCard } from '../ui/share';
 import { P } from '../view/fx';
 
 /** ?debug=1：FPS 浮层 + window.__game（文档 §8） */
@@ -159,10 +160,45 @@ export function installDebug(app: App): void {
     newGame(seed?: number) {
       if (seed !== undefined) app.opts.seed = seed >>> 0;
       if (app.state === 'title') app.startFromTitle();
+      else if (app.state === 'result') app.replay();
       else app.newGame(false, true);
     },
     restart() {
-      app.newGame(false, true);
+      if (app.state === 'result') app.replay();
+      else app.newGame(false, true);
+    },
+    /** 预览本局分享卡（再调一次关闭） */
+    shareCard() {
+      const old = document.getElementById('debug-card');
+      if (old) {
+        old.remove();
+        return;
+      }
+      const g = app.game;
+      const img = document.createElement('img');
+      img.id = 'debug-card';
+      img.src = drawShareCard(g, g.breakdown ?? g.computeBreakdown(false)).toDataURL();
+      img.style.cssText = 'position:fixed;inset:0;margin:auto;max-width:100%;max-height:100%;z-index:98';
+      img.onclick = () => img.remove();
+      document.body.appendChild(img);
+    },
+    /** 开发服务器专用：把图标与 OG 图写进 public/（vite.config.ts 的 /__asset 中间件） */
+    async exportAssets() {
+      const out: Record<string, HTMLCanvasElement> = {
+        'icon-512.png': drawIcon(512, false),
+        'icon-192.png': drawIcon(192, false),
+        'icon-maskable-512.png': drawIcon(512, true),
+        'apple-touch-icon.png': drawIcon(180, true),
+        'og.png': drawOgImage(),
+      };
+      const done: string[] = [];
+      for (const [name, c] of Object.entries(out)) {
+        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'));
+        if (!blob) continue;
+        const res = await fetch(`/__asset?name=${encodeURIComponent(name)}`, { method: 'POST', body: blob });
+        if (res.ok) done.push(name);
+      }
+      return done;
     },
     startTutorial() {
       if (app.state === 'title') app.startFromTitle(true);

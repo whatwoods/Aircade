@@ -18,6 +18,14 @@ export function save(key: string, value: unknown): void {
   }
 }
 
+export function remove(key: string): void {
+  try {
+    localStorage.removeItem(PREFIX + key);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function clearAll(): void {
   try {
     const keys: string[] = [];

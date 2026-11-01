@@ -80,6 +80,25 @@ export const CONFIG = {
     /** 随机种子但 Worker 预取未就绪时的主线程兜底预算（ms） */
     fallbackMs: 60,
   },
+  /** 死亡复盘：亮出剩余怪物（文档 §5.4b） */
+  review: {
+    /** 死亡后多久开始显出（真实时间 ms） */
+    startMs: 900,
+    /** 以致死格为中心，每格距离的延迟 */
+    stepMs: 45,
+    fadeMs: 320,
+    silScale: 0.7,
+    silAlpha: 1,
+    /** 结算面板推迟出现，先让玩家看清全盘 */
+    holdMs: 1200,
+  },
+  /** 每日挑战与分享（文档 §6.9） */
+  daily: {
+    /** 日期 → 种子的哈希盐：改它会让所有日期换图 */
+    salt: 0x5eed0d5,
+    /** 本地保留的每日成绩天数 */
+    keepDays: 60,
+  },
   dragon: {
     level: 13,
     minHpToChallenge: 14,
