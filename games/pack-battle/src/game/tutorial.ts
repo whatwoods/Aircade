@@ -1,7 +1,7 @@
 // 首局引导步骤机 + 情境提示标记
 import { load, remove, save } from '../core/storage.ts';
 
-export type HintId = 'sell' | 'stash' | 'boss' | 'poison' | 'loss' | 'interest';
+export type HintId = 'sell' | 'stash' | 'boss' | 'poison' | 'loss' | 'interest' | 'unlock' | 'affix' | 'endless';
 
 export const HINT_TEXT: Record<HintId, string> = {
   sell: '把装备拖回摊位可以卖掉',
@@ -10,6 +10,9 @@ export const HINT_TEXT: Record<HintId, string> = {
   poison: '中毒无视护盾',
   loss: '失去 1 颗心：调整背包，再战同一对手',
   interest: '存钱有利息：每 10 金下轮 +1',
+  unlock: '点锁住的格子，花金币扩背包',
+  affix: '敌人带词缀：点上方敌情卡查看',
+  endless: '无尽：敌人每轮变强，能走多远？',
 };
 
 export const TUT_TEXT: Record<number, string> = {

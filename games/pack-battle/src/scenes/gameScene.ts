@@ -2,7 +2,7 @@
 import { duckMusic, au } from '../audio/audio.ts';
 import { setMusic } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
-import { BAG, ECONOMY, EVENTS, ITEMS, SHOP } from '../config.ts';
+import { BAG, ECONOMY, EVENTS, ITEMS, ROUNDS, SHOP } from '../config.ts';
 import { input, type InputHandler } from '../core/input.ts';
 import { clock } from '../core/loop.ts';
 import { Spring } from '../core/spring.ts';
@@ -350,6 +350,11 @@ export class GameScene implements Scene {
     return info;
   }
 
+  /** 调试：正在显示的情境提示 */
+  hintText(): string | null {
+    return this.hint ? this.hint.s : null;
+  }
+
   showHint(id: HintId): void {
     if (hintSeen(id) || this.hintQ.includes(id)) return;
     // 引导气泡或另一条提示正在显示：排队，避免互相覆盖
@@ -404,8 +409,12 @@ export class GameScene implements Scene {
     this.gold.set(this.run.gold);
     this.phase = 'arrange';
     if (this.run.tutorial && this.run.round === 2 && this.run.attempt === 1 && this.tut.step !== 6) this.tut.go(6);
-    if (enemyFor(this.run.round).boss) this.showHint('boss');
-    if (this.run.gold >= 10) this.showHint('interest');
+    const run = this.run;
+    if (run.round === ROUNDS + 1) this.showHint('endless');
+    if (enemyFor(run.round).boss) this.showHint('boss');
+    if (runEnemy(run, run.round).affixes?.length) this.showHint('affix');
+    if (run.round >= 2 && run.gold >= cellPrice(run) && unlockable(run).length > 0) this.showHint('unlock');
+    if (run.gold >= 10) this.showHint('interest');
   }
 
   // ---------- 开战 ----------

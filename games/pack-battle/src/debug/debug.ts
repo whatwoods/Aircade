@@ -167,7 +167,7 @@ export function installDebug(): void {
         tier: r.tier, daily: r.daily ?? null, locked: r.locked, open: r.open, unlocked: r.unlocked, freeCells: r.freeCells, choice: r.choice, market: r.market, elite: r.elite, enemy: { name: e.name, title: e.title, hp: e.hp, boss: !!e.boss, affixes: e.affixes ?? [] },
         tutorial: g.tut.step, paused: g.paused, speed: g.bc.speed, overlay: g.ov.top ? g.ov.top.kind : null,
         dragging: !!g.ac.drag, links: g.syn.links.map((l) => ({ from: l.from, to: l.to, kind: l.kind, label: l.label })),
-        maxHp: playerMaxHp(r.round), undo: !!g.undo, outcome: g.outcome,
+        maxHp: playerMaxHp(r.round), undo: !!g.undo, outcome: g.outcome, hint: g.hintText(),
       };
     }),
     /** 背景音乐：当前曲式、播的是文件还是程序化、哪些文件已解码 */

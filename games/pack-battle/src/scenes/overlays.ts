@@ -274,11 +274,12 @@ export class SettingsPanel extends Panel {
 
 const RULES = [
   '从摊位把装备拖进行囊，松手即买。',
-  '相邻（共享一条边）的装备互相加成，发光连线就是加成。',
+  '相邻（共享边）的装备互相加成，连线就是加成。',
   '轻点装备旋转；同名同级的叠上去，合成升级。',
   '开战后自动战斗：冷却环转满一圈，装备就出手。',
   '输了失去 1 颗心，可以调整后再战同一个对手。',
-  '击败第 10 轮的古龙即通关。',
+  '点锁住的格子花金币扩背包；每赢一轮，从两个事件里选一个。',
+  '击败第 10 轮的古龙即通关，之后可以进无尽模式。',
 ];
 
 export class RulesPanel extends Panel {
@@ -310,8 +311,8 @@ export class RulesPanel extends Panel {
       ctx.fill();
       text(ctx, String(i + 1), 64, y + 2, { size: 15, family: HAND, color: '#fff3e0' });
       const lines = wrap(ctx, s, 240, 15, 700);
-      lines.forEach((l, j) => text(ctx, l, 84, y + j * 22, { size: 15, weight: 700, align: 'left' }));
-      y += Math.max(1, lines.length) * 22 + 22;
+      lines.forEach((l, j) => text(ctx, l, 84, y + j * 21, { size: 15, weight: 700, align: 'left' }));
+      y += Math.max(1, lines.length) * 21 + 14;
     });
     text(ctx, '拖拽中：第二根手指轻点 / R / 右键 / 滚轮 = 旋转', 195, r.y + r.h - 40, { size: 11, weight: 700, color: C.inkSoft });
     this.closeB.draw(ctx, time, real);
