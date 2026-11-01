@@ -1,5 +1,5 @@
 // ★ 唯一的玩法数值来源。所有可调数值集中在这里。
-import type { EnemyDef, EventId, ItemDef, ItemId } from './game/types.ts';
+import type { AffixId, EnemyDef, EventId, ItemDef, ItemId } from './game/types.ts';
 
 export const BAG = {
   cols: 6,
@@ -80,6 +80,41 @@ export const EVENTS = {
   /** 黑市：商店稀有度按"当前轮 + n"掷 */
   marketBoost: 3,
   cacheGold: 6,
+};
+
+/** 敌人词缀：第 fromRound 轮起非首领敌人带 perEnemy 个（按种子掷） */
+export const AFFIX = {
+  fromRound: 4,
+  perEnemy: 1,
+  toughHpMul: 1.25,
+  swiftSpeed: 0.15,
+  armoredReduce: 1,
+  shieldedFrac: 0.15,
+  /** 再生：每 regenEvery 秒回复 regenFrac 生命（至少 1） */
+  regenEvery: 3,
+  regenFrac: 0.025,
+};
+
+/** 难度：逐级叠加；通关第 n 级解锁第 n+1 级；结算时总分 +scoreBonus×级数 */
+export const DIFFICULTY = {
+  names: ['普通', '难度 1', '难度 2', '难度 3', '难度 4'],
+  desc: ['', '首领也带词缀', '敌人生命 +15%', '敌人带 2 个词缀', '开局少 1 颗心'],
+  bossAffixFrom: 1,
+  hpMulFrom: 2,
+  hpMul: 1.15,
+  twoAffixFrom: 3,
+  fewerHeartsFrom: 4,
+  scoreBonus: 0.25,
+  /** 每日挑战：用当天日期当种子，固定这个难度 */
+  dailyTier: 2,
+};
+
+export const AFFIX_DEFS: Record<AffixId, { name: string; desc: string }> = {
+  tough: { name: '坚韧', desc: '生命 +25%' },
+  swift: { name: '迅捷', desc: '冷却速度 +15%' },
+  armored: { name: '铁甲', desc: '每次受击伤害 -1' },
+  shielded: { name: '坚盾', desc: '开场护盾 = 15% 生命' },
+  regen: { name: '再生', desc: '每 3 秒回复 2.5% 生命' },
 };
 
 export const EVENT_DEFS: Record<EventId, { name: string; glyph: string }> = {

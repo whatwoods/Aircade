@@ -1,5 +1,5 @@
 // HUD：心、轮次签、金币栏、敌情卡 / 详情条、桌边暂存槽
-import { ITEMS, PLAYER, RARITY_NAMES, ROUNDS, TAG_NAMES } from '../../config.ts';
+import { AFFIX_DEFS, ITEMS, PLAYER, RARITY_NAMES, ROUNDS, TAG_NAMES } from '../../config.ts';
 import type { Rolling } from '../../core/tween.ts';
 import { ease } from '../../core/tween.ts';
 import type { EnemyDef, ItemId, Lv, Placed } from '../../game/types.ts';
@@ -147,7 +147,12 @@ export function drawEnemyCard(ctx: CanvasRenderingContext2D, r: Rect, e: EnemyDe
   text(ctx, e.boss ? '首领：' : '下一位：', 64, 19, { size: 12, weight: 700, color: e.boss ? C.wax : C.inkSoft, align: 'left' });
   const lw = measure(ctx, e.boss ? '首领：' : '下一位：', 12, 700);
   text(ctx, nm, 64 + lw, 19, { size: 16, weight: 900, color: C.ink, align: 'left', maxW: 190 - lw });
-  text(ctx, `♥${e.hp} · ${bag.length} 件装备`, 64, 41, { size: 13, weight: 700, color: C.hp, align: 'left' });
+  const stat = `♥${e.hp} · ${bag.length} 件装备`;
+  text(ctx, stat, 64, 41, { size: 13, weight: 700, color: C.hp, align: 'left' });
+  if (e.affixes?.length) {
+    const sw = measure(ctx, stat, 13, 700);
+    text(ctx, ' · ' + e.affixes.map((a) => AFFIX_DEFS[a].name).join(' '), 64 + sw, 41, { size: 13, weight: 900, color: C.wax, align: 'left' });
+  }
   const cell = 7;
   const mw = e.cols * cell;
   const mh = e.rows * cell;

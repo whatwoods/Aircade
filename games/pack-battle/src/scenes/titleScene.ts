@@ -2,7 +2,7 @@
 import { setMusic } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
 import { clock } from '../core/loop.ts';
-import { loadBest, type BestRecord } from '../game/score.ts';
+import { loadBest, loadDaily, today, unlockedTier, type BestRecord } from '../game/score.ts';
 import { clearRun, loadRun } from '../game/save.ts';
 import { resetTutorialFlag, tutorialDone } from '../game/tutorial.ts';
 import type { RunState } from '../game/types.ts';
@@ -14,7 +14,7 @@ import { C, cached, drawPaper, pat, rivet } from '../render/kit.ts';
 import { LW, stage } from '../render/stage.ts';
 import { LOGO, drawSprite, num, text, type Sprite } from '../render/text.ts';
 import { Button, type UiEl } from '../render/ui/widgets.ts';
-import { RulesPanel, Overlays, SettingsPanel } from './overlays.ts';
+import { RulesPanel, Overlays, SettingsPanel, StartPanel } from './overlays.ts';
 import { factories, gotoScene, type Scene } from './sceneManager.ts';
 
 interface Mote {
@@ -96,7 +96,24 @@ export class TitleScene implements Scene {
       else gotoScene(() => factories.game({ resume: saved }), 0.5, (596 + this.oy + 35) / stage.H);
       return;
     }
-    gotoScene(() => factories.game({ tutorial: !tutorialDone() }), 0.5, (610 + this.oy + 35) / stage.H);
+    this.pickMode((610 + this.oy + 35) / stage.H);
+  }
+
+  /** 打过引导后：先选难度 / 每日挑战 */
+  private pickMode(fy: number): void {
+    if (!tutorialDone()) {
+      gotoScene(() => factories.game({ tutorial: true }), 0.5, fy);
+      return;
+    }
+    const date = today();
+    this.ov.open(
+      new StartPanel(stage.H, unlockedTier(), loadDaily(date)?.score ?? null, (tier, daily) => {
+        clearRun();
+        this.saved = null;
+        const mode = { tier, daily: daily ? date : undefined };
+        gotoScene(() => factories.game({ tutorial: false, mode }), 0.5, fy);
+      }),
+    );
   }
 
   /** 有存档时开新局：二次确认后丢弃存档 */
@@ -107,10 +124,8 @@ export class TitleScene implements Scene {
       return;
     }
     this.start.confirmUntil = 0;
-    clearRun();
-    this.saved = null;
     sfx('click');
-    gotoScene(() => factories.game({ tutorial: !tutorialDone() }), 0.5, (678 + this.oy + 22) / stage.H);
+    this.pickMode((678 + this.oy + 22) / stage.H);
   }
 
   private buttons(): Button[] {

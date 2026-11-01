@@ -1,5 +1,5 @@
 // pnpm bot [局数=200] [起始种子=1]：贪心机器人从商店买装备、摆背包，完整打很多局，统计真实的通关率和每轮数据
-// pnpm bot --blind 不偷看敌人。
+// pnpm bot --blind 不偷看敌人；--tier=N 指定难度。
 // 和 pnpm balance 互补：balance 测手写的参考构筑，bot 测"按商店随机货品一路买下来"能走多远。
 // 机器人的策略（每次整理阶段反复执行，直到没有更好的动作）：
 //   1. 对每张买得起的商店卡：能合成就试合成；否则在背包里找加成最高的位置；背包放不下就试"卖掉一件再放"
@@ -10,7 +10,7 @@
 // 它不会重新整理已经摆好的装备，所以比认真玩的人弱一些，可以看作"普通玩家"的下限。
 import { BAG, ECONOMY, ROUNDS } from '../src/config.ts';
 import { simulate } from '../src/game/battle/sim.ts';
-import { enemyBag, enemyFor, playerMaxHp } from '../src/game/enemies.ts';
+import { enemyBag, playerMaxHp, runEnemy } from '../src/game/enemies.ts';
 import { canPlace, buildOcc, DIRS, isOpen } from '../src/game/grid.ts';
 import {
   applyChoice, applyResult, beginArrange, buy, smithTarget, cellPrice, mergeTargetFor, move, newRun, refresh, sell, startBattle, unlockable, unlockCell, type Dest,
@@ -21,6 +21,8 @@ import type { EventId, ItemInst, Placed, Rot, RunState } from '../src/game/types
 const args = process.argv.slice(2);
 /** --blind：不偷看敌人，只按背包强度粗估买（更像普通玩家）；默认对着本轮敌人真打来挑（接近上限） */
 const BLIND = args.includes('--blind');
+/** --tier N：难度等级 */
+const TIER = Number(args.find((a) => a.startsWith('--tier='))?.slice(7) ?? 0);
 const nums = args.filter((a) => !a.startsWith('--')).map(Number);
 const N = nums[0] ?? 200;
 const SEED0 = nums[1] ?? 1;
@@ -42,11 +44,11 @@ function power(items: readonly Placed[], open: number): number {
 /** 对着本轮敌人真打：赢了 1 + 剩余生命比例，输了 = 打掉敌人生命的比例 */
 function evaluate(run: RunState): number {
   if (BLIND) return power(run.bag, run.open);
-  const e = enemyFor(run.round);
+  const e = runEnemy(run, run.round);
   const maxHp = playerMaxHp(run.round);
   const res = simulate(
     { items: run.bag, cols: BAG.cols, rows: BAG.rows, maxHp, open: run.open },
-    { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits },
+    { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits, affixes: e.affixes },
   );
   return res.winner === 0 ? 1 + res.hpEnd[0] / maxHp : 1 - Math.max(0, res.hpEnd[1]) / e.hp;
 }
@@ -153,6 +155,8 @@ function pickEvent(run: RunState, opts: EventId[]): EventId {
   return opts.reduce((a, b) => (score(b) > score(a) ? b : a));
 }
 const picks = new Map<EventId, number>();
+/** 词缀 → [首战次数, 首战胜] */
+const affixWin = new Map<string, [number, number]>();
 
 interface RoundStat {
   reach: number;
@@ -176,7 +180,7 @@ let scoreSum = 0;
 const diedAt: number[] = new Array(ROUNDS + 1).fill(0);
 
 for (let n = 0; n < N; n++) {
-  const run = newRun(SEED0 + n, false);
+  const run = newRun(SEED0 + n, false, { tier: TIER });
   let counted = 0;
   for (;;) {
     beginArrange(run);
@@ -191,6 +195,13 @@ for (let n = 0; n < N; n++) {
     const attempt = run.attempt;
     const res = startBattle(run);
     const out = applyResult(run, res);
+    for (const a of runEnemy({ seed: run.seed, elite: false, tier: run.tier }, round).affixes ?? []) {
+      if (attempt !== 1) continue;
+      const v = affixWin.get(a) ?? [0, 0];
+      v[0]++;
+      if (out.win) v[1]++;
+      affixWin.set(a, v);
+    }
     if (out.win) {
       st.wins++;
       if (attempt === 1) st.firstWin++;
@@ -219,7 +230,7 @@ for (let n = 0; n < N; n++) {
 
 const pct = (a: number, b: number): string => (b ? Math.round((a / b) * 100) + '%' : '-');
 const avg = (a: number, b: number, d = 1): string => (b ? (a / b).toFixed(d) : '-');
-console.log(`机器人${BLIND ? '（不看敌人）' : ''} ${N} 局（种子 ${SEED0}–${SEED0 + N - 1}）  通关 ${pct(clears, N)}  平均分 ${Math.round(scoreSum / N)}`);
+console.log(`机器人${BLIND ? '（不看敌人）' : ''}${TIER ? ' 难度 ' + TIER : ''} ${N} 局（种子 ${SEED0}–${SEED0 + N - 1}）  通关 ${pct(clears, N)}  平均分 ${Math.round(scoreSum / N)}`);
 console.log('轮  到达   首战胜  平均挑战  赢时剩血  用时s  件数  占格  开放  ★★   ★★★  剩金  死在这轮');
 for (let r = 1; r <= ROUNDS; r++) {
   const s = stats[r];
@@ -232,3 +243,4 @@ for (let r = 1; r <= ROUNDS; r++) {
   );
 }
 console.log('轮间事件选择：' + [...picks].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join('  '));
+console.log('词缀首战胜率：' + [...affixWin].map(([k, [n, w]]) => `${k} ${pct(w, n)}`).join('  '));

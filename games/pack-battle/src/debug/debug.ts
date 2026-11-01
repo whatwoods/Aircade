@@ -1,9 +1,10 @@
 // ?debug=1：FPS 浮层（DOM）+ window.__game 测试 / 审查接口（坐标一律为 CSS 像素）
 import { sfx } from '../audio/sfx.ts';
-import { BAG, ENEMIES, ITEMS, ROUNDS, SCORE } from '../config.ts';
+import { BAG, DIFFICULTY, ENEMIES, ITEMS, ROUNDS, SCORE } from '../config.ts';
+import { save } from '../core/storage.ts';
 import { clock } from '../core/loop.ts';
 import { simulate as runSim } from '../game/battle/sim.ts';
-import { enemyBag, enemyFor, parseBag, playerMaxHp } from '../game/enemies.ts';
+import { enemyBag, enemyFor, parseBag, playerMaxHp, runEnemy } from '../game/enemies.ts';
 import { fullMask } from '../game/grid.ts';
 import { giveItem, unlockCell } from '../game/run.ts';
 import { rollShop } from '../game/shop.ts';
@@ -156,13 +157,13 @@ export function installDebug(): void {
       const g = game();
       if (!g) return { scene: sm.cur?.name ?? null };
       const r = g.run;
-      const e = enemyFor(r.round, r.elite);
+      const e = runEnemy(r, r.round);
       return {
         scene: 'game', phase: g.phase, round: r.round, attempt: r.attempt, hearts: r.hearts, gold: r.gold, score: r.score,
         bag: r.bag.map((i) => ({ uid: i.uid, id: i.id, lv: i.lv, rot: i.rot, x: i.x, y: i.y })),
         stash: r.stash.map((i) => (i ? { uid: i.uid, id: i.id, lv: i.lv, rot: i.rot, slot: i.slot } : null)),
         shop: r.shop.map((s) => ({ id: s.id, price: s.price, lv: s.lv ?? 1 })),
-        locked: r.locked, open: r.open, unlocked: r.unlocked, freeCells: r.freeCells, choice: r.choice, market: r.market, elite: r.elite, enemy: { name: e.name, title: e.title, hp: e.hp, boss: !!e.boss },
+        tier: r.tier, daily: r.daily ?? null, locked: r.locked, open: r.open, unlocked: r.unlocked, freeCells: r.freeCells, choice: r.choice, market: r.market, elite: r.elite, enemy: { name: e.name, title: e.title, hp: e.hp, boss: !!e.boss, affixes: e.affixes ?? [] },
         tutorial: g.tut.step, paused: g.paused, speed: g.bc.speed, overlay: g.ov.top ? g.ov.top.kind : null,
         dragging: !!g.ac.drag, links: g.syn.links.map((l) => ({ from: l.from, to: l.to, kind: l.kind, label: l.label })),
         maxHp: playerMaxHp(r.round), undo: !!g.undo, outcome: g.outcome,
@@ -237,6 +238,11 @@ export function installDebug(): void {
       g.syncViews(true);
       g.recompute(true);
       return r.uid;
+    }),
+    /** 解锁全部难度（写进本地纪录） */
+    unlockTiers: safe(() => {
+      save('tier', DIFFICULTY.names.length - 1);
+      return true;
     }),
     /** 背包全开 */
     openBag: mut(() => {
@@ -323,7 +329,7 @@ export function installDebug(): void {
       gotoScene(() =>
         factories.ending({
           cleared: true, round: ROUNDS, score, roundScores: scores, clearBonus, hearts, seed: run?.seed ?? 0,
-          bestHit: run?.stats.bestHit ?? 0, merges: run?.stats.merges ?? 0, spent: run?.stats.spent ?? 0, killer: null, killerName: '', debug: true,
+          bestHit: run?.stats.bestHit ?? 0, merges: run?.stats.merges ?? 0, spent: run?.stats.spent ?? 0, killer: null, killerName: '', debug: true, tier: 0, tierBonus: 0,
         }),
       );
       return true;
@@ -337,7 +343,7 @@ export function installDebug(): void {
         factories.ending({
           cleared: false, round, score: run?.score ?? 0, roundScores: run ? run.stats.roundScores.slice() : [], clearBonus: 0, hearts: 0,
           seed: run?.seed ?? 0, bestHit: run?.stats.bestHit ?? 0, merges: run?.stats.merges ?? 0, spent: run?.stats.spent ?? 0,
-          killer: e.portrait, killerName: `${e.title}「${e.name}」`, debug: true,
+          killer: e.portrait, killerName: `${e.title}「${e.name}」`, debug: true, tier: 0, tierBonus: 0,
         }),
       );
       return true;
@@ -353,10 +359,10 @@ export function installDebug(): void {
       const g = game();
       if (!g) return fail('不在游戏中');
       const r = g.run;
-      const e = enemyFor(r.round, r.elite);
+      const e = runEnemy(r, r.round);
       const res = runSim(
         { items: r.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(r.round), open: r.open },
-        { items: enemyBag(r.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits },
+        { items: enemyBag(r.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits, affixes: e.affixes },
       );
       return { winner: res.winner, duration: +res.duration.toFixed(2), hpEnd: res.hpEnd, events: res.events.length };
     }),

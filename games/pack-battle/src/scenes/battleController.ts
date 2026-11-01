@@ -4,7 +4,7 @@ import { sfx } from '../audio/sfx.ts';
 import { BATTLE, ECONOMY, FX, ITEMS, TUTORIAL } from '../config.ts';
 import { Spring } from '../core/spring.ts';
 import { Playback } from '../game/battle/playback.ts';
-import { enemyBag, enemyFor } from '../game/enemies.ts';
+import { enemyBag, enemyFor, runEnemy } from '../game/enemies.ts';
 import { badgeCell, shapeOf } from '../game/shapes.ts';
 import { computeSynergy, type SynergyResult } from '../game/synergy.ts';
 import type { BattleEvent, BattleResult, EnemyDef, ItemId, ItemInst, Placed, Side } from '../game/types.ts';
@@ -120,7 +120,7 @@ export class BattleController {
     const gs = this.gs;
     const round = gs.run.round;
     this.res = res;
-    this.e = enemyFor(round, gs.run.elite);
+    this.e = runEnemy(gs.run, round);
     this.eItems = enemyBag(round);
     this.layout();
     this.eSyn = computeSynergy(this.eItems, this.e.cols, this.e.rows);

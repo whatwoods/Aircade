@@ -1,7 +1,8 @@
 // 从 ASCII 布局解析背包（敌人与参考构筑共用）
-import { ENEMIES, EVENTS, ITEMS, PLAYER } from '../config.ts';
+import { AFFIX, DIFFICULTY, ENEMIES, EVENTS, ITEMS, PLAYER } from '../config.ts';
+import { derive } from '../core/rng.ts';
 import { cellsKey, shapeOf, type Cell } from './shapes.ts';
-import type { EnemyDef, ItemId, Lv, Placed, Rot } from './types.ts';
+import type { AffixId, EnemyDef, ItemId, Lv, Placed, Rot, RunState } from './types.ts';
 
 /**
  * layout：每行一个字符串，'.' 或空格为空格子；legend：字母 → "id[:lv][方向]"
@@ -65,13 +66,42 @@ export function parseBag(layout: string[], legend: Record<string, string>, uidSt
   return out;
 }
 
-const eliteCache = new Map<number, EnemyDef>();
-/** elite = 轮间事件"精英"：生命 ×EVENTS.eliteHpMul，称号前加"精英" */
-export function enemyFor(round: number, elite = false): EnemyDef {
-  const e = ENEMIES[Math.max(0, Math.min(ENEMIES.length - 1, round - 1))];
-  if (!elite) return e;
-  let x = eliteCache.get(round);
-  if (!x) eliteCache.set(round, (x = { ...e, hp: Math.round(e.hp * EVENTS.eliteHpMul), title: '精英' + e.title }));
+/** 敌人原表（不含精英、词缀） */
+export function enemyFor(round: number): EnemyDef {
+  return ENEMIES[Math.max(0, Math.min(ENEMIES.length - 1, round - 1))];
+}
+
+const ALL_AFFIXES: AffixId[] = ['tough', 'swift', 'armored', 'shielded', 'regen'];
+
+/** 这一局第 round 轮敌人的词缀（确定性：hash(seed, 'affix', round)） */
+export function affixesFor(seed: number, round: number, tier = 0): AffixId[] {
+  const e = enemyFor(round);
+  let n = 0;
+  if (e.boss) n = tier >= DIFFICULTY.bossAffixFrom ? 1 : 0;
+  else if (round >= AFFIX.fromRound) n = tier >= DIFFICULTY.twoAffixFrom ? 2 : AFFIX.perEnemy;
+  if (n === 0) return [];
+  const rng = derive(seed, 'affix', round);
+  const pool = [...ALL_AFFIXES];
+  const out: AffixId[] = [];
+  for (let i = 0; i < n && pool.length; i++) out.push(pool.splice(Math.floor(rng.next() * pool.length), 1)[0]);
+  return out;
+}
+
+const runEnemyCache = new Map<string, EnemyDef>();
+/** 本局实际遇到的敌人：词缀（坚韧加生命）+ 精英（生命 ×EVENTS.eliteHpMul，称号前加"精英"） */
+export function runEnemy(run: Pick<RunState, 'seed' | 'elite' | 'tier'>, round: number): EnemyDef {
+  const affixes = affixesFor(run.seed, round, run.tier);
+  const key = round + '|' + run.elite + '|' + run.tier + '|' + affixes.join(',');
+  let x = runEnemyCache.get(key);
+  if (!x) {
+    const e = enemyFor(round);
+    let hp = e.hp;
+    if (affixes.includes('tough')) hp *= AFFIX.toughHpMul;
+    if (run.elite) hp *= EVENTS.eliteHpMul;
+    if (run.tier >= DIFFICULTY.hpMulFrom) hp *= DIFFICULTY.hpMul;
+    x = { ...e, hp: Math.round(hp), title: (run.elite ? '精英' : '') + e.title, affixes };
+    runEnemyCache.set(key, x);
+  }
   return x;
 }
 

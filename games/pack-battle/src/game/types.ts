@@ -150,6 +150,12 @@ export interface RunState {
   elite: boolean;
   /** 精英赏金，下次整理时发放 */
   eliteGold: number;
+  /** 难度等级（0 = 普通） */
+  tier: number;
+  /** 每日挑战的日期（YYYY-MM-DD），普通局为空 */
+  daily?: string;
+  /** 结算时的难度加成分 */
+  tierBonus: number;
   /** 被调试接口改过：不存档、不计最高分 */
   debug?: boolean;
 }
@@ -207,6 +213,9 @@ export type TraitDef =
   | { kind: 'enrage'; at: number; speed: number }
   | { kind: 'dragonRage'; at: number; trueDmg: number; speed: number };
 
+/** 敌人词缀（开局静态生效） */
+export type AffixId = 'tough' | 'swift' | 'armored' | 'shielded' | 'regen';
+
 export type FrameStyle =
   | 'moss' | 'patch' | 'silk' | 'bone' | 'hide' | 'crate' | 'wicker' | 'iron' | 'shadow' | 'gold';
 
@@ -228,6 +237,8 @@ export interface EnemyDef {
   hint: string;
   portrait: PortraitId;
   boss?: boolean;
+  /** 本局这个敌人带的词缀（由 runEnemy 填） */
+  affixes?: AffixId[];
 }
 
 export type BattleEventType =

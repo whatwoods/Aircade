@@ -2,7 +2,7 @@
 import { applyVolumes } from '../audio/audio.ts';
 import { setMusic, musicMode } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
-import { BATTLE, ENEMIES, EVENT_DEFS, ITEMS, RARITY_NAMES, ROUNDS, TAG_NAMES } from '../config.ts';
+import { AFFIX_DEFS, BATTLE, DIFFICULTY, ENEMIES, EVENT_DEFS, ITEMS, RARITY_NAMES, ROUNDS, TAG_NAMES } from '../config.ts';
 import { saveSettings, settings } from '../core/storage.ts';
 import { ease } from '../core/tween.ts';
 import { enemyBag } from '../game/enemies.ts';
@@ -553,7 +553,7 @@ export class DrawerPanel extends Panel {
     this.list = [...seen.values()];
     // 高度按内容自适应（底边不动）
     const cell = Math.min(40, Math.floor((r.w - 40) / e.cols));
-    const want = 70 + e.rows * cell + 26 + e.traits.length * 22 + 24 + this.list.length * 40 + 64;
+    const want = 70 + e.rows * cell + 26 + (e.traits.length + (e.affixes?.length ?? 0)) * 22 + 24 + this.list.length * 40 + 64;
     const h = Math.max(300, Math.min(r.h, want));
     this.r = r = { x: r.x, y: r.y + r.h - h, w: r.w, h };
     this.closeB = new Button('drawer.close', R(r.x + r.w - 46, r.y + 6, 40, 40), '', 'coin', 61);
@@ -618,6 +618,10 @@ export class DrawerPanel extends Panel {
       text(ctx, d.effect, r.x + 24, y + 22, { size: 13, weight: 700, align: 'left', maxW: r.w - 48 });
       y += 48;
     } else {
+      for (const a of e.affixes ?? []) {
+        text(ctx, `◆ ${AFFIX_DEFS[a].name}：${AFFIX_DEFS[a].desc}`, r.x + 24, y, { size: 13, weight: 800, color: C.wax, align: 'left', maxW: r.w - 48 });
+        y += 22;
+      }
       for (const tr of e.traits) {
         const s = tr.kind === 'enrage' ? `半血狂暴：全部冷却速度 +${Math.round(tr.speed * 100)}%` : `龙怒：半血时喷吐 ${tr.trueDmg} 真实伤害，冷却速度 +${Math.round(tr.speed * 100)}%`;
         text(ctx, '◆ ' + s, r.x + 24, y, { size: 13, weight: 800, color: C.wax, align: 'left', maxW: r.w - 48 });
@@ -847,5 +851,76 @@ export class ChoicePanel extends Panel {
       c.desc.forEach((l, j) => text(ctx, l, br.x + br.w / 2, br.y + 160 + j * 24, { size: 15, weight: 700, color: C.inkSoft }));
       ctx.restore();
     });
+  }
+}
+
+// ---------- 选择冒险（难度 / 每日挑战） ----------
+
+export class StartPanel extends Panel {
+  readonly kind = 'StartPanel';
+  private oy: number;
+  private unlocked: number;
+  private dailyBest: number | null;
+  private onPick: (tier: number, daily: boolean) => void;
+  private closeB: Button;
+  private rows: Button[];
+  private dailyB: Button;
+  constructor(H: number, unlocked: number, dailyBest: number | null, onPick: (tier: number, daily: boolean) => void) {
+    super();
+    this.oy = (H - 844) / 2;
+    this.unlocked = unlocked;
+    this.dailyBest = dailyBest;
+    this.onPick = onPick;
+    const r = this.rect();
+    this.closeB = new Button('start.close', R(r.x + r.w - 48, r.y + 8, 40, 40), '', 'coin', 80);
+    this.closeB.icon = 'close';
+    this.rows = DIFFICULTY.names.map((n, i) => {
+      const b = new Button('start.tier' + i, R(r.x + 20, r.y + 70 + i * 58, r.w - 40, 50), n, 'paper', 81 + i);
+      b.enabled = i <= unlocked;
+      return b;
+    });
+    this.dailyB = new Button('start.daily', R(r.x + 20, r.y + 70 + DIFFICULTY.names.length * 58 + 14, r.w - 40, 50), '每日挑战', 'paper', 90);
+    this.buttons = [this.closeB, ...this.rows, this.dailyB];
+  }
+  rect(): Rect {
+    return R(16, 150 + this.oy, 358, 70 + DIFFICULTY.names.length * 58 + 14 + 50 + 24);
+  }
+  activate(b: Button): void {
+    if (this.closing) return;
+    if (b === this.closeB) {
+      this.close();
+      return;
+    }
+    const daily = b === this.dailyB;
+    const tier = daily ? DIFFICULTY.dailyTier : this.rows.indexOf(b);
+    this.close();
+    this.onPick(tier, daily);
+  }
+  drawBody(ctx: CanvasRenderingContext2D, time: number, real: number): void {
+    const r = this.rect();
+    drawPanel(ctx, r, 41);
+    titleText(ctx, '选择冒险', 195, r.y + 40, 26);
+    const row = (b: Button, label: string, desc: string, locked: boolean, k: number): void => {
+      const br = b.r;
+      const s = this.pressed === b ? 0.97 : 1;
+      ctx.save();
+      ctx.translate(br.x + br.w / 2, br.y + br.h / 2);
+      ctx.scale(s, s);
+      ctx.translate(-(br.x + br.w / 2), -(br.y + br.h / 2));
+      ctx.globalAlpha *= locked ? 0.45 : 1;
+      ctx.fillStyle = k > 0 ? rgba(C.wax, 0.06 + 0.04 * k) : 'rgba(43,29,20,0.06)';
+      ctx.strokeStyle = 'rgba(43,29,20,0.35)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.roundRect(br.x, br.y, br.w, br.h, 6);
+      ctx.fill();
+      ctx.stroke();
+      text(ctx, label, br.x + 16, br.y + br.h / 2, { size: 18, weight: 900, align: 'left' });
+      if (desc) text(ctx, desc, br.x + br.w - 14, br.y + br.h / 2, { size: 13, weight: 700, color: C.inkSoft, align: 'right' });
+      ctx.restore();
+    };
+    this.rows.forEach((b, i) => row(b, DIFFICULTY.names[i], DIFFICULTY.desc[i], i > this.unlocked, i / 4));
+    row(this.dailyB, '每日挑战', this.dailyBest != null ? `今日最高 ${this.dailyBest}` : DIFFICULTY.names[DIFFICULTY.dailyTier], false, 0.6);
+    this.closeB.draw(ctx, time, real);
   }
 }

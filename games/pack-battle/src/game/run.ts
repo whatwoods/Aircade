@@ -1,23 +1,29 @@
 // 一局的状态与所有规则操作（纯逻辑，无 DOM）
-import { BAG, ECONOMY, EVENTS, ITEMS, PLAYER, ROUNDS, SCORE, SHOP } from '../config.ts';
+import { BAG, DIFFICULTY, ECONOMY, EVENTS, ITEMS, PLAYER, ROUNDS, SCORE, SHOP } from '../config.ts';
 import { derive } from '../core/rng.ts';
 import { simulate } from './battle/sim.ts';
 import { receiptFor, sellPrice, type ReceiptLine } from './economy.ts';
-import { enemyBag, enemyFor, playerMaxHp } from './enemies.ts';
+import { enemyBag, enemyFor, playerMaxHp, runEnemy } from './enemies.ts';
 import { buildOcc, canPlace, DIRS, findFit, isOpen, NUDGES, rectMask, type Occ } from './grid.ts';
 import { winScore } from './score.ts';
 import { rollShop } from './shop.ts';
 import { shapeOf } from './shapes.ts';
 import type { BattleResult, EventId, ItemId, ItemInst, Lv, Rot, RunState } from './types.ts';
 
-export function newRun(seed: number, tutorial: boolean): RunState {
+export interface RunMode {
+  tier: number;
+  daily?: string;
+}
+
+export function newRun(seed: number, tutorial: boolean, mode: RunMode = { tier: 0 }): RunState {
+  const tier = tutorial ? 0 : mode.tier;
   return {
-    seed, round: 1, attempt: 1, hearts: PLAYER.hearts, gold: 0, score: 0, phase: 'receipt',
+    seed, round: 1, attempt: 1, hearts: PLAYER.hearts - (tier >= DIFFICULTY.fewerHeartsFrom ? 1 : 0), gold: 0, score: 0, phase: 'receipt',
     bag: [], stash: new Array<ItemInst | null>(SHOP.stashSlots).fill(null), shop: [], locked: false,
     refreshIndex: 0, phaseStamp: 0, lastResult: null, pouchGold: 0, savedGold: 0, lastHpRatio: 0,
     tutorial, cleared: false, stats: { bestHit: 0, merges: 0, spent: 0, roundScores: [], wins: 0 }, nextUid: 1,
     open: rectMask(BAG.cols, BAG.start), unlocked: 0,
-    choice: null, freeCells: 0, market: false, elite: false, eliteGold: 0,
+    choice: null, freeCells: 0, market: false, elite: false, eliteGold: 0, tier, daily: tutorial ? undefined : mode.daily, tierBonus: 0,
   };
 }
 
@@ -285,10 +291,10 @@ export function startBattle(run: RunState): BattleResult {
   for (const it of run.bag) if (it.id === 'pouch') pouch += ITEMS.pouch.lv[it.lv - 1].gold ?? 0;
   run.pouchGold = pouch;
   run.market = false;
-  const e = enemyFor(run.round, run.elite);
+  const e = runEnemy(run, run.round);
   const res = simulate(
     { items: run.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(run.round), open: run.open },
-    { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits },
+    { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits, affixes: e.affixes },
   );
   run.phase = 'battle';
   return res;
@@ -333,6 +339,10 @@ export function applyResult(run: RunState, res: BattleResult): Outcome {
     run.lastResult = 'loss';
     run.attempt++;
     if (run.hearts <= 0) ending = true;
+  }
+  if (ending && run.tier > 0) {
+    run.tierBonus = Math.round(run.score * DIFFICULTY.scoreBonus * run.tier);
+    run.score += run.tierBonus;
   }
   run.phase = ending ? 'ending' : 'result';
   return { win, gain, ending, clearBonus };

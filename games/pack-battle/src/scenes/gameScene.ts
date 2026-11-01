@@ -11,11 +11,11 @@ import { Rolling, ease } from '../core/tween.ts';
 import type { ReceiptLine } from '../game/economy.ts';
 import { battleReport, type SideReport } from '../game/report.ts';
 import { clearRun, saveRun, saveable } from '../game/save.ts';
-import { clearScore } from '../game/score.ts';
-import { enemyBag, enemyFor } from '../game/enemies.ts';
+import { clearScore, dailySeed } from '../game/score.ts';
+import { enemyBag, enemyFor, runEnemy } from '../game/enemies.ts';
 import {
   applyChoice, applyResult, beginArrange, canUnlock, mergeTargetFor, smithTarget, cellPrice, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, unlockable, unlockCell,
-  type Outcome, type SellRecord,
+  type Outcome, type RunMode, type SellRecord,
 } from '../game/run.ts';
 import { fullMask } from '../game/grid.ts';
 import { computeSynergy, type SynergyResult } from '../game/synergy.ts';
@@ -125,10 +125,10 @@ export class GameScene implements Scene {
   private saveT = 0;
   private lastSave = '';
 
-  constructor(o: { seed?: number; tutorial?: boolean; round?: number; resume?: RunState }) {
-    const seed = o.seed ?? (Date.now() % 1000000);
+  constructor(o: { seed?: number; tutorial?: boolean; round?: number; resume?: RunState; mode?: RunMode }) {
+    const seed = o.mode?.daily ? dailySeed(o.mode.daily) : o.seed ?? (Date.now() % 1000000);
     this.resumed = !!o.resume;
-    this.run = o.resume ?? newRun(seed, !!o.tutorial);
+    this.run = o.resume ?? newRun(seed, !!o.tutorial, o.mode);
     this.pauseB = new Button('btn.pause', { x: 12, y: 8, w: 44, h: 44 }, '', 'coin', 3);
     this.pauseB.icon = 'pause';
     this.fightB = new Button('btn.fight', { x: 95, y: 732, w: 200, h: 60 }, '开战', 'plank', 5);
@@ -627,7 +627,8 @@ export class GameScene implements Scene {
         restart: () => {
           this.ov.closeAll();
           clearRun();
-          gotoScene(() => factories.game({ tutorial: false }));
+          const mode = { tier: this.run.tier, daily: this.run.daily };
+          gotoScene(() => factories.game({ tutorial: false, mode }));
         },
         title: () => {
           this.ov.closeAll();
@@ -639,7 +640,7 @@ export class GameScene implements Scene {
 
   openReport(): void {
     if (!this.report) return;
-    const e = enemyFor(this.battleRound);
+    const e = runEnemy({ seed: this.run.seed, elite: false, tier: this.run.tier }, this.battleRound);
     this.ov.open(new ReportPanel(stage.H, this.report, e.title));
   }
 
@@ -925,7 +926,7 @@ export class GameScene implements Scene {
       ctx.translate(0, -this.tr.enemy * 40);
       const showDetail = this.detail && this.phase !== 'toBattle';
       if (showDetail && this.detail) drawDetailBar(ctx, L.enemyCard, this.detail.info, this.detail.t);
-      else drawEnemyCard(ctx, L.enemyCard, enemyFor(this.run.round, this.run.elite), enemyBag(this.run.round), this.enemyFlip, time);
+      else drawEnemyCard(ctx, L.enemyCard, runEnemy(this.run, this.run.round), enemyBag(this.run.round), this.enemyFlip, time);
       ctx.restore();
     }
   }
@@ -1238,7 +1239,7 @@ export class GameScene implements Scene {
         this.pressedHud = null;
         if (ph && tap) {
           if (ph === 'round') this.ov.open(new RoutePanel(this.run.round, this.run.round - 1));
-          else if (ph === 'enemy') this.ov.open(new DrawerPanel(this.L.drawer, enemyFor(this.run.round, this.run.elite), this.run.round));
+          else if (ph === 'enemy') this.ov.open(new DrawerPanel(this.L.drawer, runEnemy(this.run, this.run.round), this.run.round));
           return;
         }
         if (this.phase === 'arrange') this.ac.up(x, y, tap);
@@ -1439,7 +1440,7 @@ export function endingData(run: RunState): EndingData {
     cleared: run.cleared, round: run.round, score: run.score, roundScores: run.stats.roundScores.slice(),
     clearBonus: run.cleared ? clearScore(run.hearts) : 0, hearts: run.hearts, seed: run.seed, bestHit: run.stats.bestHit,
     merges: run.stats.merges, spent: run.stats.spent, killer: run.cleared ? null : e.portrait, killerName: `${e.title}「${e.name}」`,
-    debug: run.debug,
+    debug: run.debug, tier: run.tier, tierBonus: run.tierBonus, daily: run.daily,
   };
 }
 

@@ -1,12 +1,12 @@
 // 结局页：冒险者证书（分数逐行累加、总分、历史最高 / 新纪录印章、趣味统计、种子）+ 再来一局 / 标题
 import { setMusic } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
-import { SCORE } from '../config.ts';
+import { DIFFICULTY, SCORE } from '../config.ts';
 import type { InputHandler } from '../core/input.ts';
 import { clock } from '../core/loop.ts';
 import { Rolling, ease } from '../core/tween.ts';
 import { clearRun } from '../game/save.ts';
-import { loadBest, submitBest, type BestRecord } from '../game/score.ts';
+import { loadBest, loadDaily, submitBest, submitDaily, unlockTier } from '../game/score.ts';
 import { emit } from '../render/fx/particles.ts';
 import { tier } from '../render/fx/shake.ts';
 import { C, paper } from '../render/kit.ts';
@@ -30,8 +30,10 @@ export class EndingScene implements Scene {
   private shown = 0;
   private t = 0;
   private total = new Rolling(0, 0.25);
-  private best: BestRecord | null = null;
-  private prevBest: BestRecord | null = null;
+  private best: { score: number } | null = null;
+  private prevBest: { score: number } | null = null;
+  /** 这一局通关解锁的新难度（没有则 -1） */
+  private unlocked = -1;
   private isRecord = false;
   /** 证书顶部与高度（随内容行数自适应，证书 + 按钮整体垂直居中） */
   private py = 90;
@@ -59,6 +61,7 @@ export class EndingScene implements Scene {
       this.lines.push({ label: '通关奖励', amount: SCORE.clearBonus });
       if (d.hearts > 0) this.lines.push({ label: `剩余心 ×${d.hearts}`, amount: SCORE.heartBonus * d.hearts });
     }
+    if (d.tierBonus > 0) this.lines.push({ label: `${DIFFICULTY.names[d.tier]} 加成`, amount: d.tierBonus });
     this.again = new Button('btn.again', { x: 40, y: 728, w: 210, h: 64 }, '再来一局', 'sealTag', 31);
     this.again.glyph = '↻';
     this.share = new Button('btn.share', { x: 218, y: 728, w: 66, h: 64 }, '分享', 'paper', 33);
@@ -68,10 +71,14 @@ export class EndingScene implements Scene {
 
   enter(): void {
     clearRun();
-    const prev = loadBest();
+    const d = this.d;
+    const prev = d.daily ? loadDaily(d.daily) : loadBest();
     this.prevBest = prev;
-    this.isRecord = !this.d.debug && submitBest({ score: this.d.score, round: this.d.round, cleared: this.d.cleared, date: Date.now() });
-    this.best = this.isRecord ? { score: this.d.score, round: this.d.round, cleared: this.d.cleared, date: Date.now() } : prev;
+    if (d.debug) this.isRecord = false;
+    else if (d.daily) this.isRecord = submitDaily({ date: d.daily, score: d.score, round: d.round, cleared: d.cleared });
+    else this.isRecord = submitBest({ score: d.score, round: d.round, cleared: d.cleared, date: Date.now() });
+    this.best = this.isRecord ? { score: d.score } : prev;
+    if (!d.debug && !d.daily && d.cleared && unlockTier(d.tier)) this.unlocked = d.tier + 1;
     setMusic(null);
     if (this.d.cleared) {
       sfx('victory', 0, 0.3);
@@ -105,7 +112,10 @@ export class EndingScene implements Scene {
   }
 
   private activate(b: Button): void {
-    if (b === this.again) gotoScene(() => factories.game({ tutorial: false }));
+    if (b === this.again) {
+      const mode = { tier: this.d.tier, daily: this.d.daily };
+      gotoScene(() => factories.game({ tutorial: false, mode }));
+    }
     else if (b === this.share) this.doShare();
     else gotoScene(() => factories.title());
   }
@@ -274,7 +284,8 @@ export class EndingScene implements Scene {
     const a = Math.min(1, (t - 0.3) / 0.25);
     ctx.save();
     ctx.globalAlpha *= a;
-    text(ctx, '冒 险 者 证 书', 195, py + 40, { size: 15, weight: 900, color: C.inkSoft, spacing: 3 });
+    const mode = d.daily ? '每日挑战 ' + d.daily : d.tier > 0 ? DIFFICULTY.names[d.tier] : '';
+    text(ctx, '冒 险 者 证 书' + (mode ? ' · ' + mode : ''), 195, py + 40, { size: 15, weight: 900, color: C.inkSoft, spacing: mode ? 1 : 3 });
     text(ctx, d.cleared ? '通关！十轮全胜' : `冒险终结于第 ${d.round} 轮`, 195, py + 76, {
       size: 26, weight: 900, color: d.cleared ? C.wax : C.ink, spacing: 2,
     });
@@ -309,7 +320,8 @@ export class EndingScene implements Scene {
     const by = ty + 52;
     // 破纪录时：盖章那一刻才把"历史最高"换成新分数
     const b = this.recordT >= 0 ? this.best : this.prevBest;
-    text(ctx, `历史最高 ${b ? num(b.score) : '—'}`, 64, by, { size: 14, weight: 700, color: C.inkSoft, align: 'left' });
+    text(ctx, `${d.daily ? '今日最高' : '历史最高'} ${b ? num(b.score) : '—'}`, 64, by, { size: 14, weight: 700, color: C.inkSoft, align: 'left' });
+    if (this.unlocked > 0) text(ctx, `解锁${DIFFICULTY.names[this.unlocked]}`, 64, by + 20, { size: 13, weight: 900, color: C.wax, align: 'left' });
     this.stampY = by - 4;
     if (this.recordT >= 0 && this.isRecord && d.score > 0) {
       const st = Math.min(1, this.recordT / 0.12);
