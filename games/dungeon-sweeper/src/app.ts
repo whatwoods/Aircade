@@ -14,6 +14,7 @@ import { type BoardData, LAIR_DIST, N, cx, cy, generateBoard } from './game/boar
 import { Game, pickBoard, type RunSave } from './game/rules';
 import { beginDaily, type DailyInfo, type DailyRec, dailyInfo, dailySeed, finishDaily, todayKey } from './game/daily';
 import { checkAchievements } from './game/achievements';
+import { type BlessId, blessDef } from './game/blessings';
 import { DIFF_IDS, type DiffId, isDiff } from './game/difficulty';
 import { commitRecords, recordsKey } from './game/score';
 import { type TutStep, Tutorial } from './game/tutorial';
@@ -362,7 +363,9 @@ export class App implements Stage, InputHandler {
     const g = this.game;
     const hud = this.hud;
     // 计时（R11）
-    if (this.state === 'playing' && this.timerOn && !this.tut.active && g.phase === 'playing') g.timeMs += rdt;
+    if (this.state === 'playing' && this.timerOn && !this.tut.active && g.phase === 'playing' && !this.screens.blessOpen) g.timeMs += rdt;
+    // 祝福：升级演出播完再弹三选一（读档回来有待选的也在这里弹）
+    if (g.offer && g.phase === 'playing' && this.state === 'playing' && !this.director.busy && !this.screens.modalOpen) this.openBless(g.offer);
     hud.timeSec = Math.floor(g.timeMs / 1000);
     this.board.hpShown = hud.hp;
     // 巨龙显露
@@ -504,7 +507,7 @@ export class App implements Stage, InputHandler {
     this.resetScene(deal);
     this.board.reset(this.game, deal, this.clock.world);
     const p = this.game.player;
-    this.hud.sync(p.level, p.hp, p.xp, 0, this.game.alive);
+    this.hud.sync(p.level, p.hp, p.xp, 0, this.game.alive, this.game.bonusHp, this.game.blessings.map((b) => blessDef(b).seal));
     this.tw.set(this.hud.bars, 0);
     this.tw.to(this.hud.bars, 1, 600, this.clock.world, cubicOut, deal ? 600 : 200);
     this.closeRadial();
@@ -562,7 +565,7 @@ export class App implements Stage, InputHandler {
     this.resetScene(false);
     this.board.restore(g);
     const p = g.player;
-    this.hud.sync(p.level, p.hp, p.xp, g.score, g.alive);
+    this.hud.sync(p.level, p.hp, p.xp, g.score, g.alive, g.bonusHp, g.blessings.map((b) => blessDef(b).seal));
     this.tw.set(this.hud.bars, 0);
     this.tw.to(this.hud.bars, 1, 600, this.clock.world, cubicOut, 200);
     this.tw.to(this.ov.brazier, 1, 450, this.clock.world, cubicOut, 200);
@@ -640,8 +643,21 @@ export class App implements Stage, InputHandler {
     }, 320);
   }
 
+  private openBless(offer: readonly BlessId[]): void {
+    this.closeRadial();
+    this.pressing = false;
+    this.downCell = -1;
+    this.board.pressCell = -1;
+    this.sfx.levelUp(1);
+    void this.screens.blessPick(offer).then((id) => {
+      this.sfx.button();
+      if (this.game.phase === 'playing') this.playEvents(this.game.chooseBlessing(id));
+    });
+  }
+
   pause(): void {
     if (this.state !== 'playing' && this.state !== 'intro') return;
+    if (this.screens.blessOpen) return;
     if (this.director.locked) return;
     this.closeRadial();
     this.state = 'paused';
@@ -1287,6 +1303,11 @@ export class App implements Stage, InputHandler {
   // ================================================================== 键盘
   private key(e: KeyboardEvent): void {
     const k = e.key;
+    if (this.screens.blessOpen) {
+      const o = this.game.offer;
+      if (o && k >= '1' && k <= String(o.length)) this.screens.resolveBless(o[+k - 1]);
+      return;
+    }
     if (this.screens.dialogOpen) {
       if (k === 'Escape') this.screens.resolveDialog(false);
       else if (k === 'Enter') this.screens.resolveDialog(true);

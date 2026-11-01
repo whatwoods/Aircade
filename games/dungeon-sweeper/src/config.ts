@@ -3,6 +3,29 @@
 //  字段名与 docs/dungeon-sweeper.md §3.6 一一对应。调平衡只改这里。
 // ============================================================================
 
+/** 祝福的数值字段（见 CONFIG.blessings） */
+export interface BlessCfg {
+  hp?: number;
+  noPotion?: boolean;
+  noChestXp?: boolean;
+  goldHalf?: boolean;
+  potionHeal?: number;
+  potionFull?: boolean;
+  dmgAll?: number;
+  killHeal?: number;
+  killHealMinLevel?: number;
+  killXp?: number;
+  freeMaxLevel?: number;
+  reduceMinLevel?: number;
+  reduce?: number;
+  lowMax?: number;
+  lowAdd?: number;
+  chestXp?: number;
+  goldMult?: number;
+  count?: number;
+  perLevel?: number;
+}
+
 export interface Band {
   min: number;
   max: number;
@@ -104,11 +127,32 @@ export const CONFIG = {
    * 各档胜率目标与 pnpm sim 实测见文档 §3.8。
    */
   difficulty: {
-    easy: { name: '学徒', countsDelta: {} as Record<number, number>, potionCount: 4, dragonLevel: 11, minHpToChallenge: 12 },
-    normal: { name: '冒险者', countsDelta: {} as Record<number, number>, potionCount: 3, dragonLevel: 13, minHpToChallenge: 14 },
-    hard: { name: '英雄', countsDelta: {} as Record<number, number>, potionCount: 3, dragonLevel: 15, minHpToChallenge: 16 },
+    easy: { name: '学徒', countsDelta: {} as Record<number, number>, potionCount: 4, dragonLevel: 11, minHpToChallenge: 12, blessLevels: [5, 9] },
+    normal: { name: '冒险者', countsDelta: {} as Record<number, number>, potionCount: 3, dragonLevel: 13, minHpToChallenge: 14, blessLevels: [6, 10] },
+    hard: { name: '英雄', countsDelta: {} as Record<number, number>, potionCount: 3, dragonLevel: 15, minHpToChallenge: 16, blessLevels: [11] },
   },
   defaultDifficulty: 'normal' as 'easy' | 'normal' | 'hard',
+
+  /**
+   * 祝福（文档 §3.10）：升到 difficulty.*.blessLevels 时三选一，每种一局最多一次；引导局没有。
+   * 每张的收益写在专属字段里，代价用通用字段：hp 生命上限增减、noPotion 血瓶失效、
+   * noChestXp 宝箱不给经验、goldHalf 宝箱金币减半、potionHeal 血瓶回复增减、dmgAll 所有伤害增减。
+   */
+  blessings: {
+    offerCount: 3,
+    cards: {
+      vigor: { hp: 2, noPotion: true },
+      leech: { killHeal: 1, killHealMinLevel: 2, hp: -1 },
+      butcher: { freeMaxLevel: 2 },
+      armor: { reduceMinLevel: 5, reduce: 1, lowMax: 1, lowAdd: 1 },
+      greed: { chestXp: 3, goldMult: 2, potionHeal: -1 },
+      alchemy: { potionFull: true, goldHalf: true },
+      undying: { noChestXp: true },
+      insight: { count: 2 },
+      bounty: { perLevel: 5 },
+      berserk: { killXp: 2, dmgAll: 1, hp: -1 },
+    } as Record<string, BlessCfg>,
+  },
 
   /** 成就门槛（文档 §6.11） */
   achievements: {

@@ -38,6 +38,7 @@ export function breakdownRows(b: ScoreBreakdown): { label: string; detail: strin
     { label: '金币', detail: '', value: b.gold },
   ];
   if (b.rage > 0) rows.splice(1, 0, { label: '龙怒', detail: `×${CONFIG.score.awakeKillMult}`, value: b.rage });
+  if (b.bounty > 0) rows.splice(b.rage > 0 ? 2 : 1, 0, { label: '赏金', detail: '', value: b.bounty });
   if (b.won) {
     rows.push({ label: '屠龙', detail: '', value: b.dragon });
     rows.push({ label: '余勇', detail: `生命 ${b.hpLeft} × ${CONFIG.score.hpLeftBonus}`, value: b.hpScore });

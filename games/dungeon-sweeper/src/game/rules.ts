@@ -1,4 +1,5 @@
 import { CONFIG, maxHpForLevel, xpToNextLevel } from '../config.ts';
+import { type BlessId, bonusHp, chestGoldOf, chestXpOf, damageOf, isBless, killHealOf, killXpOf, potionHealOf, rollOffer } from './blessings.ts';
 import { type BoardData, generateBoard, N, NEIGHBORS, START_CELL } from './board.ts';
 import { type DiffId, type DiffParams, diffParams } from './difficulty.ts';
 import { solveGame } from './solver.ts';
@@ -50,11 +51,27 @@ export class Game {
   /** 每日挑战的日期键（YYYY-MM-DD）；普通局为 null */
   daily: string | null = null;
 
+  // ---- 祝福（§3.10）
+  /** 引导局和选盘校验关闭：选盘保证的是「不靠祝福也无需致命猜测」 */
+  blessEnabled: boolean;
+  blessings: BlessId[] = [];
+  /** 待选次数（一次连升可能跨过两个祝福等级）与当前候选 */
+  offersDue = 0;
+  offer: BlessId[] | null = null;
+  /** 已选次数：决定下一次候选的随机序列 */
+  picks = 0;
+  undyingUsed = false;
+  /** 选了赏金之后击杀的等级和 */
+  bountyXp = 0;
+  /** 洞察得知的等级（0 = 未知） */
+  readonly known = new Int8Array(N);
+
   constructor(seed: number, tutorial = false, board?: BoardData) {
     this.seed = seed;
     this.isTutorial = tutorial;
     this.b = board ?? pickBoard(seed, tutorial);
     this.diff = diffParams(this.b.diff);
+    this.blessEnabled = !tutorial;
     const lv = 1;
     this.player = { level: lv, hp: maxHpForLevel(lv), maxHp: maxHpForLevel(lv), xp: 0 };
     for (let i = 0; i < N; i++) {
@@ -76,7 +93,21 @@ export class Game {
   }
   get score(): number {
     const S = CONFIG.score;
-    return (this.killXp + this.awakeKillXp * (S.awakeKillMult - 1)) * S.perMonsterLevel + this.gold + (this.fullCleared ? S.fullClearBonus : 0);
+    return (
+      (this.killXp + this.awakeKillXp * (S.awakeKillMult - 1)) * S.perMonsterLevel +
+      this.bountyXp * (CONFIG.blessings.cards.bounty.perLevel ?? 0) +
+      this.gold +
+      (this.fullCleared ? S.fullClearBonus : 0)
+    );
+  }
+  readonly has = (id: BlessId): boolean => this.blessings.includes(id);
+  /** 祝福带来的生命上限增减 */
+  get bonusHp(): number {
+    return bonusHp(this.has);
+  }
+  /** 该等级的怪物实际造成的伤害（祝福修正后） */
+  damageOf(level: number): number {
+    return damageOf(this.has, level);
   }
   /** 已翻开的信息格（显示数字的格子） */
   isInfo(i: number): boolean {
@@ -100,7 +131,7 @@ export class Game {
   }
   isLethalMark(i: number): boolean {
     const m = this.mark[i];
-    return m > 0 && m >= this.player.hp;
+    return m > 0 && this.damageOf(m) >= this.player.hp;
   }
   /** 周围已翻开数字的最小值（标记轮盘的「上限」提示）；无则 -1 */
   boundAt(i: number): number {
@@ -148,7 +179,7 @@ export class Game {
   /** 点击格子。confirmedDragon：挑战确认框已同意 */
   tap(i: number, confirmedDragon = false): GameEvent[] {
     const ev: GameEvent[] = [];
-    if (this.phase !== 'playing') return ev;
+    if (this.phase !== 'playing' || this.offer) return ev;
     const kind = this.b.kind[i];
     if (kind === Kind.Lair) {
       this.tapDragon(confirmedDragon, ev);
@@ -160,8 +191,8 @@ export class Game {
     }
     if (kind === Kind.Chest && !this.collected[i]) {
       this.collected[i] = 1;
-      const gold = this.b.gold[i];
-      const xp = this.b.itemXp[i];
+      const gold = chestGoldOf(this.has, this.b.gold[i]);
+      const xp = chestXpOf(this.has, this.b.itemXp[i]);
       this.gold += gold;
       ev.push({ t: 'collect', cell: i, item: 'chest', gold, xp, heal: 0 });
       this.gainXp(xp, i, 'chest', ev);
@@ -169,12 +200,13 @@ export class Game {
     }
     if (kind === Kind.Potion && !this.collected[i]) {
       const p = this.player;
-      if (p.hp >= p.maxHp) {
-        ev.push({ t: 'potionRefused', cell: i });
+      const full = potionHealOf(this.has, this.b.heal[i]);
+      if (p.hp >= p.maxHp || full <= 0) {
+        ev.push({ t: 'potionRefused', cell: i, void: full <= 0 });
         return ev;
       }
       this.collected[i] = 1;
-      const heal = Math.min(this.b.heal[i], p.maxHp - p.hp);
+      const heal = Math.min(full, p.maxHp - p.hp);
       p.hp += heal;
       ev.push({ t: 'collect', cell: i, item: 'potion', gold: 0, xp: 0, heal });
       return ev;
@@ -237,12 +269,15 @@ export class Game {
 
   private markReveal(i: number, cells: number[], ev: GameEvent[]): void {
     this.revealed[i] = 1;
+    const known = this.known[i];
+    this.known[i] = 0;
     cells.push(i);
     const m = this.mark[i];
     if (m !== MARK_NONE) {
       const isMon = this.b.kind[i] === Kind.Monster;
       const correct = m === MARK_SAFE ? !isMon : m > 0 ? isMon && this.b.level[i] === m : false;
-      if (correct) this.correctMarks++;
+      // 洞察给出的标记不算猜中
+      if (correct && !known) this.correctMarks++;
       ev.push({ t: 'markResult', cell: i, correct, mark: m });
       this.mark[i] = MARK_NONE;
     }
@@ -268,13 +303,30 @@ export class Game {
     const L = this.b.level[i];
     const p = this.player;
     const before = p.hp;
-    p.hp -= L;
-    const lethal = CONFIG.rules.deathAtZero ? p.hp <= 0 : p.hp < 0;
+    p.hp -= this.damageOf(L);
+    let lethal = CONFIG.rules.deathAtZero ? p.hp <= 0 : p.hp < 0;
+    let undying = false;
+    if (lethal && this.has('undying') && !this.undyingUsed) {
+      this.undyingUsed = true;
+      undying = true;
+      lethal = false;
+      p.hp = 1;
+    }
     // 翻开（标记结果在战斗事件之前给出）
     const tmp: number[] = [];
     this.markReveal(i, tmp, ev);
     const score = L * CONFIG.score.perMonsterLevel * (this.dragonAwake ? CONFIG.score.awakeKillMult : 1);
-    ev.push({ t: 'fight', cell: i, level: L, hpBefore: before, hpAfter: Math.max(0, p.hp), lethal, score, rage: this.dragonAwake });
+    ev.push({
+      t: 'fight',
+      cell: i,
+      level: L,
+      hpBefore: before,
+      hpAfter: Math.max(0, p.hp),
+      lethal,
+      score,
+      rage: this.dragonAwake,
+      undying,
+    });
     if (lethal) {
       p.hp = 0;
       this.phase = 'lost';
@@ -287,9 +339,16 @@ export class Game {
     this.kills++;
     this.killXp += L;
     if (this.dragonAwake) this.awakeKillXp += L;
+    if (this.has('bounty')) this.bountyXp += L;
     this.alive[L]--;
     this.totalAlive--;
-    this.gainXp(L * CONFIG.monsters.xpPerLevel, i, 'monster', ev);
+    const kh = killHealOf(this.has, L);
+    if (kh > 0 && p.hp < p.maxHp) {
+      const heal = Math.min(kh, p.maxHp - p.hp);
+      p.hp += heal;
+      ev.push({ t: 'heal', cell: i, amount: heal });
+    }
+    this.gainXp(killXpOf(this.has, L), i, 'monster', ev);
     // 数字更新
     const cells: number[] = [];
     const before2: number[] = [];
@@ -331,14 +390,60 @@ export class Game {
       p.level++;
     }
     if (p.level !== startLevel) {
-      p.maxHp = maxHpForLevel(p.level);
+      p.maxHp = maxHpForLevel(p.level) + this.bonusHp;
       p.hp = p.maxHp;
       ev.push({ t: 'levelUp', from: startLevel, to: p.level, maxHp: p.maxHp });
-      if (!this.dragonAwake && p.maxHp >= this.diff.minHp) {
-        this.dragonAwake = true;
-        ev.push({ t: 'dragonAwake' });
+      this.checkAwake(ev);
+      if (this.blessEnabled)
+        for (let lv = startLevel + 1; lv <= p.level; lv++) if (this.diff.blessLevels.includes(lv)) this.offersDue++;
+      if (this.offersDue > 0 && !this.offer) {
+        this.offer = rollOffer(this.seed, this.picks, this.blessings);
+        ev.push({ t: 'blessOffer', offer: this.offer });
       }
     }
+  }
+
+  private checkAwake(ev: GameEvent[]): void {
+    if (!this.dragonAwake && this.player.maxHp >= this.diff.minHp) {
+      this.dragonAwake = true;
+      ev.push({ t: 'dragonAwake' });
+    }
+  }
+
+  /** 从当前候选里选一个祝福；不在候选里返回 [] */
+  chooseBlessing(id: BlessId): GameEvent[] {
+    const ev: GameEvent[] = [];
+    if (this.phase !== 'playing' || !this.offer || !this.offer.includes(id)) return ev;
+    this.blessings.push(id);
+    this.picks++;
+    this.offersDue--;
+    this.offer = null;
+    const p = this.player;
+    const cells: number[] = [];
+    const dHp = bonusHp(this.has) - bonusHp((b) => b !== id && this.has(b));
+    if (dHp) {
+      p.maxHp += dHp;
+      p.hp = Math.max(1, Math.min(p.maxHp, p.hp + dHp));
+    }
+    if (id === 'insight') {
+      const cand: number[] = [];
+      for (let i = 0; i < N; i++) if (this.b.kind[i] === Kind.Monster && !this.revealed[i] && !this.known[i]) cand.push(i);
+      cand.sort((a, c) => this.b.level[c] - this.b.level[a] || a - c);
+      for (const i of cand.slice(0, CONFIG.blessings.cards.insight.count ?? 0)) {
+        this.known[i] = this.b.level[i];
+        const prev = this.mark[i];
+        this.mark[i] = this.b.level[i];
+        cells.push(i);
+        ev.push({ t: 'mark', cell: i, mark: this.mark[i], prev });
+      }
+    }
+    ev.unshift({ t: 'bless', id, cells });
+    this.checkAwake(ev);
+    if (this.offersDue > 0) {
+      this.offer = rollOffer(this.seed, this.picks, this.blessings);
+      ev.push({ t: 'blessOffer', offer: this.offer });
+    }
+    return ev;
   }
 
   computeBreakdown(won: boolean): ScoreBreakdown {
@@ -351,10 +456,12 @@ export class Game {
     const hpScore = hpLeft * S.hpLeftBonus;
     const timeScore = won ? Math.max(0, S.timeBonusBaseSec - timeSec) * S.timeBonusPerSec : 0;
     const fullClear = this.fullCleared ? S.fullClearBonus : 0;
+    const bounty = this.bountyXp * (CONFIG.blessings.cards.bounty.perLevel ?? 0);
     return {
       kills: this.kills,
       killScore,
       rage,
+      bounty,
       gold: this.gold,
       dragon,
       hpLeft,
@@ -362,7 +469,7 @@ export class Game {
       timeSec,
       timeScore,
       fullClear,
-      total: killScore + rage + this.gold + dragon + hpScore + timeScore + fullClear,
+      total: killScore + rage + bounty + this.gold + dragon + hpScore + timeScore + fullClear,
       won,
     };
   }
@@ -392,6 +499,11 @@ export class Game {
       dragonAwake: this.dragonAwake,
       timeMs: Math.floor(this.timeMs),
       marksPlaced: this.marksPlaced,
+      blessings: this.blessings.slice(),
+      offersDue: this.offersDue,
+      undyingUsed: this.undyingUsed,
+      bountyXp: this.bountyXp,
+      known: Array.from(this.known),
     };
   }
 
@@ -432,6 +544,13 @@ export class Game {
     g.dragonAwake = s.dragonAwake;
     g.timeMs = s.timeMs;
     g.marksPlaced = s.marksPlaced;
+    g.blessings = (s.blessings ?? []).filter(isBless);
+    g.picks = g.blessings.length;
+    g.offersDue = Math.max(0, s.offersDue ?? 0);
+    g.undyingUsed = s.undyingUsed ?? false;
+    g.bountyXp = s.bountyXp ?? 0;
+    if (s.known?.length === N) for (let i = 0; i < N; i++) g.known[i] = g.revealed[i] ? 0 : s.known[i] | 0;
+    if (g.offersDue > 0) g.offer = rollOffer(g.seed, g.picks, g.blessings);
     return g;
   }
 
@@ -448,7 +567,7 @@ export class Game {
     const p = this.player;
     const from = p.level;
     p.level = Math.max(1, Math.floor(n));
-    p.maxHp = maxHpForLevel(p.level);
+    p.maxHp = maxHpForLevel(p.level) + this.bonusHp;
     p.hp = p.maxHp;
     p.xp = 0;
     const ev: GameEvent[] = [];
@@ -529,6 +648,12 @@ export interface RunSave {
   dragonAwake: boolean;
   timeMs: number;
   marksPlaced: number;
+  /** 祝福（§3.10），旧存档缺省为空 */
+  blessings?: string[];
+  offersDue?: number;
+  undyingUsed?: boolean;
+  bountyXp?: number;
+  known?: number[];
 }
 
 /**
@@ -543,7 +668,9 @@ export function pickBoard(seed: number, tutorial: boolean, budgetMs: number = CO
   const t0 = performance.now();
   let b = first;
   for (let n = 0; n < S.maxTries; n++) {
-    const r = solveGame(new Game(seed, false, b), CONFIG.solver.maxNodes, minHp);
+    const vg = new Game(seed, false, b);
+    vg.blessEnabled = false;
+    const r = solveGame(vg, CONFIG.solver.maxNodes, minHp);
     if (r.won && r.deadly === 0) return b;
     if (performance.now() - t0 > budgetMs) break;
     b = generateBoard(seed, false, b.regen + 1, diff);

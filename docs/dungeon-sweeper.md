@@ -304,6 +304,7 @@ input:  { longPressMs: 380, longPressHintMs: 120, tapSlopPx: 10, radialRadius: 7
 | `minHpToChallenge`（也是巨龙觉醒的生命上限） | 12（8 级） | 14（10 级） | 16（12 级） |
 | `potionCount` | 4 | 3 | 3 |
 | `countsDelta`（怪物数量增减） | 无 | 无 | 无 |
+| `blessLevels`（升到这些等级时三选一祝福，§3.10） | 5、9 | 6、10 | 11 |
 
 - 记录（最高分、最快、通关/总局数）每档一份：冒险者沿用旧 key `records`，其余为 `records.easy` / `records.hard`。标题页铭牌显示所选难度的记录；每日挑战计入冒险者。
 - 暂停面板和分享文字带难度名（「英雄 · 种子 #123」）。
@@ -317,7 +318,7 @@ input:  { longPressMs: 380, longPressHintMs: 120, tapSlopPx: 10, radialRadius: 7
 | skilled | 600 | 1.2% |
 | expert | 3000（同选盘校验） | 0 |
 
-够血即屠龙时的胜率（目标写在 `scripts/sim.ts` 的 `TARGETS`）：
+够血即屠龙时的胜率（目标写在 `scripts/sim.ts` 的 `TARGETS`）。下表是加入祝福（§3.10）之前的结果，现在的数字见 §3.10：
 
 | 难度 | novice | skilled | expert |
 |---|---|---|---|
@@ -345,6 +346,60 @@ input:  { longPressMs: 380, longPressHintMs: 120, tapSlopPx: 10, radialRadius: 7
 - **余勇**：每点剩余生命 30 → 60 分（`score.hpLeftBonus`），多升一级就多 60 分。
 
 结果：专家在 14 / 15 / 16 血屠龙的期望分相差 8%（`pnpm sim` 检查 ≤ 15%），15 血略优；熟手在 14 / 15 血几乎持平（1,732 / 1,710）。冲最高分的玩家（败局不计入记录）有明确的理由继续清图，求稳的玩家够血就走也不吃亏。
+
+### 3.10 祝福：升级时三选一
+
+升到该难度的祝福等级时（`difficulty.*.blessLevels`：学徒 5 / 9，冒险者 6 / 10，英雄 11），升级演出播完弹出三张祝福卡，点一张即选，没有取消。效果整局有效，每种一局最多一次。目的：每局的构筑不同，同一张图换一套祝福打法也不同。
+
+**规则**
+- 候选由「种子 + 第几次选」决定（`blessings.ts` 的 `rollOffer`），已拥有的不再出现。每日挑战人人相同，读档后候选不变。
+- 有待选时 `Game.tap` 什么也不做；一次连升跨过两个祝福等级时依次弹两次。选择期间计时暂停，暂停按钮无效。
+- 引导局没有祝福。
+- **选盘不变**：校验时关掉祝福（`Game.blessEnabled = false`），所以「无需致命猜测」保证的是不靠祝福也能推理通关。祝福都会改变数值，带代价的祝福可能让这条保证失效（例如血瓶失效后，原本要靠血瓶撑过的一战打不过了）。这是玩家自己做的交换。
+
+**十张祝福**（数值在 `CONFIG.blessings.cards`；代价用通用字段，卡面上的代价文字由字段生成）
+
+| id | 印 | 名 | 收益 | 代价 |
+|---|---|---|---|---|
+| vigor | 韧 | 坚韧 | 生命上限 +2 | 血瓶失效（点了只提示「坚韧：血瓶已失效」，不消耗） |
+| leech | 噬 | 噬血 | 击杀 2 级及以上的怪物回复 1 生命 | 生命上限 −1 |
+| butcher | 屠 | 屠夫 | 2 级及以下的怪物不伤你 | 它们也不给经验 |
+| armor | 甲 | 鳞甲 | 5 级及以上的怪物伤害 −1 | 1 级怪伤害 +1 |
+| greed | 贪 | 贪婪 | 宝箱经验 +3、金币 ×2 | 血瓶回复 −1 |
+| alchemy | 药 | 炼金 | 血瓶回满生命 | 宝箱金币减半 |
+| undying | 魂 | 不屈 | 第一次受到致命伤害时留 1 生命（照常击败该怪、拿经验） | 宝箱不再给经验 |
+| berserk | 狂 | 狂战 | 击杀经验 +2 | 生命上限 −1，受到伤害 +1 |
+| insight | 眼 | 洞察 | 立刻在最强的 2 只存活怪物上标出真实等级 | 无（只给信息；这两个标记不算「猜中」） |
+| bounty | 赏 | 赏金 | 此后击杀分每级 +5，结算单列「赏金」 | 无（只给分） |
+
+- 伤害、经验、血瓶、宝箱的修正集中在 `blessings.ts` 的 `damageOf` / `killXpOf` / `potionHealOf` / `chestXpOf` / `chestGoldOf` / `bonusHp`，规则和机器人共用。
+- 生命上限的增减在选的那一刻生效（当前生命同步增减，至少留 1），之后每次升级都带上；巨龙觉醒看的是加成后的上限。
+- 致命标记的判断（R8）按修正后的伤害：选了屠夫，标「2」的格子不再算致命。
+
+**界面**
+- 三选一面板：每张卡是朱红印章 + 名字 + 收益（米色）+ 代价（红色）。键盘 1–3 也能选。
+- HUD：已选祝福的印章排在分数行中间，新印章弹入。选中时消息行显示「名字：收益，代价」。
+- 暂停面板列出已选祝福（印章、收益、代价）。
+- 不屈触发时怪物上方飘金字「不屈！」；噬血回血在出击后显示在血条旁。
+
+**平衡**
+
+先试了纯加成：单张就太强，冒险者 skilled 胜率 70% → 87–94%（这游戏生命预算很紧，多 1 点血就能改变胜负）。所以改成每张都有代价，用 `scratchpad` 的单卡消融逐张校准：在第一个祝福等级强制选同一张，看 novice / skilled 胜率。目标是每张对 skilled 的影响落在 −5 ~ +10 个百分点，打法各不相同。几个教训：
+- 「血瓶失效」代价很重：选盘的无猜测路线常常要靠血瓶撑过一战，噬血 + 血瓶失效让 skilled 掉到 21%。只给坚韧（+2 上限）用。
+- 生命上限 −1 约等于晚一级觉醒，代价同样很重；不屈带上它只剩 40%，改为「宝箱不再给经验」。
+- 给得越晚影响越小；英雄档只在 11 级给一次，几乎不改变胜率，冒险者在 6 / 10 级（第二次正好在觉醒时，适合拿赏金冲分）。
+
+机器人怎么选：novice 随机；skilled 按 `BLESS_PREF`（先保命：噬血、狂战、炼金、坚韧……）；expert 按 `BLESS_PREF_EXPERT`（先拿无代价的赏金、洞察，其次不动生命上限、不废血瓶的）。专家用祝福后偶尔会输：路线偏离了选盘时验证的那条（洞察让它先去打已知的大怪、屠夫让它白打小怪），之后被迫猜。真人也不会走验证路线，所以 `pnpm sim` 的专家下限从 98% 放到 95%。
+
+`pnpm sim`（150 局；`--nobless` 关掉祝福对照）：
+
+| 难度 | novice 无 → 有 | skilled 无 → 有 | expert 无 → 有 |
+|---|---|---|---|
+| 学徒 | 66.7 → 62.7 | 91.3 → 88.0 | 100 → 99.3 |
+| 冒险者 | 28.0 → 36.0 | 70.7 → 73.3 | 100 → 97.3 |
+| 英雄 | 9.3 → 12.7 | 46.7 → 47.3 | 100 → 98.7 |
+
+冒险者专家在 14 / 15 / 16 血屠龙的期望分：2,515 / 2,735 / 2,563（相差 8%，检查 ≤ 15%）。
 
 ---
 
@@ -799,6 +854,7 @@ games/dungeon-sweeper/
    │  ├─ rules.ts          # reveal / cascade / fight / collect / mark / chord / dragon → 返回 GameEvent[]
    │  ├─ solver.ts         # 只看可见信息的求解机器人：选盘校验（solveGame）与 sim 画像（playBot）
    │  ├─ difficulty.ts     # 难度档：基础数值 + CONFIG.difficulty 覆盖（§3.8）
+   │  ├─ blessings.ts      # 祝福定义、候选抽取、伤害 / 经验 / 血瓶 / 宝箱修正（§3.10）
    │  ├─ achievements.ts   # 成就定义与结算检查（§6.11）
    │  ├─ score.ts
    │  ├─ daily.ts          # 每日挑战：日期键、派生种子、每天一次（§6.9）
@@ -881,13 +937,14 @@ URL 参数：
 
 | 方法 | 说明 |
 |---|---|
-| `state()` | `{phase, seed, diff, titleDiff, awakeKillXp, hp, maxHp, level, xp, xpToNext, score, gold, timeMs, revealed, alive: {1..9: n}, dragonAwake, isTutorial}`（`diff` 本局难度，`titleDiff` 标题页所选） |
+| `state()` | `{phase, seed, diff, titleDiff, awakeKillXp, blessings, offer, hp, maxHp, level, xp, xpToNext, score, gold, timeMs, revealed, alive: {1..9: n}, dragonAwake, isTutorial}`（`diff` 本局难度，`titleDiff` 标题页所选） |
 | `board()` | 9 × 12 数组 `{x, y, kind, level, revealed, dead, mark, number}`（真相，含隐藏信息） |
 | `cellCenter(x, y)` | 返回该格中心的 `{x, y}` 客户端坐标，供 Playwright `mouse.click` |
 | `tap(x, y)` / `longPress(x, y)` / `mark(x, y, m)` | 走真实输入管线 |
 | `revealSafe()` | 翻开所有非怪物格（不拾取道具） |
 | `xray(on)` | 渲染叠加真相（怪物等级半透明显示） |
 | `addXp(n)` / `setHp(n)` / `setLevel(n)` / `heal()` | 数值作弊 |
+| `bless(id?)` | 祝福（§3.10）：`bless('leech')` 直接获得一张（已有则返回 false）；`bless()` 多排一次三选一，返回候选。`state()` 里有 `blessings` 与 `offer` |
 | `killAll()` | 按等级从低到高击杀全部怪物（带奖励，快速演出），直达「巨龙可战」状态 |
 | `dragonReady()` | 把生命和等级设为可以挑战巨龙 |
 | `fightDragon()` | 立即进入屠龙序列（必要时自动补足生命） |
@@ -1041,6 +1098,19 @@ URL 参数：
 | 长按 / 右键按设备落字 | 引导文案写 `{hold}`，显示时按玩家最近一次按下的指针类型换成「长按」（触屏）或「右键」（鼠标）；还没按过时用 `(hover: hover) and (pointer: fine)` 猜（`Input.usesMouse`）。去掉了「（电脑右键）」括注 | 试玩反馈：同时写两种操作不如直接说对的那种 |
 | 切难度时菜单跳动 | 铭牌没记录时改为 `visibility: hidden` 保留占位（原先 `display: none`） | 菜单从底部排，有的难度有记录、有的没有时，切换会让按钮上下移动 |
 | 中文标题字体 | 系统黑体 900 → 马善政毛笔楷书（§4.3），标题页和分享卡都用 | 系统黑体太普通；对比过马善政、志莽行、龙藏、站酷小薇、站酷庆科黄油、思源宋体 Black，毛笔字最贴暗黑地牢气质且仍好认 |
+
+---
+
+## 16. 长线可玩性第二批：祝福
+
+| 项 | 修改 | 说明 |
+|---|---|---|
+| 升级三选一祝福 | §3.10：新模块 `game/blessings.ts`；`Game` 加 `blessings / offer / offersDue / picks / undyingUsed / bountyXp / known` 和 `chooseBlessing(id)`；新事件 `blessOffer`、`bless`、`heal`，`fight` 带 `undying`，`potionRefused` 带 `void`；结算加「赏金」行 | 每局构筑不同，提高重玩价值 |
+| 难度档 | `difficulty.*.blessLevels` | 学徒 5 / 9、冒险者 6 / 10、英雄 11 |
+| 存档 | `RunSave` 加 `blessings / offersDue / undyingUsed / bountyXp / known`（可缺省），读档时按种子重抽同一组候选并重新弹出 | 旧存档按无祝福读 |
+| 机器人与模拟 | `playBot` 会选祝福（`blessPref`，不给则随机）；伤害、经验、血瓶、宝箱都按祝福修正；洞察的已知等级进入回溯约束。`pnpm sim 150 1 normal --nobless` 对照 | 专家胜率下限 98 → 95，原因见 §3.10 |
+| 调试 | `__game.bless(id?)`，`state()` 带 `blessings` / `offer` | |
+| 成就面板铆钉 | `#panel-ach::after` 跟 `::before` 一起改阴影偏移 | 原先右上角多一颗铆钉；祝福面板同样处理 |
 
 ---
 
