@@ -162,7 +162,7 @@ export class Director {
           fightCell = e.cell;
           hasFight = true;
           if (e.lethal) lethal = true;
-          this.fight(e.cell, e.level, e.hpBefore, e.hpAfter, e.lethal, fightT0);
+          this.fight(e.cell, e.level, e.hpBefore, e.hpAfter, e.lethal, e.score, fightT0);
           break;
         }
         case 'xp': {
@@ -221,7 +221,7 @@ export class Director {
           s.sfx.disturb();
           vibrate(15);
           s.cam.add(0.15);
-          s.hud.message('巨龙之威：需要至少 14 点生命', 'red', s.clock.real);
+          s.hud.message(`巨龙之威：需要至少 ${s.game.diff.minHp} 点生命`, 'red', s.clock.real);
           s.tip('disturb', '巨龙需要生命 ≥ 14 才能挑战：先升级吧', true);
           break;
         case 'dragonFight':
@@ -319,7 +319,7 @@ export class Director {
   }
 
   // ------------------------------------------------------------ 战斗
-  private fight(cell: number, level: number, hpBefore: number, hpAfter: number, lethal: boolean, t0: number): void {
+  private fight(cell: number, level: number, hpBefore: number, hpAfter: number, lethal: boolean, score: number, t0: number): void {
     const s = this.s;
     const B = s.board;
     B.scheduleFlip(cell, 1, t0, T.fastFlipMs, 0, cell);
@@ -371,7 +371,7 @@ export class Director {
       B.numInT0[cell] = s.clock.world;
       B.num[cell] = s.game.number[cell];
       s.hud.killed(level, s.clock.world);
-      s.hud.addScore(level * CONFIG.score.perMonsterLevel, s.L, s.clock.world);
+      s.hud.addScore(score, s.L, s.clock.world);
       s.hud.message(`击败 ${CONFIG.monsters.names[level]} Lv${level} · 经验 +${level * CONFIG.monsters.xpPerLevel}`, 'normal', s.clock.real, 2400);
     });
     void hpAfter;
@@ -449,7 +449,7 @@ export class Director {
     s.dragon.eyes = 2;
     s.hud.dragonReady = true;
     s.hud.setBase('巨龙已醒——点击龙巢挑战', 'gold');
-    s.hud.message('巨龙已醒——点击龙巢挑战', 'gold', s.clock.real, 3500);
+    s.hud.message(`巨龙已醒 · 此后击杀分 ×${CONFIG.score.awakeKillMult}`, 'gold', s.clock.real, 3500);
     s.sfx.awaken();
     s.music.awake = true;
     vibrate(20);

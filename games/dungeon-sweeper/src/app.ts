@@ -13,7 +13,9 @@ import { Tweens } from './core/tween';
 import { type BoardData, LAIR_DIST, N, cx, cy, generateBoard } from './game/board';
 import { Game, pickBoard, type RunSave } from './game/rules';
 import { beginDaily, type DailyInfo, type DailyRec, dailyInfo, dailySeed, finishDaily, todayKey } from './game/daily';
-import { commitRecords } from './game/score';
+import { checkAchievements } from './game/achievements';
+import { DIFF_IDS, type DiffId, isDiff } from './game/difficulty';
+import { commitRecords, recordsKey } from './game/score';
 import { type TutStep, Tutorial } from './game/tutorial';
 import { type GameEvent, Kind, MARK_NONE, MARK_SAFE, MARK_UNKNOWN } from './game/types';
 import { type Action, Screens } from './ui/screens';
@@ -125,9 +127,12 @@ export class App implements Stage, InputHandler {
     this.ctx = this.canvas.getContext('2d', { alpha: false })!;
     this.safeProbe = document.getElementById('safe-probe')!;
     this.settings = loadSettings();
-    this.records = loadRecords();
+    const d = load<string>('difficulty', CONFIG.defaultDifficulty);
+    this.diff = isDiff(d) ? d : CONFIG.defaultDifficulty;
+    this.records = loadRecords(recordsKey(this.diff));
     this.tips = load<Record<string, boolean>>('tips', {});
     this.daily = load<Record<string, DailyRec>>('daily', {});
+    this.ach = load<Record<string, number>>('achievements', {});
     this.fx = new Fx(this.tex, this.sil);
     this.board = new BoardView(this.tex, this.gl, this.sil, this.fx, {
       onFlipStart: (i, o) => this.director.onFlipStart(i, o),
@@ -176,13 +181,13 @@ export class App implements Stage, InputHandler {
     {
       // 标题页的占位局：只用快速生成，不跑求解校验
       const s0 = opts.seed ?? randomSeed();
-      this.game = new Game(s0, false, generateBoard(s0, false));
+      this.game = new Game(s0, false, generateBoard(s0, false, 0, this.diff));
     }
     this.prefetchBoard();
     this.board.reset(this.game, false, 0);
     this.layout();
     this.bindGlobal();
-    this.screens.showTitle(this.records, this.hasRun(), this.dailyInfo());
+    this.screens.showTitle(this.records, this.hasRun(), this.dailyInfo(), this.diff);
     this.loop.start();
   }
 
@@ -227,9 +232,14 @@ export class App implements Stage, InputHandler {
   // ------------------------------------------------------------ 后台选盘
   private worker: Worker | null = null;
   private prefetched: { seed: number; board: BoardData } | null = null;
+  /** 标题页选择的难度（每日挑战固定 normal） */
+  diff: DiffId;
+  /** 成就 id → 解锁时间 */
+  ach: Record<string, number>;
   private prefetching = false;
 
   private prefetchBoard(): void {
+    if (this.prefetched && this.prefetched.board.diff !== this.diff) this.prefetched = null;
     if (this.opts.seed !== null || this.prefetched || this.prefetching) return;
     try {
       if (!this.worker) {
@@ -237,6 +247,8 @@ export class App implements Stage, InputHandler {
         this.worker.onmessage = (e: MessageEvent<{ seed: number; board: BoardData }>) => {
           this.prefetching = false;
           this.prefetched = e.data;
+          // 预取途中换了难度：作废重取
+          if (e.data.board.diff !== this.diff) this.prefetchBoard();
         };
         this.worker.onerror = () => {
           this.prefetching = false;
@@ -244,7 +256,7 @@ export class App implements Stage, InputHandler {
         };
       }
       this.prefetching = true;
-      this.worker.postMessage({ seed: randomSeed() });
+      this.worker.postMessage({ seed: randomSeed(), diff: this.diff });
     } catch {
       this.worker = null;
       this.prefetching = false;
@@ -427,7 +439,7 @@ export class App implements Stage, InputHandler {
     const run = mode === 'resume' ? Game.fromSave(load<RunSave | null>('run', null) as RunSave) : null;
     if (mode === 'resume' && !run) {
       remove('run');
-      this.screens.showTitle(this.records, false, this.dailyInfo());
+      this.screens.showTitle(this.records, false, this.dailyInfo(), this.diff);
       return;
     }
     this.screens.hideTitle();
@@ -477,14 +489,16 @@ export class App implements Stage, InputHandler {
       this.game.daily = daily;
       beginDaily(this.daily, daily);
       save('daily', this.daily);
-    } else if (!tutorial && this.opts.seed === null && pre) {
+    } else if (!tutorial && this.opts.seed === null && pre && pre.board.diff === this.diff) {
       // 用 Worker 预取好的盘面（已通过无致命猜测校验）
       this.prefetched = null;
       this.game = new Game(pre.seed, false, pre.board);
     } else {
       const seed = this.opts.seed ?? randomSeed();
       // 指定种子：主线程同步校验（同种子同盘面）；随机种子但预取未就绪：短预算兜底
-      this.game = tutorial ? new Game(seed, true) : new Game(seed, false, pickBoard(seed, false, this.opts.seed === null ? CONFIG.solver.fallbackMs : CONFIG.solver.budgetMs));
+      this.game = tutorial
+        ? new Game(seed, true)
+        : new Game(seed, false, pickBoard(seed, false, this.opts.seed === null ? CONFIG.solver.fallbackMs : CONFIG.solver.budgetMs, this.diff));
     }
     if (!tutorial) this.prefetchBoard();
     this.resetScene(deal);
@@ -522,7 +536,8 @@ export class App implements Stage, InputHandler {
     if (!deal) this.tw.to(this.ov.dragonAlpha, 1, 600, this.clock.world, quadOut);
     this.dragon.reset();
     this.hud.dragonReady = false;
-    this.hud.setBase('巨龙沉睡中 · 需 14 点生命', 'normal');
+    this.hud.dragonHp = this.game.diff.minHp;
+    this.hud.setBase(`巨龙沉睡中 · 需 ${this.game.diff.minHp} 点生命`, 'normal');
     this.hud.clearMessage();
     this.hud.hidden = false;
     this.music.awake = false;
@@ -618,7 +633,7 @@ export class App implements Stage, InputHandler {
       this.canvas.classList.remove('rblur');
       this.audio.musicFilter(18000);
       this.screens.showPauseBtn(false);
-      this.screens.showTitle(this.records, this.hasRun(), this.dailyInfo());
+      this.screens.showTitle(this.records, this.hasRun(), this.dailyInfo(), this.diff);
       this.music.title = true;
       this.music.danger = 0;
       this.screens.fadeTo(false);
@@ -663,12 +678,24 @@ export class App implements Stage, InputHandler {
   onSequenceEnd(won: boolean): void {
     const g = this.game;
     const b = g.breakdown ?? g.computeBreakdown(won);
-    const r = commitRecords(this.records, b);
+    // 每日挑战固定标准难度，可能和标题页所选不同
+    const key = recordsKey(g.diff.id);
+    const rec = g.diff.id === this.diff ? this.records : loadRecords(key);
+    const r = commitRecords(rec, b, key);
     if (g.daily) {
       finishDaily(this.daily, g.daily, b);
       save('daily', this.daily);
     }
     remove('run');
+    let totalWins = 0;
+    for (const d of DIFF_IDS) totalWins += (d === this.diff ? this.records : loadRecords(recordsKey(d))).wins;
+    const unlocked = checkAchievements(this.ach, {
+      g,
+      b,
+      totalWins,
+      dailyDone: Object.values(this.daily).filter((r) => r.done).length,
+    });
+    if (unlocked.length) save('achievements', this.ach);
     this.state = 'result';
     this.ov.bigOutT0 = this.clock.real;
     // HUD 分数滚到结算总分；场景虚化压暗；胜利后棋盘数字淡出
@@ -687,6 +714,7 @@ export class App implements Stage, InputHandler {
       explored: explored(g),
       marks: g.correctMarks,
       daily: g.daily,
+      unlocked,
     });
   }
 
@@ -771,6 +799,12 @@ export class App implements Stage, InputHandler {
       case 'howto':
         this.startFromTitle(true);
         break;
+      case 'achievements':
+        this.screens.showAchievements(this.ach);
+        break;
+      case 'close-modal':
+        this.screens.closeModal();
+        break;
       case 'settings':
         this.screens.showSettings(this.settings, this.state === 'title' ? 'title' : 'pause');
         break;
@@ -822,11 +856,12 @@ export class App implements Stage, InputHandler {
         }
         break;
       case 'clear':
-        void this.screens.dialog('清除全部记录？', '最高分、通关次数、引导与提示状态都会被清除', '清除', '取消').then((ok) => {
+        void this.screens.dialog('清除全部记录？', '最高分、成就、引导与提示状态都会被清除', '清除', '取消').then((ok) => {
           if (ok) {
             clearAll();
-            this.records = loadRecords();
+            this.records = loadRecords(recordsKey(this.diff));
             this.tips = {};
+            this.ach = {};
             save('settings', this.settings);
             this.screens.toast('记录已清除');
           }
@@ -835,7 +870,19 @@ export class App implements Stage, InputHandler {
         break;
       default:
         if (a.startsWith('toggle:')) this.toggle(a.slice(7) as keyof Settings);
+        else if (a.startsWith('diff:')) this.setDiff(a.slice(5) as DiffId);
     }
+  }
+
+  /** 标题页切换难度：记录跟着换，预取的盘面作废重取 */
+  private setDiff(d: DiffId): void {
+    if (!isDiff(d) || d === this.diff || this.state !== 'title') return;
+    this.diff = d;
+    save('difficulty', d);
+    this.records = loadRecords(recordsKey(d));
+    this.prefetchBoard();
+    this.sfx.radialOpen();
+    this.screens.showTitle(this.records, this.hasRun(), this.dailyInfo(), this.diff);
   }
 
   private toggle(k: keyof Settings): void {
@@ -1092,7 +1139,7 @@ export class App implements Stage, InputHandler {
       return;
     }
     if (kind === Kind.Lair) {
-      this.hud.message('巨龙 Lv13 · 需生命 14', 'gold', real, 2400);
+      this.hud.message(`巨龙 Lv${g.diff.dragonLevel} · 需生命 ${g.diff.minHp}`, 'gold', real, 2400);
       this.sfx.radialOpen();
       return;
     }

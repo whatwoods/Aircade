@@ -1,6 +1,6 @@
-import { CONFIG } from '../config';
-import { hash32 } from '../core/rng';
-import type { ScoreBreakdown } from './types';
+import { CONFIG } from '../config.ts';
+import { hash32 } from '../core/rng.ts';
+import type { ScoreBreakdown } from './types.ts';
 
 /**
  * 每日挑战（文档 §6.9）：本地日期派生种子，同一天所有人同一盘面。

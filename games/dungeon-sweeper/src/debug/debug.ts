@@ -1,7 +1,9 @@
 import type { App } from '../app';
 import { maxHpForLevel } from '../config';
-import { clearAll } from '../core/storage';
+import { clearAll, loadRecords, save } from '../core/storage';
 import { COLS, N, ROWS, cx, cy, idx } from '../game/board';
+import { type DiffId, isDiff } from '../game/difficulty';
+import { recordsKey } from '../game/score';
 import { Kind } from '../game/types';
 import { drawIcon, drawOgImage, drawShareCard } from '../ui/share';
 import { P } from '../view/fx';
@@ -48,6 +50,9 @@ export function installDebug(app: App): void {
         phase: g.phase,
         appState: app.state,
         seed: g.seed,
+        diff: g.diff.id,
+        titleDiff: app.diff,
+        awakeKillXp: g.awakeKillXp,
         hp: g.player.hp,
         maxHp: g.player.maxHp,
         level: g.player.level,
@@ -162,6 +167,22 @@ export function installDebug(app: App): void {
       if (app.state === 'title') app.startFromTitle();
       else if (app.state === 'result') app.replay();
       else app.newGame(false, true);
+    },
+    /** 设置下一局的难度（easy / normal / hard），同标题页的三段选择 */
+    difficulty(d: DiffId) {
+      if (!isDiff(d)) return app.diff;
+      app.diff = d;
+      save('difficulty', d);
+      app.records = loadRecords(recordsKey(d));
+      return d;
+    },
+    /** 已解锁成就（id → 时间）；reset=true 清空 */
+    achievements(reset = false) {
+      if (reset) {
+        app.ach = {};
+        save('achievements', {});
+      }
+      return { ...app.ach };
     },
     restart() {
       if (app.state === 'result') app.replay();

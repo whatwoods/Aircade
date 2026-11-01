@@ -1,5 +1,7 @@
 import type { Layout } from '../view/layout';
 import type { Records, Settings } from '../core/storage';
+import { ACHIEVEMENTS, type Achievement } from '../game/achievements';
+import { type DiffId, DIFF_IDS, diffParams } from '../game/difficulty';
 import { breakdownRows, fmtInt, fmtTime } from '../game/score';
 import type { DailyInfo } from '../game/daily';
 import type { Game } from '../game/rules';
@@ -14,6 +16,8 @@ export type Action =
   | 'share'
   | 'settings'
   | 'howto'
+  | 'achievements'
+  | 'close-modal'
   | 'pause'
   | 'resume'
   | 'restart'
@@ -24,7 +28,8 @@ export type Action =
   | 'close-settings'
   | 'rewatch'
   | 'clear'
-  | `toggle:${keyof Settings}`;
+  | `toggle:${keyof Settings}`
+  | `diff:${DiffId}`;
 
 const h = (tag: string, cls = '', html = ''): HTMLElement => {
   const e = document.createElement(tag);
@@ -41,6 +46,8 @@ export interface ResultData {
   explored: number;
   marks: number;
   daily: string | null;
+  /** 本局新解锁的成就 */
+  unlocked: Achievement[];
 }
 
 /** 'YYYY-MM-DD' → 'M月D日' */
@@ -177,7 +184,7 @@ export class Screens {
   }
 
   // ---------------------------------------------------------------- 标题
-  showTitle(rec: Records, hasRun: boolean, daily: DailyInfo): void {
+  showTitle(rec: Records, hasRun: boolean, daily: DailyInfo, diff: DiffId): void {
     this.title.classList.remove('hidden', 'out');
     const dl =
       daily.state === 'done'
@@ -185,14 +192,19 @@ export class Screens {
         : daily.state === 'playing'
           ? ''
           : `<button class="btn btn-ghost btn-daily" data-act="daily" id="btn-daily">每日挑战 · ${dayLabel(daily.key)}</button>`;
+    const seg = DIFF_IDS.map(
+      (d) => `<button class="${d === diff ? 'on' : ''}" data-act="diff:${d}" role="radio" aria-checked="${d === diff}">${diffParams(d).name}</button>`,
+    ).join('');
     this.menu.innerHTML = `
       ${hasRun ? `<button class="btn btn-main" data-act="continue" id="btn-continue">继续冒险</button>` : ''}
+      <div class="seg" role="radiogroup" id="diff">${seg}</div>
       <div class="row alt">
         <button class="btn ${hasRun ? 'btn-ghost btn-wide' : 'btn-main'}" data-act="start" id="btn-start">${hasRun ? '新的冒险' : '开始冒险'}</button>
         ${dl}
       </div>
-      <div class="row">
+      <div class="row tools">
         <button class="btn btn-ghost" data-act="settings" id="btn-settings">⚙ 设置</button>
+        <button class="btn btn-ghost" data-act="achievements" id="btn-ach">★ 成就</button>
         <button class="btn btn-ghost" data-act="howto" id="btn-howto">❖ 玩法</button>
       </div>`;
     this.menu.appendChild(this.plaque);
@@ -289,7 +301,7 @@ export class Screens {
     const p = h('div', 'panel');
     p.id = 'panel-pause';
     const regen = g.b.regen;
-    const tag = g.daily ? `每日挑战 · ${dayLabel(g.daily)}` : `种子 #${g.seed}${regen ? `（第 ${regen} 次重抽）` : ''}`;
+    const tag = g.daily ? `每日挑战 · ${dayLabel(g.daily)}` : `${g.diff.name} · 种子 #${g.seed}${regen ? `（第 ${regen} 次重抽）` : ''}`;
     p.innerHTML = `<h2>暂停</h2>
       <button class="btn btn-main" data-act="resume" id="btn-resume">继续</button>
       ${g.daily ? '' : '<button class="btn btn-ghost" data-act="restart" id="btn-restart">重新开始</button>'}
@@ -298,6 +310,20 @@ export class Screens {
       <div class="quick">${this.tog('sfx', '音效', st.sfx)}${this.tog('music', '音乐', st.music)}</div>
       <div class="seed">${tag}</div>`;
     this.settingsFrom = 'pause';
+    this.openModal(p);
+  }
+
+  /** 成就一览：已解锁在前，未解锁的压暗但给出条件 */
+  showAchievements(have: Record<string, number>): void {
+    const p = h('div', 'panel');
+    p.id = 'panel-ach';
+    const n = ACHIEVEMENTS.filter((a) => have[a.id]).length;
+    const list = [...ACHIEVEMENTS].sort((a, b) => (have[b.id] ? 1 : 0) - (have[a.id] ? 1 : 0));
+    p.innerHTML = `<h2>成就 <small>${n} / ${ACHIEVEMENTS.length}</small></h2>
+      <div class="ach-list">${list
+        .map((a) => `<div class="ach-i${have[a.id] ? ' got' : ''}"><span class="s">${have[a.id] ? '★' : '☆'}</span><b>${a.name}</b><span class="d">${a.desc}</span></div>`)
+        .join('')}</div>
+      <button class="btn btn-main" data-act="close-modal" id="btn-close-ach">完成</button>`;
     this.openModal(p);
   }
 
@@ -377,6 +403,7 @@ export class Screens {
       <div class="total">0</div>
       <div class="best">${d.newBest ? (d.prevBest > 0 ? `此前最高 <b>${fmtInt(d.prevBest)}</b>` : '首个纪录') : `历史最高 <b>${fmtInt(d.prevBest)}</b>`}</div>
       <div class="stats">等级 ${d.level} · 探索 ${d.explored}% · 猜中标记 ${d.marks} · 用时 ${fmtTime(b.timeSec)}</div>
+      ${d.unlocked.length ? `<div class="ach-new">${d.unlocked.map((a) => `<span>★ ${a.name}</span>`).join('')}</div>` : ''}
       <button class="btn btn-main" data-act="replay" id="btn-replay">再来一局</button>
       <div class="row">
         ${b.won ? '' : '<button class="btn btn-ghost" data-act="review" id="btn-review">查看盘面</button>'}

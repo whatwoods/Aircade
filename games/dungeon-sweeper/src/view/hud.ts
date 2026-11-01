@@ -56,6 +56,8 @@ export class Hud {
   private sil: Silhouettes;
   private fx: Fx;
   hidden = false;
+  /** 当前难度的屠龙血量线 */
+  dragonHp = 14;
 
   constructor(tw: Tweens, tex: Textures, gl: Glyphs, sil: Silhouettes, fx: Fx) {
     this.tw = tw;
@@ -369,8 +371,8 @@ export class Hud {
       ctx.globalAlpha = 1;
     }
     // 屠龙线
-    if (this.maxHp >= CONFIG.dragon.minHpToChallenge) {
-      const x = sg.x0 + CONFIG.dragon.minHpToChallenge * sg.w;
+    if (this.maxHp >= this.dragonHp) {
+      const x = sg.x0 + this.dragonHp * sg.w;
       ctx.fillStyle = PAL.gold;
       ctx.fillRect(x - 1, hy - 3, 2, H.h + 6);
       ctx.beginPath();

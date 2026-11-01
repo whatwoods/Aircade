@@ -21,7 +21,7 @@ function cellTag(g: Game, i: number): CellTag {
 const EMOJI: Record<CellTag, string> = { lit: '🟨', dark: '⬛', lair: '🟥', dragon: '🐉', death: '💀' };
 
 export function shareText(g: Game, b: ScoreBreakdown, url: string): string {
-  const head = g.daily ? `地牢扫雷 · 每日挑战 ${dayLabel(g.daily)}` : `地牢扫雷 · 种子 #${g.seed}`;
+  const head = g.daily ? `地牢扫雷 · 每日挑战 ${dayLabel(g.daily)}` : `地牢扫雷 · ${g.diff.name} · 种子 #${g.seed}`;
   const res = b.won ? `屠龙成功 ${fmtInt(b.total)} 分 · ${fmtTime(b.timeSec)}` : `倒在了 Lv${g.player.level} · ${fmtInt(b.total)} 分`;
   const rows: string[] = [];
   for (let y = 0; y < ROWS; y++) {
@@ -133,7 +133,7 @@ export function drawShareCard(g: Game, b: ScoreBreakdown): HTMLCanvasElement {
   ctx.font = `600 36px ${FONT_CN}`;
   ctx.fillStyle = PAL.ash;
   setSpacing(ctx, 4);
-  ctx.fillText(g.daily ? `每日挑战 · ${dayLabel(g.daily)}` : `种子 #${g.seed}`, W / 2, 280);
+  ctx.fillText(g.daily ? `每日挑战 · ${dayLabel(g.daily)}` : `${g.diff.name} · 种子 #${g.seed}`, W / 2, 280);
   ctx.font = `900 60px ${FONT_CN}`;
   ctx.fillStyle = b.won ? PAL.gold : '#FF5A6A';
   ctx.fillText(b.won ? '屠龙成功' : '你倒下了', W / 2, 380);

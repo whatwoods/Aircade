@@ -1,6 +1,7 @@
-import { CONFIG } from '../config';
-import { Rng, hash01 } from '../core/rng';
-import { Kind } from './types';
+import { CONFIG } from '../config.ts';
+import { Rng, hash01 } from '../core/rng.ts';
+import { type DiffId, diffParams } from './difficulty.ts';
+import { Kind } from './types.ts';
 
 export const COLS = CONFIG.board.cols;
 export const ROWS = CONFIG.board.rows;
@@ -48,6 +49,7 @@ export interface BoardData {
   seed: number;
   regen: number;
   tutorial: boolean;
+  diff: DiffId;
   kind: Uint8Array;
   level: Uint8Array;
   gold: Uint16Array;
@@ -73,11 +75,12 @@ export const TUTORIAL_ROWS: Record<number, string> = {
   11: '...EEE2.C',
 };
 
-function emptyBoard(seed: number, tutorial: boolean): BoardData {
+function emptyBoard(seed: number, tutorial: boolean, diff: DiffId): BoardData {
   return {
     seed,
     regen: 0,
     tutorial,
+    diff,
     kind: new Uint8Array(N),
     level: new Uint8Array(N),
     gold: new Uint16Array(N),
@@ -117,9 +120,10 @@ export function simulateStartReveal(b: BoardData): number {
   return count;
 }
 
-function generateOnce(seed: number, tutorial: boolean, attempt: number): BoardData {
+function generateOnce(seed: number, tutorial: boolean, attempt: number, diff: DiffId): BoardData {
   const rng = new Rng(seed * 7919 + attempt * 104729 + 17);
-  const b = emptyBoard(seed, tutorial);
+  const b = emptyBoard(seed, tutorial, diff);
+  const D = diffParams(diff);
   const locked = new Uint8Array(N);
   for (let i = 0; i < N; i++) {
     if (inLair(cx(i), cy(i))) {
@@ -127,9 +131,9 @@ function generateOnce(seed: number, tutorial: boolean, attempt: number): BoardDa
       locked[i] = 1;
     } else if (inEntrance(cx(i), cy(i))) locked[i] = 1;
   }
-  const counts: Record<number, number> = { ...CONFIG.monsters.counts };
+  const counts: Record<number, number> = { ...D.counts };
   let chestsLeft: number = CONFIG.items.chest.count;
-  let potionsLeft: number = CONFIG.items.potion.count;
+  let potionsLeft: number = D.potionCount;
 
   if (tutorial) {
     for (const [l, d] of Object.entries(CONFIG.tutorial.countsDelta)) counts[+l] = Math.max(0, counts[+l] + d);
@@ -225,11 +229,13 @@ function generateOnce(seed: number, tutorial: boolean, attempt: number): BoardDa
   return b;
 }
 
-export function generateBoard(seed: number, tutorial = false, startK = 0): BoardData {
+export function generateBoard(seed: number, tutorial = false, startK = 0, diff: DiffId = 'normal'): BoardData {
+  // 引导局固定用标准难度
+  if (tutorial) diff = 'normal';
   let last: BoardData | null = null;
   const [lo, hi] = CONFIG.board.initialRevealRange;
   for (let k = startK; k < startK + CONFIG.board.maxRegen; k++) {
-    const b = generateOnce(seed, tutorial, k);
+    const b = generateOnce(seed, tutorial, k, diff);
     last = b;
     if (tutorial) return b;
     const n = simulateStartReveal(b);
