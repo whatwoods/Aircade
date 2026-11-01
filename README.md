@@ -95,7 +95,7 @@ for g in games/*/; do (cd "$g" && pnpm install --frozen-lockfile && pnpm build) 
 
 - `scripts/build-site.sh` 依次构建上线的游戏，生成 `site/`；增减游戏改脚本里的 `GAMES`，并同步入口页链接。
 - `wrangler.jsonc` 把 `site/` 作为静态资源目录，没有 Worker 代码。
-- Cloudflare 后台设置：构建命令 `bash scripts/build-site.sh`，部署命令 `npx wrangler deploy`，生产分支 `main`，自定义域名 `games.wayai.cc`。Node 版本由 `.node-version` 指定。
+- Cloudflare 后台设置：构建命令 `bash scripts/build-site.sh`，部署命令 `npx wrangler deploy`，生产分支 `main`。自定义域名 `games.wayai.cc` 写在 `wrangler.jsonc` 的 `routes` 里，部署时自动绑定。Node 版本由 `.node-version` 指定。
 - 本地预览：`bash scripts/build-site.sh && npx wrangler dev`。
 
 ### 其他静态托管
