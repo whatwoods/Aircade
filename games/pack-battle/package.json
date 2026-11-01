@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 5104 --strictPort --host",
     "balance": "node scripts/balance.ts",
+    "bot": "node scripts/bot.ts",
     "icons": "node scripts/icons.ts"
   },
   "dependencies": {
