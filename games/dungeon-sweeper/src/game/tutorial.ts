@@ -21,6 +21,8 @@ export interface TutStep {
   ms: number;
   /** 本步提示文案（操作错误时） */
   wrong?: string;
+  /** mark 步骤里点错了操作（点按，或长按了别的格）时的提示；缺省用 wrong */
+  wrongGesture?: string;
   /** 在暗砖上显示的等级标签（教学「数字 = 等级之和」） */
   labels?: { cell: number; level: number }[];
   /** 在数字格上方显示的算式 */
@@ -100,7 +102,8 @@ export const TUTORIAL_STEPS: TutStep[] = [
     target: idx(8, 9),
     mark: 3,
     ms: 0,
-    wrong: '选 3 试试',
+    wrong: '在轮盘里选「3」',
+    wrongGesture: '长按这块暗砖（电脑：右键），在弹出的轮盘里选「3」',
   },
   {
     id: '3b',

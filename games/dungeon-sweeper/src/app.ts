@@ -1135,7 +1135,7 @@ export class App implements Stage, InputHandler {
     const real = this.clock.real;
     const kind = g.b.kind[c];
     if (this.tut.active && !this.tut.allowLongPress(c)) {
-      if (!this.tut.waiting) this.screens.shakeBubble(this.tut.cur?.wrong);
+      if (!this.tut.waiting) this.screens.shakeBubble(this.tutWrongGesture());
       return;
     }
     if (kind === Kind.Lair) {
@@ -1184,6 +1184,12 @@ export class App implements Stage, InputHandler {
     this.board.radialCell = -1;
   }
 
+  /** 引导中操作方式不对时的提示（标记步骤要长按，点按会被拦下） */
+  private tutWrongGesture(): string | undefined {
+    const s = this.tut.cur;
+    return s?.wrongGesture ?? s?.wrong;
+  }
+
   applyMark(cell: number, m: number): void {
     this.userActed = true;
     const g = this.game;
@@ -1211,7 +1217,7 @@ export class App implements Stage, InputHandler {
     if (real < this.lockUntil) return;
     if (this.tut.active && !this.tut.allowTap(c)) {
       if (!this.tut.waiting) {
-        this.screens.shakeBubble(this.tut.cur?.wrong);
+        this.screens.shakeBubble(this.tutWrongGesture());
         this.sfx.boop();
       }
       return;
