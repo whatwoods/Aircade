@@ -11,6 +11,8 @@ export interface DiffParams {
   potionCount: number;
   dragonLevel: number;
   minHp: number;
+  /** 升到这些等级时三选一祝福 */
+  blessLevels: readonly number[];
 }
 
 export const isDiff = (x: unknown): x is DiffId => typeof x === 'string' && x in CONFIG.difficulty;
@@ -22,7 +24,7 @@ export function diffParams(id: DiffId): DiffParams {
   const d = CONFIG.difficulty[id];
   const counts: Record<number, number> = {};
   for (let l = 1; l <= 9; l++) counts[l] = Math.max(0, (CONFIG.monsters.counts[l] ?? 0) + (d.countsDelta[l] ?? 0));
-  p = { id, name: d.name, counts, potionCount: d.potionCount, dragonLevel: d.dragonLevel, minHp: d.minHpToChallenge };
+  p = { id, name: d.name, counts, potionCount: d.potionCount, dragonLevel: d.dragonLevel, minHp: d.minHpToChallenge, blessLevels: d.blessLevels };
   cache.set(id, p);
   return p;
 }

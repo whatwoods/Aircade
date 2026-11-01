@@ -1,5 +1,6 @@
 import { CONFIG } from '../config.ts';
 import { N, NEIGHBORS } from './board.ts';
+import { type BlessId, chestXpOf, killXpOf, potionHealOf } from './blessings.ts';
 import type { Game } from './rules.ts';
 import { Kind } from './types.ts';
 
@@ -130,8 +131,10 @@ function analyze(g: Game): Analysis {
     const a = order[d];
     const cell = frontier[a];
     const b = bound[cell];
+    const kv = g.known[cell];
     for (let v = 0; v <= b; v++) {
       if (v > 0 && used[v] >= g.alive[v]) continue;
+      if (kv && v !== kv) continue;
       val[cell] = v;
       if (v) used[v]++;
       let good = true;
@@ -188,7 +191,14 @@ export interface BotOpts {
   stopHp: number;
   /** slip 用的随机数 [0,1) */
   rand?: () => number;
+  /** 祝福偏好（靠前的先选）；不给则从候选里随机选 */
+  blessPref?: readonly BlessId[];
 }
+
+/** 模拟默认的祝福偏好：先保命、再省经验、最后要分 */
+export const BLESS_PREF: readonly BlessId[] = ['leech', 'berserk', 'alchemy', 'vigor', 'undying', 'armor', 'butcher', 'greed', 'insight', 'bounty'];
+/** 推理无误的玩家不缺生存：优先无代价的赏金 / 洞察，其次不动生命上限、不废血瓶的 */
+export const BLESS_PREF_EXPERT: readonly BlessId[] = ['bounty', 'insight', 'alchemy', 'butcher', 'armor', 'greed', 'vigor', 'berserk', 'leech', 'undying'];
 
 const BOT_DEFAULT: BotOpts = { maxNodes: CONFIG.solver.maxNodes, slip: 0, minHp: 0, stopHp: 0 };
 
@@ -207,7 +217,14 @@ export function playBot(g: Game, o: BotOpts): SolveResult {
   for (let step = 0; step < 400 && g.phase === 'playing'; step++) {
     actions++;
     g.timeMs += o.msPerAction ?? 0;
+    if (g.offer) {
+      const offer = g.offer;
+      const id = o.blessPref ? (o.blessPref.find((b) => offer.includes(b)) ?? offer[0]) : offer[Math.floor(rand() * offer.length)];
+      g.chooseBlessing(id);
+      continue;
+    }
     const p = g.player;
+    const dmg = (v: number) => g.damageOf(v);
     const ready = p.hp >= o.minHp;
     if (ready && p.hp >= o.stopHp) {
       g.tap(lair, true);
@@ -219,7 +236,7 @@ export function playBot(g: Game, o: BotOpts): SolveResult {
     // 0. 失手：随手点开一个不一定致死的前沿格
     if (o.slip > 0 && count > 0 && rand() < o.slip) {
       const cand: number[] = [];
-      for (let a = 0; a < count; a++) if (minOf(possMask[frontier[a]]) < p.hp) cand.push(frontier[a]);
+      for (let a = 0; a < count; a++) if (dmg(minOf(possMask[frontier[a]])) < p.hp) cand.push(frontier[a]);
       if (cand.length) pick = cand[Math.floor(rand() * cand.length)];
     }
     // 1. 必定为空
@@ -227,7 +244,7 @@ export function playBot(g: Game, o: BotOpts): SolveResult {
     // 2. 能升级的宝箱（未满血时）
     if (pick < 0 && p.hp < p.maxHp)
       for (let i = 0; i < N && pick < 0; i++)
-        if (g.revealed[i] && !g.collected[i] && g.b.kind[i] === Kind.Chest && g.b.itemXp[i] >= xpLeft) pick = i;
+        if (g.revealed[i] && !g.collected[i] && g.b.kind[i] === Kind.Chest && chestXpOf(g.has, g.b.itemXp[i]) >= xpLeft) pick = i;
     // 3. 已知、可活且能升级的怪（取最大）
     if (pick < 0) {
       let best = -1;
@@ -235,7 +252,7 @@ export function playBot(g: Game, o: BotOpts): SolveResult {
         const m = possMask[frontier[a]];
         if (!single(m)) continue;
         const v = minOf(m);
-        if (v > 0 && v < p.hp && v >= xpLeft && v > best) {
+        if (v > 0 && dmg(v) < p.hp && killXpOf(g.has, v) >= xpLeft && v > best) {
           best = v;
           pick = frontier[a];
         }
@@ -247,7 +264,7 @@ export function playBot(g: Game, o: BotOpts): SolveResult {
       for (let a = 0; a < count; a++) {
         const m = possMask[frontier[a]];
         const mx = maxOf(m);
-        if (mx >= p.hp) continue;
+        if (dmg(mx) >= p.hp) continue;
         const sc = mx * 2 + (m & 1 ? 0 : 1);
         if (sc < bs) {
           bs = sc;
@@ -259,7 +276,7 @@ export function playBot(g: Game, o: BotOpts): SolveResult {
     if (pick < 0)
       for (let i = 0; i < N && pick < 0; i++) {
         if (!g.revealed[i] || g.collected[i]) continue;
-        if (g.b.kind[i] === Kind.Potion && p.hp < p.maxHp) pick = i;
+        if (g.b.kind[i] === Kind.Potion && p.hp < p.maxHp && potionHealOf(g.has, g.b.heal[i]) > 0) pick = i;
       }
     if (pick < 0)
       for (let i = 0; i < N && pick < 0; i++) if (g.revealed[i] && !g.collected[i] && g.b.kind[i] === Kind.Chest) pick = i;
@@ -286,7 +303,7 @@ export function playBot(g: Game, o: BotOpts): SolveResult {
             break;
           }
       if (pick < 0) break;
-      if (bs >= p.hp) deadly++;
+      if (dmg(Math.min(bs, 9)) >= p.hp) deadly++;
     }
     g.tap(pick, true);
   }

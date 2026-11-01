@@ -1,5 +1,5 @@
 import { CONFIG, maxHpForLevel, xpToNextLevel } from '../config';
-import { clamp01, cubicOut, quadOut } from '../core/ease';
+import { backOut, clamp01, cubicOut, quadOut } from '../core/ease';
 import { Channel, Tweens } from '../core/tween';
 import { P, type Fx } from './fx';
 import { type Sprite, roundRect, sprite } from './gfx';
@@ -58,6 +58,11 @@ export class Hud {
   hidden = false;
   /** 当前难度的屠龙血量线 */
   dragonHp = 14;
+  /** 祝福带来的生命上限增减（§3.10） */
+  bonusHp = 0;
+  /** 已选祝福的印章字（分数行中间） */
+  seals: string[] = [];
+  private sealT0 = -1e9;
 
   constructor(tw: Tweens, tex: Textures, gl: Glyphs, sil: Silhouettes, fx: Fx) {
     this.tw = tw;
@@ -68,9 +73,11 @@ export class Hud {
   }
 
   /** 与逻辑真相对齐（新局 / 空闲时兜底） */
-  sync(level: number, hp: number, xp: number, score: number, alive: readonly number[]): void {
+  sync(level: number, hp: number, xp: number, score: number, alive: readonly number[], bonusHp = 0, seals: string[] = []): void {
     this.level = level;
-    this.maxHp = maxHpForLevel(level);
+    this.bonusHp = bonusHp;
+    this.seals = seals;
+    this.maxHp = maxHpForLevel(level) + bonusHp;
     this.hp = hp;
     this.xp = xp;
     this.xpNeed = xpToNextLevel(level);
@@ -107,7 +114,7 @@ export class Hud {
 
   levelUp(to: number, now: number): void {
     this.level = to;
-    this.maxHp = maxHpForLevel(to);
+    this.maxHp = maxHpForLevel(to) + this.bonusHp;
     this.xpNeed = xpToNextLevel(to);
     this.hp = this.maxHp;
     this.tw.set(this.hpLag, this.hpFill.v);
@@ -116,6 +123,17 @@ export class Hud {
     this.levelT0 = now;
     this.refillT0 = now;
     for (let i = 0; i < this.xpNeed; i++) this.slotPop[i] = now + i * 30;
+  }
+
+  /** 选了祝福：印章入列，生命上限按差值调整 */
+  bless(seal: string, bonusHp: number, hp: number, now: number): void {
+    this.seals = [...this.seals, seal];
+    this.sealT0 = now;
+    this.bonusHp = bonusHp;
+    this.maxHp = maxHpForLevel(this.level) + bonusHp;
+    this.hp = hp;
+    this.tw.to(this.hpFill, hp, 300, now, cubicOut);
+    this.tw.to(this.hpLag, hp, 300, now, cubicOut);
   }
 
   refill(now: number): void {
@@ -450,6 +468,27 @@ export class Hud {
     const tw = G.time.drawTime(ctx, this.timeSec, S.x + S.w, sy, 1);
     ctx.drawImage(T.hourglass.c, S.x + S.w - tw - 18 * s, sy - 8 * s, 14 * s, 16 * s);
     calls += 4;
+    // 祝福印章
+    const ns = this.seals.length;
+    if (ns) {
+      const sz = 19 * s;
+      const gap = 5 * s;
+      const x0 = S.x + S.w / 2 - (ns * sz + (ns - 1) * gap) / 2;
+      for (let k = 0; k < ns; k++) {
+        const pt = k === ns - 1 ? (world - this.sealT0) / 420 : 1;
+        const sc = pt >= 1 ? 1 : 1 + 0.6 * (1 - backOut(clamp01(pt)));
+        const cx0 = x0 + k * (sz + gap) + sz / 2;
+        const w = sz * sc;
+        roundRect(ctx, cx0 - w / 2, sy - w / 2, w, w, 3 * s);
+        ctx.fillStyle = '#6E1F14';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(232,176,75,0.7)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        drawText(ctx, G.text.get(this.seals[k], 12 * s, PAL.gold, 700), cx0, sy, 0.5, d, sc);
+      }
+      calls += ns * 2;
+    }
     // ---- 消息行
     this.currentMsg(real);
     const mt = this.curText;

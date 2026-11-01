@@ -8,6 +8,7 @@ import { vibrate } from '../core/haptics';
 import type { Tweens } from '../core/tween';
 import { COLS, N, START_CELL, cx, cy } from '../game/board';
 import type { Game } from '../game/rules';
+import { type BlessId, blessDef, killXpOf } from '../game/blessings';
 import { type GameEvent, Kind } from '../game/types';
 import { type BoardView, torchOffset } from './boardView';
 import type { Camera } from './camera';
@@ -162,7 +163,7 @@ export class Director {
           fightCell = e.cell;
           hasFight = true;
           if (e.lethal) lethal = true;
-          this.fight(e.cell, e.level, e.hpBefore, e.hpAfter, e.lethal, e.score, fightT0);
+          this.fight(e.cell, e.level, e.hpBefore, e.hpAfter, e.lethal, e.score, fightT0, e.undying);
           break;
         }
         case 'xp': {
@@ -214,7 +215,22 @@ export class Director {
         case 'potionRefused':
           s.board.shakeT0[e.cell] = s.clock.world;
           s.sfx.boop();
-          s.hud.message('生命已满，留着以后用', 'normal', s.clock.real, 2200);
+          s.hud.message(e.void ? '坚韧：血瓶已失效' : '生命已满，留着以后用', 'normal', s.clock.real, 2200);
+          break;
+        case 'heal': {
+          const t = fightT0 >= 0 ? fightT0 + T.strikeAtMs + 260 : cursor;
+          const n = e.amount;
+          this.at(t, () => {
+            const g2 = s.hud.hpTarget(s.L);
+            s.hud.heal(n, s.clock.world);
+            s.fx.numText(s.gl.heal, n, 43, g2.x, g2.y + 22 * s.L.s, 800, 1, undefined, 0.8);
+          });
+          break;
+        }
+        case 'bless':
+          this.bless(e.id);
+          break;
+        case 'blessOffer':
           break;
         case 'dragonBlocked':
           s.dragon.disturb(s.L, s.clock.real);
@@ -319,7 +335,7 @@ export class Director {
   }
 
   // ------------------------------------------------------------ 战斗
-  private fight(cell: number, level: number, hpBefore: number, hpAfter: number, lethal: boolean, score: number, t0: number): void {
+  private fight(cell: number, level: number, hpBefore: number, hpAfter: number, lethal: boolean, score: number, t0: number, undying: boolean): void {
     const s = this.s;
     const B = s.board;
     B.scheduleFlip(cell, 1, t0, T.fastFlipMs, 0, cell);
@@ -357,6 +373,12 @@ export class Director {
       s.hud.damage(dmg, L, s.clock.world);
       s.ov.redT0 = s.clock.real;
       s.ov.redA = Math.min(0.35, (dmg / Math.max(1, s.hud.maxHp)) * 0.7 + 0.08);
+      if (undying) {
+        const spr = s.gl.text.get('不屈！', 22 * L.s, PAL.gold, 700, FONT_CN, { glow: 'rgba(255,181,74,0.9)', glowBlur: 10, stroke: 'rgba(40,20,4,0.95)', strokeW: 4 });
+        s.fx.sprText(spr, x, y - L.cell * 0.9, 1400, 1, 30, 1);
+        s.fx.burstRays(x, y, 0.8 * L.s, 800, 1);
+        s.sfx.bell();
+      }
     });
     if (lethal) return;
     // 碎裂（hitstop 结束后的第一帧）
@@ -372,7 +394,7 @@ export class Director {
       B.num[cell] = s.game.number[cell];
       s.hud.killed(level, s.clock.world);
       s.hud.addScore(score, s.L, s.clock.world);
-      s.hud.message(`击败 ${CONFIG.monsters.names[level]} Lv${level} · 经验 +${level * CONFIG.monsters.xpPerLevel}`, 'normal', s.clock.real, 2400);
+      s.hud.message(`击败 ${CONFIG.monsters.names[level]} Lv${level} · 经验 +${killXpOf(s.game.has, level)}`, 'normal', s.clock.real, 2400);
     });
     void hpAfter;
   }
@@ -540,6 +562,21 @@ export class Director {
       }, s.tex.bottle, 22);
       s.hud.message(`饮下血瓶：生命 +${heal}`, 'mint', s.clock.real, 2200);
     });
+  }
+
+  // ------------------------------------------------------------ 祝福
+  private bless(id: BlessId): void {
+    const s = this.s;
+    const L = s.L;
+    const g = s.game;
+    s.hud.bless(blessDef(id).seal, g.bonusHp, g.player.hp, s.clock.world);
+    const p = s.hud.scorePos(L);
+    const x = L.scoreLine.x + L.scoreLine.w / 2;
+    s.fx.burst(P.Spark, x, p.y, 18, 40, 140, 700, 5, 0, 60, 1);
+    s.sfx.bell();
+    vibrate(12);
+    const d = blessDef(id);
+    s.hud.message(d.cost ? `${d.name}：${d.gain}，${d.cost}` : `${d.name}：${d.gain}`, 'gold', s.clock.real, 3200);
   }
 
   // ------------------------------------------------------------ 标记

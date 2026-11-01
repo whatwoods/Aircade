@@ -1,3 +1,5 @@
+import type { BlessId } from './blessings.ts';
+
 export const Kind = {
   Empty: 0,
   Monster: 1,
@@ -27,6 +29,8 @@ export interface ScoreBreakdown {
   killScore: number;
   /** 巨龙觉醒后的击杀分（已含倍率） */
   rage: number;
+  /** 赏金祝福的额外击杀分 */
+  bounty: number;
   gold: number;
   dragon: number;
   hpLeft: number;
@@ -50,12 +54,18 @@ export type GameEvent =
       /** 本次击杀得分（含龙怒倍率） */
       score: number;
       rage: boolean;
+      /** 不屈：本该致死，留了 1 生命 */
+      undying: boolean;
     }
+  | { t: 'heal'; cell: number; amount: number }
+  | { t: 'blessOffer'; offer: BlessId[] }
+  | { t: 'bless'; id: BlessId; cells: number[] }
   | { t: 'xp'; amount: number; from: number; source: 'monster' | 'chest' }
   | { t: 'levelUp'; from: number; to: number; maxHp: number }
   | { t: 'numbers'; cells: number[]; before: number[]; after: number[] }
   | { t: 'collect'; cell: number; item: 'chest' | 'potion'; gold: number; xp: number; heal: number }
-  | { t: 'potionRefused'; cell: number }
+  /** void：祝福让血瓶失效（坚韧） */
+  | { t: 'potionRefused'; cell: number; void: boolean }
   | { t: 'dragonBlocked' }
   | { t: 'dragonConfirm' }
   | { t: 'dragonAwake' }

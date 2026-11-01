@@ -1,25 +1,28 @@
 /**
  * pnpm sim —— 用只看可见信息的机器人批量打局：各难度 × 各水平的胜率与得分、贪心曲线，并对照文档 §3.8 的目标。
- * 用法：node scripts/sim.ts [runs=150] [seed0=1] [难度=easy,normal,hard] [--raw]
+ * 用法：node scripts/sim.ts [runs=150] [seed0=1] [难度=easy,normal,hard] [--raw] [--nobless]
  */
 import { CONFIG, validateConfig } from '../src/config.ts';
 import { Rng } from '../src/core/rng.ts';
 import { type BoardData, generateBoard } from '../src/game/board.ts';
 import { type DiffId, DIFF_IDS, diffParams } from '../src/game/difficulty.ts';
 import { Game, pickBoard } from '../src/game/rules.ts';
-import { type BotOpts, playBot } from '../src/game/solver.ts';
+import { BLESS_PREF, BLESS_PREF_EXPERT, type BotOpts, playBot } from '../src/game/solver.ts';
 
-type Profile = Pick<BotOpts, 'maxNodes' | 'slip' | 'msPerAction'>;
+type Profile = Pick<BotOpts, 'maxNodes' | 'slip' | 'msPerAction' | 'blessPref'>;
 const PROFILES: Record<string, Profile> = {
-  novice: { maxNodes: 60, slip: 0.04, msPerAction: 4000 },
-  skilled: { maxNodes: 600, slip: 0.012, msPerAction: 3000 },
-  expert: { maxNodes: CONFIG.solver.maxNodes, slip: 0, msPerAction: 2000 },
+  novice: { maxNodes: 60, slip: 0.04, msPerAction: 4000 },  // 祝福随手选
+  skilled: { maxNodes: 600, slip: 0.012, msPerAction: 3000, blessPref: BLESS_PREF },
+  expert: { maxNodes: CONFIG.solver.maxNodes, slip: 0, msPerAction: 2000, blessPref: BLESS_PREF_EXPERT },
 };
 
-/** 胜率目标（够血即屠龙），[下限, 上限] %。各档都保留「无致命猜测」保证，所以专家应接近 100% */
+/**
+ * 胜率目标（够血即屠龙），[下限, 上限] %。选盘保证「不靠祝福也无需致命猜测」，所以专家接近 100%；
+ * 祝福会让路线偏离校验时那条，偶尔被迫猜，专家下限放到 95（文档 §3.10）
+ */
 const TARGETS: Record<DiffId, Record<string, [number, number]>> = {
-  easy: { novice: [50, 75], skilled: [85, 100], expert: [98, 100] },
-  normal: { novice: [20, 40], skilled: [55, 80], expert: [98, 100] },
+  easy: { novice: [50, 75], skilled: [85, 100], expert: [95, 100] },
+  normal: { novice: [20, 40], skilled: [55, 80], expert: [95, 100] },
   hard: { novice: [0, 15], skilled: [25, 50], expert: [95, 100] },
 };
 
@@ -38,6 +41,7 @@ const runs = Number(args[0] ?? 150);
 const seed0 = Number(args[1] ?? 1);
 const diffs = (args[2] ?? DIFF_IDS.join(',')).split(',') as DiffId[];
 const withRaw = process.argv.includes('--raw');
+const noBless = process.argv.includes('--nobless');
 const t0 = Date.now();
 
 function boards(diff: DiffId, pick: boolean): BoardData[] {
@@ -50,6 +54,7 @@ function run(bs: BoardData[], prof: Profile, stopHp = 0): Row {
   const r: Row = { n: 0, wins: 0, deadly: 0, winScore: 0, hpLeft: 0, killXp: 0, clears: 0 };
   bs.forEach((b, k) => {
     const g = new Game(seed0 + k, false, b);
+    g.blessEnabled = !noBless;
     const rng = new Rng((seed0 + k) * 7919 + 13);
     const res = playBot(g, { ...prof, minHp: g.diff.minHp, stopHp: Math.max(stopHp, g.diff.minHp), rand: () => rng.next() });
     r.n++;
@@ -77,7 +82,7 @@ const head = (first: string) => console.log(`${first}   win%  致命猜  胜局�
 
 const checks: string[] = validateConfig().map((e) => `[FAIL] config: ${e}`);
 const ok = (c: boolean, s: string) => checks.push(`[${c ? 'ok' : 'FAIL'}] ${s}`);
-console.log(`runs=${runs} seed0=${seed0}`);
+console.log(`runs=${runs} seed0=${seed0}${noBless ? ' 无祝福' : ''}`);
 
 for (const diff of diffs) {
   const D = diffParams(diff);

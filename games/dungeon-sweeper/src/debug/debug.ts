@@ -4,6 +4,7 @@ import { clearAll, loadRecords, save } from '../core/storage';
 import { COLS, N, ROWS, cx, cy, idx } from '../game/board';
 import { type DiffId, isDiff } from '../game/difficulty';
 import { recordsKey } from '../game/score';
+import { blessDef, isBless, rollOffer } from '../game/blessings';
 import { Kind } from '../game/types';
 import { drawIcon, drawOgImage, drawShareCard } from '../ui/share';
 import { P } from '../view/fx';
@@ -34,7 +35,7 @@ export function installDebug(app: App): void {
 
   const resync = () => {
     const p = app.game.player;
-    app.hud.sync(p.level, p.hp, p.xp, app.game.score, app.game.alive);
+    app.hud.sync(p.level, p.hp, p.xp, app.game.score, app.game.alive, app.game.bonusHp, app.game.blessings.map((b) => blessDef(b).seal));
   };
   const play = (ev: ReturnType<App['game']['tap']>) => app.playEvents(ev);
   const ensurePlaying = () => {
@@ -53,6 +54,8 @@ export function installDebug(app: App): void {
         diff: g.diff.id,
         titleDiff: app.diff,
         awakeKillXp: g.awakeKillXp,
+        blessings: g.blessings.slice(),
+        offer: g.offer,
         hp: g.player.hp,
         maxHp: g.player.maxHp,
         level: g.player.level,
@@ -132,6 +135,20 @@ export function installDebug(app: App): void {
     setLevel(n: number) {
       play(app.game.debugSetLevel(n));
       resync();
+    },
+    /** 祝福：bless('leech') 直接获得；bless() 立刻弹出一次三选一 */
+    bless(id?: string) {
+      const g = app.game;
+      if (id !== undefined) {
+        if (!isBless(id) || g.has(id)) return false;
+        g.offer = [id];
+        g.offersDue++;
+        play(g.chooseBlessing(id));
+        return true;
+      }
+      g.offersDue++;
+      g.offer ??= rollOffer(g.seed, g.picks, g.blessings);
+      return g.offer;
     },
     heal() {
       app.game.player.hp = app.game.player.maxHp;

@@ -1,6 +1,7 @@
 import type { Layout } from '../view/layout';
 import type { Records, Settings } from '../core/storage';
 import { ACHIEVEMENTS, type Achievement } from '../game/achievements';
+import { type BlessId, blessDef } from '../game/blessings';
 import { type DiffId, DIFF_IDS, diffParams } from '../game/difficulty';
 import { breakdownRows, fmtInt, fmtTime } from '../game/score';
 import type { DailyInfo } from '../game/daily';
@@ -78,6 +79,7 @@ export class Screens {
   private resultLayer: HTMLElement;
   private fade: HTMLElement;
   private dlgResolve: ((v: boolean) => void) | null = null;
+  private blessResolve: ((id: BlessId) => void) | null = null;
   private settingsFrom: 'title' | 'pause' = 'title';
   private countRaf = 0;
   /** 结算计数中：返回 true 时 app 播放滴答 */
@@ -307,6 +309,7 @@ export class Screens {
       ${g.daily ? '' : '<button class="btn btn-ghost" data-act="restart" id="btn-restart">重新开始</button>'}
       <button class="btn btn-ghost" data-act="settings" id="btn-psettings">设置</button>
       <button class="btn btn-ghost" data-act="title" id="btn-ptitle">返回标题</button>
+      ${g.blessings.length ? `<div class="bless-own">${g.blessings.map((id) => blessCard(id)).join('')}</div>` : ''}
       <div class="quick">${this.tog('sfx', '音效', st.sfx)}${this.tog('music', '音乐', st.music)}</div>
       <div class="seed">${tag}</div>`;
     this.settingsFrom = 'pause';
@@ -373,6 +376,28 @@ export class Screens {
       p.querySelector('#dlg-yes')!.addEventListener('click', () => this.resolveDialog(true));
     });
   }
+  /** 祝福三选一（§3.10）：没有取消，点卡片即选 */
+  blessPick(offer: readonly BlessId[]): Promise<BlessId> {
+    const p = h('div', 'panel');
+    p.id = 'panel-bless';
+    p.innerHTML = `<h2>选择祝福</h2><div class="bless-cards">${offer.map((id, k) => blessCard(id, `bless:${k}`)).join('')}</div>`;
+    this.openModal(p);
+    return new Promise((res) => {
+      this.blessResolve = res;
+      p.querySelectorAll<HTMLElement>('.bless-card').forEach((el, k) => el.addEventListener('click', () => this.resolveBless(offer[k])));
+    });
+  }
+  get blessOpen(): boolean {
+    return this.blessResolve !== null;
+  }
+  resolveBless(id: BlessId): void {
+    const r = this.blessResolve;
+    if (!r) return;
+    this.blessResolve = null;
+    this.closeModal();
+    r(id);
+  }
+
   get dialogOpen(): boolean {
     return this.dlgResolve !== null;
   }
@@ -478,4 +503,13 @@ export class Screens {
   fadeTo(on: boolean): void {
     this.fade.classList.toggle('on', on);
   }
+}
+
+/** 祝福卡：印章 + 名字 + 收益 + 代价 */
+function blessCard(id: BlessId, act = ''): string {
+  const d = blessDef(id);
+  const tag = act ? 'button' : 'div';
+  return `<${tag} class="bless-card"${act ? ` data-bless="${id}"` : ''}><span class="seal">${d.seal}</span><span class="txt"><b>${d.name}</b><span class="gain">${d.gain}</span>${
+    d.cost ? `<span class="cost">${d.cost}</span>` : ''
+  }</span></${tag}>`;
 }
