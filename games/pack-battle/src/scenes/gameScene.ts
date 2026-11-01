@@ -1436,11 +1436,14 @@ export class GameScene implements Scene {
 /** 一局结束时交给结局页的数据（读档进入结局时也用） */
 export function endingData(run: RunState): EndingData {
   const e = enemyFor(run.round);
+  const dead = !run.cleared || !!run.endless;
+  const hearts = run.clearHearts ?? run.hearts;
   return {
     cleared: run.cleared, round: run.round, score: run.score, roundScores: run.stats.roundScores.slice(),
-    clearBonus: run.cleared ? clearScore(run.hearts) : 0, hearts: run.hearts, seed: run.seed, bestHit: run.stats.bestHit,
-    merges: run.stats.merges, spent: run.stats.spent, killer: run.cleared ? null : e.portrait, killerName: `${e.title}「${e.name}」`,
+    clearBonus: run.cleared ? clearScore(hearts) : 0, hearts, seed: run.seed, bestHit: run.stats.bestHit,
+    merges: run.stats.merges, spent: run.stats.spent, killer: dead ? e.portrait : null, killerName: `${e.title}「${e.name}」`,
     debug: run.debug, tier: run.tier, tierBonus: run.tierBonus, daily: run.daily,
+    endless: !!run.endless, resume: run.cleared && !run.endless && !run.daily ? run : undefined,
   };
 }
 

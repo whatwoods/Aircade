@@ -1,5 +1,5 @@
 // pnpm bot [局数=200] [起始种子=1]：贪心机器人从商店买装备、摆背包，完整打很多局，统计真实的通关率和每轮数据
-// pnpm bot --blind 不偷看敌人；--tier=N 指定难度。
+// pnpm bot --blind 不偷看敌人；--tier=N 指定难度；--endless 通关后接着打无尽，统计能打到第几轮。
 // 和 pnpm balance 互补：balance 测手写的参考构筑，bot 测"按商店随机货品一路买下来"能走多远。
 // 机器人的策略（每次整理阶段反复执行，直到没有更好的动作）：
 //   1. 对每张买得起的商店卡：能合成就试合成；否则在背包里找加成最高的位置；背包放不下就试"卖掉一件再放"
@@ -13,7 +13,7 @@ import { simulate } from '../src/game/battle/sim.ts';
 import { enemyBag, playerMaxHp, runEnemy } from '../src/game/enemies.ts';
 import { canPlace, buildOcc, DIRS, isOpen } from '../src/game/grid.ts';
 import {
-  applyChoice, applyResult, beginArrange, buy, smithTarget, cellPrice, mergeTargetFor, move, newRun, refresh, sell, startBattle, unlockable, unlockCell, type Dest,
+  applyChoice, applyResult, beginArrange, buy, enterEndless, smithTarget, cellPrice, mergeTargetFor, move, newRun, refresh, sell, startBattle, unlockable, unlockCell, type Dest,
 } from '../src/game/run.ts';
 import { computeSynergy } from '../src/game/synergy.ts';
 import type { EventId, ItemInst, Placed, Rot, RunState } from '../src/game/types.ts';
@@ -23,6 +23,10 @@ const args = process.argv.slice(2);
 const BLIND = args.includes('--blind');
 /** --tier N：难度等级 */
 const TIER = Number(args.find((a) => a.startsWith('--tier='))?.slice(7) ?? 0);
+/** --endless：通关后进入无尽 */
+const ENDLESS_MODE = args.includes('--endless');
+/** 统计表覆盖到第几轮（无尽最多看 40 轮） */
+const MAXR = ENDLESS_MODE ? ROUNDS + 40 : ROUNDS;
 const nums = args.filter((a) => !a.startsWith('--')).map(Number);
 const N = nums[0] ?? 200;
 const SEED0 = nums[1] ?? 1;
@@ -50,7 +54,7 @@ function evaluate(run: RunState): number {
   const maxHp = playerMaxHp(run.round);
   const res = simulate(
     { items: run.bag, cols: BAG.cols, rows: BAG.rows, maxHp, open: run.open },
-    { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits, affixes: e.affixes },
+    { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits, affixes: e.affixes, speed: e.speed },
   );
   return res.winner === 0 ? 1 + res.hpEnd[0] / maxHp : 1 - Math.max(0, res.hpEnd[1]) / e.hp;
 }
@@ -174,17 +178,25 @@ interface RoundStat {
   goldLeft: number;
   open: number;
 }
-const stats: RoundStat[] = Array.from({ length: ROUNDS + 1 }, () => ({
+const stats: RoundStat[] = Array.from({ length: MAXR + 1 }, () => ({
   reach: 0, firstWin: 0, attempts: 0, hpWin: 0, wins: 0, dur: 0, items: 0, cells: 0, lv2: 0, lv3: 0, goldLeft: 0, open: 0,
 }));
 let clears = 0;
 let scoreSum = 0;
-const diedAt: number[] = new Array(ROUNDS + 1).fill(0);
+const diedAt: number[] = new Array(MAXR + 1).fill(0);
+/** 无尽里死在第几轮（总轮数） */
+const endlessDeath: number[] = [];
 
 for (let n = 0; n < N; n++) {
   const run = newRun(SEED0 + n, false, { tier: TIER });
   let counted = 0;
   for (;;) {
+    if (run.round > MAXR) {
+      // 无尽打穿统计上限：按打到上限算
+      endlessDeath.push(MAXR + 1);
+      scoreSum += run.score;
+      break;
+    }
     beginArrange(run);
     arrange(run);
     const st = stats[run.round];
@@ -221,8 +233,16 @@ for (let n = 0; n < N; n++) {
       picks.set(id, (picks.get(id) ?? 0) + 1);
       applyChoice(run, id);
     }
+    if (out.ending && run.cleared && !run.endless && ENDLESS_MODE) {
+      clears++;
+      enterEndless(run);
+      continue;
+    }
     if (out.ending) {
-      if (run.cleared) clears++;
+      if (run.endless) {
+        diedAt[round]++;
+        endlessDeath.push(round);
+      } else if (run.cleared) clears++;
       else diedAt[round]++;
       scoreSum += run.score;
       break;
@@ -234,8 +254,9 @@ const pct = (a: number, b: number): string => (b ? Math.round((a / b) * 100) + '
 const avg = (a: number, b: number, d = 1): string => (b ? (a / b).toFixed(d) : '-');
 console.log(`机器人${BLIND ? '（不看敌人）' : ''}${TIER ? ' 难度 ' + TIER : ''} ${N} 局（种子 ${SEED0}–${SEED0 + N - 1}）  通关 ${pct(clears, N)}  平均分 ${Math.round(scoreSum / N)}`);
 console.log('轮  到达   首战胜  平均挑战  赢时剩血  用时s  件数  占格  开放  ★★   ★★★  剩金  死在这轮');
-for (let r = 1; r <= ROUNDS; r++) {
+for (let r = 1; r <= MAXR; r++) {
   const s = stats[r];
+  if (!s.reach) continue;
   console.log(
     [
       String(r).padEnd(3), pct(s.reach, N).padEnd(6), pct(s.firstWin, s.reach).padEnd(7), avg(s.attempts, s.reach, 2).padEnd(9),
@@ -246,3 +267,8 @@ for (let r = 1; r <= ROUNDS; r++) {
 }
 console.log('轮间事件选择：' + [...picks].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join('  '));
 console.log('词缀首战胜率：' + [...affixWin].map(([k, [n, w]]) => `${k} ${pct(w, n)}`).join('  '));
+if (ENDLESS_MODE && endlessDeath.length) {
+  const d = endlessDeath.slice().sort((a, b) => a - b);
+  const q = (f: number): number => d[Math.min(d.length - 1, Math.floor(d.length * f))];
+  console.log(`无尽：${d.length} 局进入，死在总第 ${q(0.25)} / ${q(0.5)} / ${q(0.75)} 轮（25% / 中位 / 75%），最远 ${d[d.length - 1]}`);
+}

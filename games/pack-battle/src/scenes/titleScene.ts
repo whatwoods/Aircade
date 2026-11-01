@@ -1,4 +1,5 @@
 // 标题页：Logo 横幅（钉子 + 缓慢摆动 + 墨线沸腾）、合着的行囊（呼吸 + 扣具闪光）、开始按钮、最高分签、设置 / 规则
+import { ROUNDS } from '../config.ts';
 import { setMusic } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
 import { clock } from '../core/loop.ts';
@@ -272,7 +273,7 @@ export class TitleScene implements Scene {
     this.start.draw(ctx, t, real);
     if (this.best && this.best.score > 0) {
       const b = this.best;
-      const s = `最高分 ${num(b.score)} · ${b.cleared ? '已通关' : '最远第 ' + b.round + ' 轮'}`;
+      const s = `最高分 ${num(b.score)} · ${b.round > ROUNDS ? '无尽第 ' + b.round + ' 轮' : b.cleared ? '已通关' : '最远第 ' + b.round + ' 轮'}`;
       const by = this.saved ? 734 : 694;
       drawSprite(ctx, bestTag(), 105, by + oy);
       text(ctx, s, 195, by + 13 + oy, { size: 13, weight: 700, color: C.ink });

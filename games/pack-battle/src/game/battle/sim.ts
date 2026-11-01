@@ -13,6 +13,8 @@ export interface FighterInput {
   open?: number;
   /** 敌人词缀（坚韧已经算进 maxHp） */
   affixes?: AffixId[];
+  /** 额外冷却速度（无尽轮的敌人） */
+  speed?: number;
 }
 
 interface Unit {
@@ -71,7 +73,7 @@ function makeFighter(side: Side, inp: FighterInput): Fighter {
   });
   return {
     side, maxHp: inp.maxHp, hp: inp.maxHp, shield: 0, poison: 0, poisonT: 0, stun: 0, immune: 0, reduce, reducers, thorns,
-    speedBonus: affixes.includes('swift') ? AFFIX.swiftSpeed : 0, units, potions, phoenix, starts, traits: inp.traits ?? [],
+    speedBonus: (affixes.includes('swift') ? AFFIX.swiftSpeed : 0) + (inp.speed ?? 0), units, potions, phoenix, starts, traits: inp.traits ?? [],
     traitFired: (inp.traits ?? []).map(() => false), dead: false, affixes, regenT: 0,
   };
 }

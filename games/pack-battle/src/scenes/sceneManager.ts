@@ -92,4 +92,8 @@ export interface EndingData {
   tier: number;
   tierBonus: number;
   daily?: string;
+  /** 通关后在无尽里结束的 */
+  endless?: boolean;
+  /** 刚通关、还能进无尽：这一局的状态 */
+  resume?: RunState;
 }

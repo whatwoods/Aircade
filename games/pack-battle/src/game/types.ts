@@ -167,6 +167,10 @@ export interface RunState {
   daily?: string;
   /** 结算时的难度加成分 */
   tierBonus: number;
+  /** 通关后进入了无尽模式 */
+  endless?: boolean;
+  /** 通关那一刻剩下的心（结算明细用；无尽里心会再掉） */
+  clearHearts?: number;
   /** 被调试接口改过：不存档、不计最高分 */
   debug?: boolean;
 }
@@ -253,6 +257,8 @@ export interface EnemyDef {
   boss?: boolean;
   /** 本局这个敌人带的词缀（由 runEnemy 填） */
   affixes?: AffixId[];
+  /** 无尽轮的冷却速度加成（由 runEnemy 填） */
+  speed?: number;
 }
 
 export type BattleEventType =

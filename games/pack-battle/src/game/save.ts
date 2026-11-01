@@ -36,7 +36,7 @@ export function loadRun(): RunState | null {
   const r = s?.run;
   if (!s || s.v !== VER || !r) return null;
   const ok =
-    r.round >= 1 && r.round <= ROUNDS && r.hearts >= 0 &&
+    r.round >= 1 && (r.round <= ROUNDS || (r.endless === true && r.round <= 999)) && r.hearts >= 0 &&
     (r.phase === 'arrange' || r.phase === 'result' || r.phase === 'ending') &&
     Array.isArray(r.bag) && r.bag.every(validItem) &&
     Array.isArray(r.stash) && r.stash.length === SHOP.stashSlots && r.stash.every((x) => x === null || validItem(x)) &&

@@ -141,6 +141,25 @@ export const INPUT = {
   refreshDebounceMs: 250,
 };
 
+/** 无尽模式：第 10 轮通关后接着打；无尽第 k 轮 = 总第 10+k 轮 */
+export const ENDLESS = {
+  /** 敌人依次轮换原表第 cycleFrom–10 轮（鼠群、女巫、黑骑士、游侠、古龙） */
+  cycleFrom: 6,
+  /** 敌人生命 ×(1 + hpPerRound·k) */
+  hpPerRound: 0.2,
+  /** 敌人全部冷却速度 +speedPerRound·k */
+  speedPerRound: 0.08,
+  /** 第 c 圈（每圈 5 轮）敌人装备至少是 ★(c+1)：第一圈全部 ≥★★，第二圈起全部 ★★★ */
+  lvFloorPerCycle: 1,
+  /** 词缀数 = min(affixMax, affixBase + ⌊k / affixEvery⌋)，首领也带 */
+  affixBase: 1,
+  affixEvery: 3,
+  affixMax: 3,
+  /** 玩家生命上限停在第 10 轮的值，不再随轮次增长 */
+  /** 进入无尽时补满心 */
+  refillHearts: true,
+};
+
 export const AUDIO = {
   /** 音乐文件（Lyria 生成，母带响度约 −16dB RMS）进音乐总线前的增益，跟程序化音乐的响度对齐 */
   musicFileLevel: 0.6,

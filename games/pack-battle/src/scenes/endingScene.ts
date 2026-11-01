@@ -1,10 +1,11 @@
 // 结局页：冒险者证书（分数逐行累加、总分、历史最高 / 新纪录印章、趣味统计、种子）+ 再来一局 / 标题
 import { setMusic } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
-import { DIFFICULTY, SCORE } from '../config.ts';
+import { DIFFICULTY, ROUNDS, SCORE } from '../config.ts';
 import type { InputHandler } from '../core/input.ts';
 import { clock } from '../core/loop.ts';
 import { Rolling, ease } from '../core/tween.ts';
+import { enterEndless } from '../game/run.ts';
 import { clearRun } from '../game/save.ts';
 import { loadBest, loadDaily, submitBest, submitDaily, unlockTier } from '../game/score.ts';
 import { emit } from '../render/fx/particles.ts';
@@ -42,6 +43,8 @@ export class EndingScene implements Scene {
   private again: Button;
   private share: Button;
   private title: Button;
+  /** 刚通关时：进入无尽 */
+  private endlessB: Button | null = null;
   /** 分享图（证书画完后预先生成：分享必须在点击的同一时刻发起，不能再等异步出图） */
   private shareFile: File | null = null;
   private sharePrepared = false;
@@ -54,18 +57,31 @@ export class EndingScene implements Scene {
 
   constructor(d: EndingData) {
     this.d = d;
+    let endlessSum = 0;
+    let endlessWins = 0;
     d.roundScores.forEach((s, i) => {
-      if (s != null) this.lines.push({ label: `第 ${i + 1} 轮`, amount: s });
+      if (s == null) return;
+      if (i < ROUNDS) this.lines.push({ label: `第 ${i + 1} 轮`, amount: s });
+      else {
+        endlessSum += s;
+        endlessWins++;
+      }
     });
     if (d.cleared) {
       this.lines.push({ label: '通关奖励', amount: SCORE.clearBonus });
       if (d.hearts > 0) this.lines.push({ label: `剩余心 ×${d.hearts}`, amount: SCORE.heartBonus * d.hearts });
     }
+    // 无尽各轮合成一行，免得明细太长
+    if (endlessWins > 0) this.lines.push({ label: `无尽 ${endlessWins} 轮`, amount: endlessSum });
     if (d.tierBonus > 0) this.lines.push({ label: `${DIFFICULTY.names[d.tier]} 加成`, amount: d.tierBonus });
     this.again = new Button('btn.again', { x: 40, y: 728, w: 210, h: 64 }, '再来一局', 'sealTag', 31);
     this.again.glyph = '↻';
     this.share = new Button('btn.share', { x: 218, y: 728, w: 66, h: 64 }, '分享', 'paper', 33);
     this.title = new Button('btn.title', { x: 292, y: 728, w: 68, h: 64 }, '标题', 'paper', 32);
+    if (d.resume) {
+      this.endlessB = new Button('btn.endless', { x: 30, y: 660, w: 330, h: 56 }, '无尽模式 ›', 'plank', 34);
+      this.endlessB.fontSize = 22;
+    }
     this.handler = this.makeHandler();
   }
 
@@ -99,20 +115,25 @@ export class EndingScene implements Scene {
     const n = Math.max(1, this.lines.length);
     const want = 134 + n * 21 + 34 + 52 + 40 + 66 + 56;
     this.ph = Math.max(440, Math.min(620, want, H - 210));
-    const total = this.ph + 22 + 64;
+    const extra = this.endlessB ? 66 : 0;
+    const total = this.ph + 22 + 64 + extra;
     this.py = Math.max(40, Math.round((H - total) / 2));
-    const by = Math.min(H - 80, this.py + this.ph + 22);
+    const by = Math.min(H - 80, this.py + this.ph + 22 + extra);
+    if (this.endlessB) this.endlessB.r = { x: 30, y: by - extra, w: 330, h: 56 };
     this.again.r = { x: 30, y: by, w: 180, h: 64 };
     this.share.r = { x: 218, y: by, w: 66, h: 64 };
     this.title.r = { x: 292, y: by, w: 68, h: 64 };
   }
 
   private buttons(): Button[] {
-    return [this.again, this.share, this.title];
+    return this.endlessB ? [this.endlessB, this.again, this.share, this.title] : [this.again, this.share, this.title];
   }
 
   private activate(b: Button): void {
-    if (b === this.again) {
+    if (b === this.endlessB && this.d.resume) {
+      const run = this.d.resume;
+      if (enterEndless(run)) gotoScene(() => factories.game({ resume: run }));
+    } else if (b === this.again) {
       const mode = { tier: this.d.tier, daily: this.d.daily };
       gotoScene(() => factories.game({ tutorial: false, mode }));
     }
@@ -162,6 +183,7 @@ export class EndingScene implements Scene {
 
   private shareText(): string {
     const d = this.d;
+    if (d.endless) return `我在《行囊对决》通关后无尽打到第 ${d.round} 轮，得分 ${d.score}！`;
     return d.cleared ? `我在《行囊对决》十轮全胜通关，得分 ${d.score}！` : `我在《行囊对决》打到第 ${d.round} 轮，得分 ${d.score}。`;
   }
 
@@ -286,10 +308,10 @@ export class EndingScene implements Scene {
     ctx.globalAlpha *= a;
     const mode = d.daily ? '每日挑战 ' + d.daily : d.tier > 0 ? DIFFICULTY.names[d.tier] : '';
     text(ctx, '冒 险 者 证 书' + (mode ? ' · ' + mode : ''), 195, py + 40, { size: 15, weight: 900, color: C.inkSoft, spacing: mode ? 1 : 3 });
-    text(ctx, d.cleared ? '通关！十轮全胜' : `冒险终结于第 ${d.round} 轮`, 195, py + 76, {
+    text(ctx, d.endless ? `无尽止步第 ${d.round} 轮` : d.cleared ? '通关！十轮全胜' : `冒险终结于第 ${d.round} 轮`, 195, py + 76, {
       size: 26, weight: 900, color: d.cleared ? C.wax : C.ink, spacing: 2,
     });
-    if (!d.cleared && d.killerName) text(ctx, `击败你的是 ${d.killerName}`, 195, py + 104, { size: 13, weight: 700, color: C.inkSoft });
+    if ((!d.cleared || d.endless) && d.killerName) text(ctx, `击败你的是 ${d.killerName}`, 195, py + 104, { size: 13, weight: 700, color: C.inkSoft });
     // 分数明细
     const ly0 = py + 134;
     const lh = Math.min(21, (ph - 382) / Math.max(1, this.lines.length));
@@ -334,7 +356,7 @@ export class EndingScene implements Scene {
     text(ctx, '种子 ' + d.seed, 195, py + ph - 22, { size: 11, weight: 700, color: C.pencil });
     ctx.restore();
     // 失败：击败你的敌人立牌（得意地摇晃）
-    if (!d.cleared && d.killer) {
+    if (d.killer) {
       const sc = 120 / standeeHeight(d.killer, 1);
       const lean = Math.sin(t * 5) * 0.06;
       const pop = Math.min(1, Math.max(0, (t - 0.5) / 0.3));
@@ -348,6 +370,7 @@ export class EndingScene implements Scene {
     const a = Math.min(1, Math.max(0, (this.t - 0.4) / 0.3));
     ctx.save();
     ctx.globalAlpha *= a;
+    this.endlessB?.draw(ctx, this.t, real);
     this.again.draw(ctx, this.t, real);
     this.share.draw(ctx, this.t, real);
     this.title.draw(ctx, this.t, real);

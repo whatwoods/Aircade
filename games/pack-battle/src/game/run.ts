@@ -1,5 +1,5 @@
 // 一局的状态与所有规则操作（纯逻辑，无 DOM）
-import { BAG, DIFFICULTY, ECONOMY, EVENTS, ITEMS, PLAYER, ROUNDS, SCORE, SHOP } from '../config.ts';
+import { BAG, DIFFICULTY, ECONOMY, ENDLESS, EVENTS, ITEMS, PLAYER, ROUNDS, SCORE, SHOP } from '../config.ts';
 import { derive } from '../core/rng.ts';
 import { simulate } from './battle/sim.ts';
 import { receiptFor, sellPrice, type ReceiptLine } from './economy.ts';
@@ -298,7 +298,7 @@ export function startBattle(run: RunState): BattleResult {
   const e = runEnemy(run, run.round);
   const res = simulate(
     { items: run.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(run.round), open: run.open },
-    { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits, affixes: e.affixes },
+    { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits, affixes: e.affixes, speed: e.speed },
   );
   run.phase = 'battle';
   return res;
@@ -328,8 +328,9 @@ export function applyResult(run: RunState, res: BattleResult): Outcome {
     run.stats.roundScores[run.round - 1] = gain;
     run.stats.wins++;
     run.lastResult = 'win';
-    if (run.round >= ROUNDS) {
+    if (run.round >= ROUNDS && !run.endless) {
       run.cleared = true;
+      run.clearHearts = run.hearts;
       clearBonus = SCORE.clearBonus + SCORE.heartBonus * run.hearts;
       run.score += clearBonus;
       ending = true;
@@ -345,11 +346,26 @@ export function applyResult(run: RunState, res: BattleResult): Outcome {
     if (run.hearts <= 0) ending = true;
   }
   if (ending && run.tier > 0) {
+    // 无尽里再结算一次：先撤掉通关时算过的加成，按总分重算
+    run.score -= run.tierBonus;
     run.tierBonus = Math.round(run.score * DIFFICULTY.scoreBonus * run.tier);
     run.score += run.tierBonus;
   }
   run.phase = ending ? 'ending' : 'result';
   return { win, gain, ending, clearBonus };
+}
+
+/** 通关后进入无尽：同一局接着打第 11 轮 */
+export function enterEndless(run: RunState): boolean {
+  if (!run.cleared || run.endless || run.daily) return false;
+  run.endless = true;
+  run.round = ROUNDS + 1;
+  run.attempt = 1;
+  if (ENDLESS.refillHearts) run.hearts = PLAYER.hearts - (run.tier >= DIFFICULTY.fewerHeartsFrom ? 1 : 0);
+  run.choice = null;
+  run.lastResult = 'win';
+  run.phase = 'result';
+  return true;
 }
 
 // ---------- 轮间事件 ----------

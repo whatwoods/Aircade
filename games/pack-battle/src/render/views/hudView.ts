@@ -57,7 +57,8 @@ export function drawHearts(ctx: CanvasRenderingContext2D, r: Rect, hearts: numbe
 export function drawRoundTag(ctx: CanvasRenderingContext2D, r: Rect, round: number, attempt: number, score: number, scoreFlash: number): void {
   drawSprite(ctx, roundTagSprite(r.w, r.h), r.x, r.y);
   text(ctx, `第 ${round} 轮`, r.x + r.w / 2 - 9, r.y + 13, { size: 15, weight: 900, color: C.ink });
-  text(ctx, '/' + ROUNDS, r.x + r.w / 2 + 26, r.y + 14, { size: 13, family: HAND, color: C.inkSoft });
+  if (round > ROUNDS) text(ctx, '无尽', r.x + r.w / 2 + 30, r.y + 13, { size: 11, weight: 900, color: C.wax });
+  else text(ctx, '/' + ROUNDS, r.x + r.w / 2 + 26, r.y + 14, { size: 13, family: HAND, color: C.inkSoft });
   const col = scoreFlash > 0 ? C.goldDark : C.inkSoft;
   if (attempt > 1) {
     // "再战"小签放在轮次签第二行左侧（上下左右都没有空位：心、金币栏、敌情卡）
