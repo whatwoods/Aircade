@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>怪物稿对比</title>
+<style>
+  body { margin: 0; padding: 16px; background: #5a3a22; background-image: radial-gradient(circle at 30% 20%, #7a5232, #4a2e1a 80%); color: #f3e6c8; font: 15px/1.4 system-ui, sans-serif; }
+  h2 { margin: 28px 0 10px; font-size: 18px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  figure { margin: 0; text-align: center; }
+  figcaption { font-size: 12px; opacity: .7; margin-top: 4px; }
+  .big img { width: 300px; height: 300px; object-fit: contain; }
+  .mj img { width: 220px; height: 220px; object-fit: contain; border-radius: 6px; }
+  .game img { height: 180px; width: auto; filter: drop-shadow(0 6px 6px rgba(0,0,0,.45)); }
+  .game { background: #3a2414; padding: 12px; border-radius: 10px; }
+</style>
+</head>
+<body>
+<h2>Codex（GPT Image）· 透明底</h2>
+<div class="row big">
+  <figure><img src="codex/slime.png"><figcaption>史莱姆</figcaption></figure>
+  <figure><img src="codex/witch.png"><figcaption>沼泽女巫</figcaption></figure>
+  <figure><img src="codex/dragon.png"><figcaption>古龙</figcaption></figure>
+</div>
+<h2>Codex · 游戏内尺寸</h2>
+<div class="row game">
+  <img src="codex/slime.png"><img src="codex/witch.png"><img src="codex/dragon.png">
+</div>
+
+<h2>Midjourney · 史莱姆</h2>
+<div class="row mj"><img src="mj/slime-1.png"><img src="mj/slime-2.png"><img src="mj/slime-3.png"><img src="mj/slime-4.png"></div>
+<h2>Midjourney · 沼泽女巫</h2>
+<div class="row mj"><img src="mj/witch-1.png"><img src="mj/witch-2.png"><img src="mj/witch-3.png"><img src="mj/witch-4.png"></div>
+<h2>Midjourney · 古龙</h2>
+<div class="row mj"><img src="mj/dragon-1.png"><img src="mj/dragon-2.png"><img src="mj/dragon-3.png"><img src="mj/dragon-4.png"></div>
+</body>
+</html>

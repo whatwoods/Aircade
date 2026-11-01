@@ -1,0 +1,15 @@
+[0.0s] Task 01c20332... status: processing
+[21.9s] Task 01c20332... status: processing
+[44.9s] Task 01c20332... status: processing
+[66.7s] Task 01c20332... status: completed
+{
+  "task_id": "01c20332-8ae1-43fc-a5f7-3b37040d74bd",
+  "status": "completed",
+  "api_path": "/vendors/midjourney/v1/tob/diffusion",
+  "results": [
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/01c20332-8ae1-43fc-a5f7-3b37040d74bd/outputs/result_00.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/01c20332-8ae1-43fc-a5f7-3b37040d74bd/outputs/result_01.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/01c20332-8ae1-43fc-a5f7-3b37040d74bd/outputs/result_02.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/01c20332-8ae1-43fc-a5f7-3b37040d74bd/outputs/result_03.png"
+  ]
+}

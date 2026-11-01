@@ -54,7 +54,7 @@
 "typescript": "~5.9.3"
 ```
 
-**体积预估**：JS 压缩后约 130–160KB（gzip 后约 45KB，其中图标/立牌绘制代码约占 40%），字体 46KB，没有图片和音频文件。首屏传输 < 100KB。
+**体积预估**：JS 压缩后约 130–160KB（gzip 后约 45KB，其中图标/立牌绘制代码约占 40%），字体 46KB，没有音频文件。v1.5 起敌人立牌换成 10 张手绘 webp（共约 540KB，见 14 节）。
 
 **package.json scripts**
 - `dev`: `vite --port 5104 --strictPort --host`（也写进 vite.config.ts 的 `server`）
@@ -1281,3 +1281,16 @@ URL 参数：
 - **狂暴药剂**和治疗药水共用"生命首次低于 50%"的队列，按位置先后各触发一件；狂暴药剂发 `lowHp` 事件带 `rage: true`、`amount: 0`，回放弹"狂暴"。
 - **幸运符**：开战时背包里所有幸运符的加成存进 `run.charmCap`，下轮整理时的利息上限 = `ECONOMY.interestCap + charmCap`（`economy.ts interestCap()`）。利息每 10 金 1 枚，所以要攒到 40 金以上才有用。
 - 机器人 `power()` 计入吸血、荆棘、狂暴和幸运符。加入后：看敌人 94%、不看敌人 66% 通关（之前 92% / 64%）。
+
+## 14. 手绘立牌（v1.5）
+
+10 个敌人立牌从程序化画法换成 Midjourney 出的手绘图（对比过 GPT Image 一稿，选了 Midjourney 的画风）。图打包在本地 `src/assets/monsters/<portrait>.webp`，运行时不请求外部资源。
+
+**出图**：Midjourney V8.2（MuleRun），每个怪物一条提示词，共用同一段画风描述和 `--seed 4242 --ar 2:3`。要求带米色模切边、纯蓝底，方便抠图。提示词、任务记录在 `art/mj/prompt-<id>.txt`、`task-<id>.json`；每个怪物 4 张候选图只留在本地（`art/.gitignore`）。选用：史莱姆 2、地精 3、毒蛛 3、骷髅 3、食人魔 1、鼠群 3、女巫 4、黑骑士 3、游侠 2、古龙 1。
+
+**抠图**：`python3 scripts/cutout.py <原图> <输出.png> [高度=600]`。按偏蓝程度 b − r 判背景（投影是青灰色，比 r 不比 g），从画面边缘泛洪；半透明只留给紧贴角色的 2px，去蓝边；裁到内容边界，缩到 600px 高。再用 `cwebp -q 82 -alpha_q 90` 转 webp。
+
+**接入**（`render/portraits.ts`）：
+- `import.meta.glob` 收集 `assets/monsters/*.webp`，启动时加载。哪个文件不存在或还没加载完，就用原来的程序化画法顶上；图加载完后把这张立牌的缓存作废重建。
+- 立牌生成流程不变，只是角色层换成图：等比缩放进 120×190 的角色框，底边落在木底座上。图自带模切边，所以只补一圈细墨线和纸板厚度（程序化版本是三圈膨胀描边）。
+- 头像徽章按 `DEFS[id].face = [cx, cy, r]` 从图上裁圆，三个数都以图宽为单位。

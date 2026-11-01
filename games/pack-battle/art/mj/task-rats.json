@@ -1,0 +1,11 @@
+Creating task at /vendors/midjourney/v1/tob/diffusion...
+{
+  "task_info": {
+    "id": "4d7be861-fb0d-431d-8866-571b360df157",
+    "status": "pending",
+    "created_at": "2026-11-01T11:42:15.778463+00:00",
+    "updated_at": "2026-11-01T11:42:15.778463+00:00"
+  },
+  "api_path": "/vendors/midjourney/v1/tob/diffusion",
+  "task_id": "4d7be861-fb0d-431d-8866-571b360df157"
+}

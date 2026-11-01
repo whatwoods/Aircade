@@ -1,0 +1,32 @@
+Creating task at /vendors/midjourney/v1/tob/diffusion...
+Task created: 8c58199f-a1ca-403a-bc1c-6db115090f8f
+[0.0s] Task 8c58199f... status: processing
+[20.7s] Task 8c58199f... status: processing
+[42.8s] Task 8c58199f... status: processing
+[64.4s] Task 8c58199f... status: completed
+{
+  "task_id": "8c58199f-a1ca-403a-bc1c-6db115090f8f",
+  "status": "completed",
+  "api_path": "/vendors/midjourney/v1/tob/diffusion",
+  "images": [
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/8c58199f-a1ca-403a-bc1c-6db115090f8f/outputs/result_00.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/8c58199f-a1ca-403a-bc1c-6db115090f8f/outputs/result_01.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/8c58199f-a1ca-403a-bc1c-6db115090f8f/outputs/result_02.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/8c58199f-a1ca-403a-bc1c-6db115090f8f/outputs/result_03.png"
+  ],
+  "data": {
+    "task_info": {
+      "id": "8c58199f-a1ca-403a-bc1c-6db115090f8f",
+      "status": "completed",
+      "created_at": "2026-11-01T11:48:34.900196+00:00",
+      "updated_at": "2026-11-01T11:49:35.943799+00:00"
+    },
+    "images": [
+      "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/8c58199f-a1ca-403a-bc1c-6db115090f8f/outputs/result_00.png",
+      "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/8c58199f-a1ca-403a-bc1c-6db115090f8f/outputs/result_01.png",
+      "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/8c58199f-a1ca-403a-bc1c-6db115090f8f/outputs/result_02.png",
+      "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/8c58199f-a1ca-403a-bc1c-6db115090f8f/outputs/result_03.png"
+    ],
+    "seed": 4242
+  }
+}

@@ -1,4 +1,5 @@
 // 10 个纸板立牌 + 玩家徽记（冒险者帽）+ 头像徽章。全部启动后按需生成为精灵。
+// 立牌优先用 src/assets/monsters/<id>.webp 的手绘图（自带米色模切边）；图没加载好时用下面的程序化画法顶上。
 import type { PortraitId } from '../game/types.ts';
 import { blade, gem, grip, guard, leaf, lin, line, outline, paint, rad, shine, steel, type Pen } from './icons/primitives.ts';
 import { bez, ellipsePts, fillPts, inkStroke, quad, rectPts, xform, type Pts } from './ink.ts';
@@ -21,6 +22,38 @@ interface PDef {
   head: [number, number, number];
   /** 立牌整体缩放（首领更大） */
   scale: number;
+  /** 手绘图的徽章裁剪：头部中心与半径（占图宽的比例） */
+  face?: [number, number, number];
+}
+
+// ---------- 手绘立牌图 ----------
+
+const ART_URLS = import.meta.glob('../assets/monsters/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const art = new Map<PortraitId, HTMLImageElement>();
+for (const [path, url] of Object.entries(ART_URLS)) {
+  const id = path.slice(path.lastIndexOf('/') + 1, -5) as PortraitId;
+  const img = new Image();
+  img.decoding = 'async';
+  img.onload = () => {
+    // 程序化的占位立牌作废，下次绘制时用图重建
+    standees.delete(id);
+    building.delete(id);
+  };
+  img.src = url;
+  art.set(id, img);
+}
+
+function artOf(id: PortraitId): HTMLImageElement | null {
+  const img = art.get(id);
+  return img && img.complete && img.naturalWidth > 0 ? img : null;
+}
+
+/** 图在角色框里的位置：等比缩放到框内，底边落在底座上 */
+function artRect(img: HTMLImageElement): [number, number, number, number] {
+  const k = Math.min(PH / img.naturalHeight, (PW + PADP * 2 - 4) / img.naturalWidth);
+  const w = img.naturalWidth * k;
+  const h = img.naturalHeight * k;
+  return [PW / 2 - w / 2, PH + 2 - h, w, h];
 }
 
 const blob = (cx: number, cy: number, rx: number, ry: number, n = 28, rot = 0): Pts => ellipsePts(cx, cy, rx, ry, n, rot);
@@ -525,16 +558,16 @@ const dragon: Draw = (pen) => {
 };
 
 const DEFS: Record<PortraitId, PDef> = {
-  slime: { draw: slime, head: [60, 130, 34], scale: 1 },
-  goblin: { draw: goblin, head: [60, 88, 34], scale: 1 },
-  spider: { draw: spider, head: [60, 110, 38], scale: 1 },
-  skeleton: { draw: skeleton, head: [60, 66, 30], scale: 1 },
-  ogre: { draw: ogre, head: [60, 52, 30], scale: 1.12 },
-  rats: { draw: rats, head: [62, 92, 30], scale: 1 },
-  witch: { draw: witch, head: [58, 80, 32], scale: 1 },
-  knight: { draw: knight, head: [60, 54, 30], scale: 1.04 },
-  ranger: { draw: ranger, head: [60, 64, 30], scale: 1 },
-  dragon: { draw: dragon, head: [60, 60, 36], scale: 1.18 },
+  slime: { draw: slime, head: [60, 130, 34], scale: 1, face: [0.5, 0.56, 0.46] },
+  goblin: { draw: goblin, head: [60, 88, 34], scale: 1, face: [0.6, 0.37, 0.23] },
+  spider: { draw: spider, head: [60, 110, 38], scale: 1, face: [0.52, 0.42, 0.28] },
+  skeleton: { draw: skeleton, head: [60, 66, 30], scale: 1, face: [0.6, 0.26, 0.17] },
+  ogre: { draw: ogre, head: [60, 52, 30], scale: 1.12, face: [0.56, 0.42, 0.2] },
+  rats: { draw: rats, head: [62, 92, 30], scale: 1, face: [0.6, 0.2, 0.2] },
+  witch: { draw: witch, head: [58, 80, 32], scale: 1, face: [0.6, 0.57, 0.24] },
+  knight: { draw: knight, head: [60, 54, 30], scale: 1.04, face: [0.6, 0.27, 0.17] },
+  ranger: { draw: ranger, head: [60, 64, 30], scale: 1, face: [0.58, 0.27, 0.16] },
+  dragon: { draw: dragon, head: [60, 60, 36], scale: 1.18, face: [0.6, 0.42, 0.17] },
 };
 
 export function portraitScale(id: PortraitId): number {
@@ -584,6 +617,8 @@ interface StandeeBuild {
   sil?: HTMLCanvasElement[];
   white?: HTMLCanvasElement;
   red?: HTMLCanvasElement;
+  /** 用的是手绘图 */
+  art?: boolean;
 }
 const building = new Map<string, StandeeBuild>();
 
@@ -604,7 +639,13 @@ function stepStandee(id: PortraitId, b: StandeeBuild): boolean {
       // 角色
       const [cc, cctx] = makeCanvas(W * ratio, H * ratio);
       cctx.setTransform(ratio, 0, 0, ratio, PADP * ratio, PADP * ratio);
-      DEFS[id].draw({ ctx: cctx, k: 1, seed: 7 });
+      const img = artOf(id);
+      b.art = !!img;
+      if (img) {
+        cctx.imageSmoothingQuality = 'high';
+        const [x, y, w, h] = artRect(img);
+        cctx.drawImage(img, x, y, w, h);
+      } else DEFS[id].draw({ ctx: cctx, k: 1, seed: 7 });
       b.cc = cc;
       flush(cc);
       return false;
@@ -626,10 +667,12 @@ function stepStandee(id: PortraitId, b: StandeeBuild): boolean {
       const which = Math.floor(k / 3);
       const part = k % 3;
       const sil = b.sil!;
-      if (which === 0) dilate(b.mctx!, sil[1], 4.6 * ratio, 2.2 * ratio, 2.4 * ratio, part);
-      else if (which === 1) dilate(b.mctx!, sil[0], 5.6 * ratio, 0, 0, part);
+      // 手绘图自带米色模切边：只补纸板厚度和一圈细墨线
+      const a = b.art ? 0.45 : 1;
+      if (which === 0) dilate(b.mctx!, sil[1], 4.6 * a * ratio, 2.2 * ratio, 2.4 * ratio, part);
+      else if (which === 1) dilate(b.mctx!, sil[0], (b.art ? 1.3 : 5.6) * ratio, 0, 0, part);
       else {
-        dilate(b.mctx!, sil[2], 4.0 * ratio, 0, 0, part);
+        if (!b.art) dilate(b.mctx!, sil[2], 4.0 * ratio, 0, 0, part);
         if (part === 2) {
           b.mctx!.drawImage(b.cc!, 0, 0);
           b.sil = undefined;
@@ -750,7 +793,8 @@ export function standeeHeight(id: PortraitId, scale: number): number {
 
 /** 头像徽章：圆形羊皮纸底 + 头部裁剪 */
 export function badge(id: PortraitId | 'player', r: number): Sprite {
-  return cached('badge|' + id + '|' + r, r * 2, r * 2, 4, (ctx) => {
+  const img = id === 'player' ? null : artOf(id);
+  return cached('badge|' + id + '|' + r + (img ? '|art' : ''), r * 2, r * 2, 4, (ctx) => {
     ctx.fillStyle = 'rgba(20,10,4,0.4)';
     ctx.beginPath();
     ctx.arc(r + 1, r + 2, r, 0, Math.PI * 2);
@@ -767,7 +811,13 @@ export function badge(id: PortraitId | 'player', r: number): Sprite {
     ctx.arc(r, r, r - 2.5, 0, Math.PI * 2);
     ctx.clip();
     if (id === 'player') drawHat({ ctx, k: 1, seed: 3 }, r, r, r * 1.6);
-    else {
+    else if (img) {
+      const [fx, fy, fr] = DEFS[id].face ?? [0.5, 0.3, 0.25];
+      const iw = img.naturalWidth;
+      const k = (r * 0.95) / (fr * iw);
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, r - fx * iw * k, r - fy * iw * k, iw * k, img.naturalHeight * k);
+    } else {
       const d = DEFS[id];
       const k = (r * 0.92) / d.head[2];
       ctx.translate(r - d.head[0] * k, r - d.head[1] * k);

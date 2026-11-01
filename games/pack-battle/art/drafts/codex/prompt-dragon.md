@@ -1,0 +1,7 @@
+Use your built-in image_gen tool to create ONE image and save it in the current directory as `dragon.png` (exactly that filename). Do not write any code or other files.
+
+The attached image is a screenshot of the current game ("Pack Battle", a backpack auto-battler). Use it only as a mood/palette reference: warm wooden tabletop, hand-drawn ink items, the procedural witch standee at upper left is the thing being replaced with a much more refined illustration.
+
+Subject — Round 10 final boss "Ember" the ancient dragon: a red-brown dragon head and long neck with both wings spread wide behind it, horned, scaled, glowing amber eyes, embers and sparks drifting up around it, imposing and majestic — this is the biggest standee in the game.
+
+Art style (must match across the whole set): a hand-painted fantasy board-game creature, drawn like a die-cut cardboard tabletop standee. Confident dark-brown ink outlines with slight hand-drawn wobble, soft gouache/watercolor shading, warm tavern lamplight from the upper left, gentle paper grain. A clean off-white die-cut border (about 12px) follows the whole silhouette, like a punched cardboard token. Full body, three-quarter view facing right, centered, nothing cropped. Charming and readable at small size (it is shown about 200px tall on a phone), cute-but-menacing, not gory, no text, no frame, no ground shadow, no background scenery. Output a PNG with a fully TRANSPARENT background, 1024x1024.

@@ -1,0 +1,12 @@
+[0.0s] Task a3de286f... status: completed
+{
+  "task_id": "a3de286f-4f0a-4b46-bfdf-b78246a7ca8d",
+  "status": "completed",
+  "api_path": "/vendors/midjourney/v1/tob/diffusion",
+  "results": [
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/a3de286f-4f0a-4b46-bfdf-b78246a7ca8d/outputs/result_00.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/a3de286f-4f0a-4b46-bfdf-b78246a7ca8d/outputs/result_01.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/a3de286f-4f0a-4b46-bfdf-b78246a7ca8d/outputs/result_02.png",
+    "https://mule-router-assets.muleusercontent.com/public/production/artifacts/midjourney/tasks/a3de286f-4f0a-4b46-bfdf-b78246a7ca8d/outputs/result_03.png"
+  ]
+}
