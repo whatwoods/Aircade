@@ -1,5 +1,5 @@
 // 商店掷骰（确定性：hash(seed, round, attempt, refreshIndex)）
-import { ITEMS, SHOP, SHOP_POOL, TUTORIAL } from '../config.ts';
+import { EVENTS, ITEMS, SHOP, SHOP_POOL, TUTORIAL } from '../config.ts';
 import { derive, type Rng } from '../core/rng.ts';
 import type { ItemId, Rarity, RunState, ShopSlot } from './types.ts';
 
@@ -59,7 +59,7 @@ export function rollShop(run: RunState, keep?: ShopSlot[]): ShopSlot[] {
       counts.set(k.id, (counts.get(k.id) ?? 0) + 1);
       continue;
     }
-    const id = pickItem(rng, pickRarity(rng, run.round), owned, counts);
+    const id = pickItem(rng, pickRarity(rng, run.round + (run.market ? EVENTS.marketBoost : 0)), owned, counts);
     counts.set(id, (counts.get(id) ?? 0) + 1);
     out.push({ id, price: ITEMS[id].price });
   }

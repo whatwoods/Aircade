@@ -45,6 +45,12 @@ export function loadRun(): RunState | null {
     clearRun();
     return null;
   }
+  // v1.2 之前的存档没有轮间事件
+  r.choice ??= null;
+  r.freeCells ??= 0;
+  r.market ??= false;
+  r.elite ??= false;
+  r.eliteGold ??= 0;
   // v1.1 的存档没有锁格：背包全开
   if (typeof r.open !== 'number') {
     r.open = fullMask(BAG.cols, BAG.rows);

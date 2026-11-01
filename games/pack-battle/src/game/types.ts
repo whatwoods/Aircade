@@ -95,6 +95,9 @@ export interface ShopSlot {
   price: number;
 }
 
+/** 轮间事件 */
+export type EventId = 'smith' | 'tailor' | 'market' | 'elite' | 'rest' | 'cache';
+
 export type Phase = 'receipt' | 'arrange' | 'toBattle' | 'battle' | 'result' | 'ending';
 
 export interface RunStats {
@@ -135,6 +138,16 @@ export interface RunState {
   open: number;
   /** 已花钱解锁的格数 */
   unlocked: number;
+  /** 赢下一轮后待选的两个轮间事件（选完清空） */
+  choice: EventId[] | null;
+  /** 裁缝送的免费解锁次数 */
+  freeCells: number;
+  /** 黑市：本轮整理的商店按更高轮次掷稀有度 */
+  market: boolean;
+  /** 精英：本轮敌人生命加成，赢了多给金币 */
+  elite: boolean;
+  /** 精英赏金，下次整理时发放 */
+  eliteGold: number;
   /** 被调试接口改过：不存档、不计最高分 */
   debug?: boolean;
 }

@@ -120,7 +120,7 @@ export class BattleController {
     const gs = this.gs;
     const round = gs.run.round;
     this.res = res;
-    this.e = enemyFor(round);
+    this.e = enemyFor(round, gs.run.elite);
     this.eItems = enemyBag(round);
     this.layout();
     this.eSyn = computeSynergy(this.eItems, this.e.cols, this.e.rows);

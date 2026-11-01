@@ -2,7 +2,7 @@
 import { duckMusic, au } from '../audio/audio.ts';
 import { setMusic } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
-import { BAG, ECONOMY, ITEMS, SHOP } from '../config.ts';
+import { BAG, ECONOMY, EVENTS, ITEMS, SHOP } from '../config.ts';
 import { input, type InputHandler } from '../core/input.ts';
 import { clock } from '../core/loop.ts';
 import { Spring } from '../core/spring.ts';
@@ -14,13 +14,13 @@ import { clearRun, saveRun, saveable } from '../game/save.ts';
 import { clearScore } from '../game/score.ts';
 import { enemyBag, enemyFor } from '../game/enemies.ts';
 import {
-  applyResult, beginArrange, canUnlock, cellPrice, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, unlockable, unlockCell,
+  applyChoice, applyResult, beginArrange, canUnlock, smithTarget, cellPrice, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, unlockable, unlockCell,
   type Outcome, type SellRecord,
 } from '../game/run.ts';
 import { fullMask } from '../game/grid.ts';
 import { computeSynergy, type SynergyResult } from '../game/synergy.ts';
 import { hintSeen, markHint, markTutorialDone, resetTutorialFlag, HINT_TEXT, Tutorial, type HintId } from '../game/tutorial.ts';
-import type { ItemInst, Rot, RunState } from '../game/types.ts';
+import type { EventId, ItemInst, Rot, RunState } from '../game/types.ts';
 import { drawParticles, emit } from '../render/fx/particles.ts';
 import { drawPopups, popup } from '../render/fx/popups.ts';
 import { shake, tier } from '../render/fx/shake.ts';
@@ -41,7 +41,7 @@ import { BattleController } from './battleController.ts';
 import { describe } from './describe.ts';
 import { Guide } from './guide.ts';
 import { HALF_PI, ItemView, stashCell } from './itemView.ts';
-import { ConfirmPanel, DetailPanel, DrawerPanel, Overlays, PausePanel, ReportPanel, RoutePanel, SettingsPanel } from './overlays.ts';
+import { ChoicePanel, ConfirmPanel, DetailPanel, DrawerPanel, Overlays, PausePanel, ReportPanel, RoutePanel, SettingsPanel } from './overlays.ts';
 import { factories, gotoScene, type EndingData, type Scene } from './sceneManager.ts';
 
 export type GPhase = 'receipt' | 'arrange' | 'toBattle' | 'battle' | 'result' | 'toArrange';
@@ -527,6 +527,39 @@ export class GameScene implements Scene {
       factories.ending && gotoScene(() => factories.ending(data));
       return;
     }
+    const ch = this.run.choice;
+    if (ch && !this.ov.active) {
+      this.ov.open(new ChoicePanel(stage.H, ch.map((id) => ({ id, desc: this.choiceDesc(id) })), (id) => this.pickChoice(id)));
+      return;
+    }
+    this.goArrange();
+  }
+
+  private choiceDesc(id: EventId): string[] {
+    switch (id) {
+      case 'smith': {
+        const it = smithTarget(this.run);
+        return it ? [ITEMS[it.id].name, '升到 ' + '★'.repeat(it.lv + 1)] : [];
+      }
+      case 'tailor': return ['免费解锁', `${EVENTS.tailorCells} 格背包`];
+      case 'market': return ['本轮商店', '多出稀有货'];
+      case 'elite': return [`敌人生命 ×${EVENTS.eliteHpMul}`, `赢了 +${EVENTS.eliteGold} 金`];
+      case 'rest': return ['恢复 1 颗心'];
+      case 'cache': return [`立刻 +${EVENTS.cacheGold} 金`];
+    }
+  }
+
+  private pickChoice(id: EventId): void {
+    if (this.phase !== 'result') return;
+    const smith = id === 'smith' ? smithTarget(this.run) : null;
+    if (!applyChoice(this.run, id)) return;
+    if (smith) {
+      this.syncViews(true);
+      sfx(smith.lv === 3 ? 'merge3' : 'merge2');
+    } else if (id === 'cache') {
+      this.setGold(this.run.gold);
+      sfx('buy');
+    } else if (id === 'rest') sfx('heal');
     this.goArrange();
   }
 
@@ -892,7 +925,7 @@ export class GameScene implements Scene {
       ctx.translate(0, -this.tr.enemy * 40);
       const showDetail = this.detail && this.phase !== 'toBattle';
       if (showDetail && this.detail) drawDetailBar(ctx, L.enemyCard, this.detail.info, this.detail.t);
-      else drawEnemyCard(ctx, L.enemyCard, enemyFor(this.run.round), enemyBag(this.run.round), this.enemyFlip, time);
+      else drawEnemyCard(ctx, L.enemyCard, enemyFor(this.run.round, this.run.elite), enemyBag(this.run.round), this.enemyFlip, time);
       ctx.restore();
     }
   }
@@ -1207,7 +1240,7 @@ export class GameScene implements Scene {
         this.pressedHud = null;
         if (ph && tap) {
           if (ph === 'round') this.ov.open(new RoutePanel(this.run.round, this.run.round - 1));
-          else if (ph === 'enemy') this.ov.open(new DrawerPanel(this.L.drawer, enemyFor(this.run.round), this.run.round));
+          else if (ph === 'enemy') this.ov.open(new DrawerPanel(this.L.drawer, enemyFor(this.run.round, this.run.elite), this.run.round));
           return;
         }
         if (this.phase === 'arrange') this.ac.up(x, y, tap);
@@ -1372,6 +1405,9 @@ export class GameScene implements Scene {
     this.run.phase = 'result';
     this.run.lastResult = null;
     this.run.locked = false;
+    this.run.choice = null;
+    this.run.elite = false;
+    this.run.market = false;
     beginArrange(this.run);
     this.phase = 'arrange';
     this.enemyFlip = 0;

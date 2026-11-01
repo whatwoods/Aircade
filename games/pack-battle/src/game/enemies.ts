@@ -1,5 +1,5 @@
 // 从 ASCII 布局解析背包（敌人与参考构筑共用）
-import { ENEMIES, ITEMS, PLAYER } from '../config.ts';
+import { ENEMIES, EVENTS, ITEMS, PLAYER } from '../config.ts';
 import { cellsKey, shapeOf, type Cell } from './shapes.ts';
 import type { EnemyDef, ItemId, Lv, Placed, Rot } from './types.ts';
 
@@ -65,8 +65,14 @@ export function parseBag(layout: string[], legend: Record<string, string>, uidSt
   return out;
 }
 
-export function enemyFor(round: number): EnemyDef {
-  return ENEMIES[Math.max(0, Math.min(ENEMIES.length - 1, round - 1))];
+const eliteCache = new Map<number, EnemyDef>();
+/** elite = 轮间事件"精英"：生命 ×EVENTS.eliteHpMul，称号前加"精英" */
+export function enemyFor(round: number, elite = false): EnemyDef {
+  const e = ENEMIES[Math.max(0, Math.min(ENEMIES.length - 1, round - 1))];
+  if (!elite) return e;
+  let x = eliteCache.get(round);
+  if (!x) eliteCache.set(round, (x = { ...e, hp: Math.round(e.hp * EVENTS.eliteHpMul), title: '精英' + e.title }));
+  return x;
 }
 
 const enemyBagCache = new Map<number, Placed[]>();

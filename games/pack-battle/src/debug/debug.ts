@@ -156,13 +156,13 @@ export function installDebug(): void {
       const g = game();
       if (!g) return { scene: sm.cur?.name ?? null };
       const r = g.run;
-      const e = enemyFor(r.round);
+      const e = enemyFor(r.round, r.elite);
       return {
         scene: 'game', phase: g.phase, round: r.round, attempt: r.attempt, hearts: r.hearts, gold: r.gold, score: r.score,
         bag: r.bag.map((i) => ({ uid: i.uid, id: i.id, lv: i.lv, rot: i.rot, x: i.x, y: i.y })),
         stash: r.stash.map((i) => (i ? { uid: i.uid, id: i.id, lv: i.lv, rot: i.rot, slot: i.slot } : null)),
         shop: r.shop.map((s) => ({ id: s.id, price: s.price })),
-        locked: r.locked, open: r.open, unlocked: r.unlocked, enemy: { name: e.name, title: e.title, hp: e.hp, boss: !!e.boss },
+        locked: r.locked, open: r.open, unlocked: r.unlocked, freeCells: r.freeCells, choice: r.choice, market: r.market, elite: r.elite, enemy: { name: e.name, title: e.title, hp: e.hp, boss: !!e.boss },
         tutorial: g.tut.step, paused: g.paused, speed: g.bc.speed, overlay: g.ov.top ? g.ov.top.kind : null,
         dragging: !!g.ac.drag, links: g.syn.links.map((l) => ({ from: l.from, to: l.to, kind: l.kind, label: l.label })),
         maxHp: playerMaxHp(r.round), undo: !!g.undo, outcome: g.outcome,
@@ -353,7 +353,7 @@ export function installDebug(): void {
       const g = game();
       if (!g) return fail('不在游戏中');
       const r = g.run;
-      const e = enemyFor(r.round);
+      const e = enemyFor(r.round, r.elite);
       const res = runSim(
         { items: r.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(r.round), open: r.open },
         { items: enemyBag(r.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits },

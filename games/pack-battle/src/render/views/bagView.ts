@@ -270,8 +270,11 @@ export function drawLockedCells(
     ctx.strokeRect(px + 3, py + 3, cell - 6, cell - 6);
     ctx.setLineDash([]);
     if (on) {
-      drawGoldCoin(ctx, px + cell / 2 - 9, py + cell / 2, 8);
-      labelOnDark(ctx, String(price), px + cell / 2 + 7, py + cell / 2 + 1, 18, 900);
+      if (price === 0) labelOnDark(ctx, '免费', px + cell / 2, py + cell / 2 + 1, 15, 900);
+      else {
+        drawGoldCoin(ctx, px + cell / 2 - 9, py + cell / 2, 8);
+        labelOnDark(ctx, String(price), px + cell / 2 + 7, py + cell / 2 + 1, 18, 900);
+      }
       if (!afford) {
         ctx.fillStyle = rgba(C.bad, 0.25);
         ctx.fillRect(px + 3, py + 3, cell - 6, cell - 6);

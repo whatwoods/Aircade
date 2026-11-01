@@ -2,14 +2,14 @@
 import { applyVolumes } from '../audio/audio.ts';
 import { setMusic, musicMode } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
-import { BATTLE, ENEMIES, ITEMS, RARITY_NAMES, ROUNDS, TAG_NAMES } from '../config.ts';
+import { BATTLE, ENEMIES, EVENT_DEFS, ITEMS, RARITY_NAMES, ROUNDS, TAG_NAMES } from '../config.ts';
 import { saveSettings, settings } from '../core/storage.ts';
 import { ease } from '../core/tween.ts';
 import { enemyBag } from '../game/enemies.ts';
 import { rowTotal, type ReportRow, type SideReport } from '../game/report.ts';
 import { shapeOf } from '../game/shapes.ts';
-import type { Derived, EnemyDef, ItemId, Lv, Placed } from '../game/types.ts';
-import { C, RARITY_COLOR, TAG_COLOR, drawGoldCoin } from '../render/kit.ts';
+import type { Derived, EnemyDef, EventId, ItemId, Lv, Placed } from '../game/types.ts';
+import { C, RARITY_COLOR, TAG_COLOR, drawGoldCoin, drawSeal } from '../render/kit.ts';
 import type { Rect } from '../render/layout.ts';
 import { drawEnemyBadge } from '../render/portraits.ts';
 import { drawItem, drawItemAt } from '../render/sprites.ts';
@@ -793,3 +793,59 @@ export class Overlays {
   }
 }
 
+
+// ---------- 轮间事件 ----------
+
+export interface ChoiceCard {
+  id: EventId;
+  desc: string[];
+}
+
+export class ChoicePanel extends Panel {
+  readonly kind = 'ChoicePanel';
+  private oy: number;
+  private cards: ChoiceCard[];
+  private onPick: (id: EventId) => void;
+  constructor(H: number, cards: ChoiceCard[], onPick: (id: EventId) => void) {
+    super();
+    this.oy = (H - 844) / 2;
+    this.cards = cards;
+    this.onPick = onPick;
+    this.outsideCloses = false;
+    this.buttons = cards.map((c, i) => new Button('choice.' + i, R(30 + i * 170, 300 + this.oy, 160, 230), EVENT_DEFS[c.id].name, 'paper', 70 + i));
+  }
+  rect(): Rect {
+    return R(16, 230 + this.oy, 358, 330);
+  }
+  key(code: string): void {
+    if (code === 'Digit1' || code === 'Digit2') this.activate(this.buttons[code === 'Digit1' ? 0 : 1]);
+  }
+  activate(b: Button): void {
+    if (this.closing) return;
+    const c = this.cards[this.buttons.indexOf(b)];
+    if (!c) return;
+    sfx('page');
+    this.close();
+    this.onPick(c.id);
+  }
+  drawBody(ctx: CanvasRenderingContext2D): void {
+    const r = this.rect();
+    titleText(ctx, '岔路', 195, r.y + 2, 30, C.paper, true);
+    this.cards.forEach((c, i) => {
+      const b = this.buttons[i];
+      const br = b.r;
+      const k = this.pressed === b ? 0.96 : 1;
+      ctx.save();
+      ctx.translate(br.x + br.w / 2, br.y + br.h / 2);
+      ctx.rotate(i === 0 ? -0.025 : 0.025);
+      ctx.scale(k, k);
+      ctx.translate(-(br.x + br.w / 2), -(br.y + br.h / 2));
+      drawPanel(ctx, br, 31 + i);
+      const def = EVENT_DEFS[c.id];
+      drawSeal(ctx, br.x + br.w / 2, br.y + 62, 34, def.glyph, 7 + i, c.id === 'elite' ? C.wax : '#7a5a2a');
+      text(ctx, def.name, br.x + br.w / 2, br.y + 122, { size: 22, weight: 900 });
+      c.desc.forEach((l, j) => text(ctx, l, br.x + br.w / 2, br.y + 160 + j * 24, { size: 15, weight: 700, color: C.inkSoft }));
+      ctx.restore();
+    });
+  }
+}

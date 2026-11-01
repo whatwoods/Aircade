@@ -6,16 +6,17 @@
 //   2. 每个候选都对着本轮敌人真打一遍（模拟），选结果提升最大的那个
 //   3. 有商店卡因为背包没位置放不下、钱又够：解锁一格（挑挨着开放格最多的）
 //   4. 都没提升且钱多时刷新商店
+// 轮间事件按固定优先级挑（见 pickEvent）。
 // 它不会重新整理已经摆好的装备，所以比认真玩的人弱一些，可以看作"普通玩家"的下限。
 import { BAG, ECONOMY, ROUNDS } from '../src/config.ts';
 import { simulate } from '../src/game/battle/sim.ts';
 import { enemyBag, enemyFor, playerMaxHp } from '../src/game/enemies.ts';
 import { canPlace, buildOcc, DIRS, isOpen } from '../src/game/grid.ts';
 import {
-  applyResult, beginArrange, buy, cellPrice, mergeTargetFor, move, newRun, refresh, sell, startBattle, unlockable, unlockCell, type Dest,
+  applyChoice, applyResult, beginArrange, buy, smithTarget, cellPrice, mergeTargetFor, move, newRun, refresh, sell, startBattle, unlockable, unlockCell, type Dest,
 } from '../src/game/run.ts';
 import { computeSynergy } from '../src/game/synergy.ts';
-import type { ItemInst, Placed, Rot, RunState } from '../src/game/types.ts';
+import type { EventId, ItemInst, Placed, Rot, RunState } from '../src/game/types.ts';
 
 const args = process.argv.slice(2);
 /** --blind：不偷看敌人，只按背包强度粗估买（更像普通玩家）；默认对着本轮敌人真打来挑（接近上限） */
@@ -136,6 +137,22 @@ function arrange(run: RunState): void {
   }
 }
 
+/** 轮间事件：缺心先回血；有贵装备就锻造；上一场赢得轻松就打精英；其余按裁缝 > 黑市 > 藏宝 */
+function pickEvent(run: RunState, opts: EventId[]): EventId {
+  const score = (id: EventId): number => {
+    switch (id) {
+      case 'rest': return run.hearts <= 1 ? 100 : 30;
+      case 'smith': return (smithTarget(run)?.value ?? 0) * 4;
+      case 'elite': return run.lastHpRatio > 0.6 ? 45 : 0;
+      case 'tailor': return 35;
+      case 'market': return run.round >= 4 ? 32 : 10;
+      case 'cache': return 25;
+    }
+  };
+  return opts.reduce((a, b) => (score(b) > score(a) ? b : a));
+}
+const picks = new Map<EventId, number>();
+
 interface RoundStat {
   reach: number;
   firstWin: number;
@@ -185,6 +202,11 @@ for (let n = 0; n < N; n++) {
       st.lv3 += run.bag.filter((i) => i.lv === 3).length;
       st.goldLeft += run.gold;
     }
+    if (run.choice) {
+      const id = pickEvent(run, run.choice);
+      picks.set(id, (picks.get(id) ?? 0) + 1);
+      applyChoice(run, id);
+    }
     if (out.ending) {
       if (run.cleared) clears++;
       else diedAt[round]++;
@@ -208,3 +230,4 @@ for (let r = 1; r <= ROUNDS; r++) {
     ].join(' '),
   );
 }
+console.log('轮间事件选择：' + [...picks].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join('  '));

@@ -1,5 +1,5 @@
 // ★ 唯一的玩法数值来源。所有可调数值集中在这里。
-import type { EnemyDef, ItemDef, ItemId } from './game/types.ts';
+import type { EnemyDef, EventId, ItemDef, ItemId } from './game/types.ts';
 
 export const BAG = {
   cols: 6,
@@ -16,8 +16,8 @@ export const ROUNDS = 10;
 
 export const ECONOMY = {
   startGold: 12,
-  /** 第 r 轮（r≥2）整理开始时的基础收入 = 9 + ceil(r/2) */
-  incomeByRound: [0, 0, 10, 11, 11, 12, 12, 13, 13, 14, 14],
+  /** 第 r 轮（r≥2）整理开始时的基础收入 = 7 + ceil(r/2) */
+  incomeByRound: [0, 0, 8, 9, 9, 10, 10, 11, 11, 12, 12],
   winBonus: 2,
   lossBonus: 3,
   interestStep: 10,
@@ -67,6 +67,27 @@ export const BATTLE = {
 };
 
 export const SCORE = { winBase: 100, winHpBonus: 40, clearBonus: 2000, heartBonus: 500 };
+
+/** 轮间事件：赢下第 r 轮（r≥1、不是最后一轮）后从池里抽两个选一个 */
+export const EVENTS = {
+  /** 精英：敌人生命倍率、赢了的赏金 */
+  eliteHpMul: 1.5,
+  eliteGold: 10,
+  /** 裁缝：免费解锁几格 */
+  tailorCells: 2,
+  /** 黑市：商店稀有度按"当前轮 + n"掷 */
+  marketBoost: 3,
+  cacheGold: 6,
+};
+
+export const EVENT_DEFS: Record<EventId, { name: string; glyph: string }> = {
+  smith: { name: '铁匠', glyph: '锻' },
+  tailor: { name: '裁缝', glyph: '缝' },
+  market: { name: '黑市', glyph: '市' },
+  elite: { name: '精英', glyph: '战' },
+  rest: { name: '营火', glyph: '歇' },
+  cache: { name: '藏宝', glyph: '宝' },
+};
 
 export const TUTORIAL = {
   shop: ['sword', 'whetstone', 'buckler', 'herb', 'dagger'] as ItemId[],
