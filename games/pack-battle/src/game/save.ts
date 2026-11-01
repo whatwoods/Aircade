@@ -1,5 +1,6 @@
 // 中途存档：整理阶段随改随存；开战那一刻存"打完之后"的状态（杀进程不能重打）
-import { ITEMS, ROUNDS, SHOP } from '../config.ts';
+import { BAG, ITEMS, ROUNDS, SHOP } from '../config.ts';
+import { fullMask } from './grid.ts';
 import { load, remove, save } from '../core/storage.ts';
 import type { ItemInst, RunState } from './types.ts';
 
@@ -43,6 +44,11 @@ export function loadRun(): RunState | null {
   if (!ok) {
     clearRun();
     return null;
+  }
+  // v1.1 的存档没有锁格：背包全开
+  if (typeof r.open !== 'number') {
+    r.open = fullMask(BAG.cols, BAG.rows);
+    r.unlocked = BAG.cols * BAG.rows - BAG.start.w * BAG.start.h;
   }
   return r;
 }

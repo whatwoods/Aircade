@@ -9,6 +9,8 @@ export interface FighterInput {
   rows: number;
   maxHp: number;
   traits?: TraitDef[];
+  /** 开放格掩码（缺省 = 全开） */
+  open?: number;
 }
 
 interface Unit {
@@ -40,7 +42,7 @@ interface Fighter {
 }
 
 function makeFighter(side: Side, inp: FighterInput): Fighter {
-  const syn = computeSynergy(inp.items, inp.cols, inp.rows);
+  const syn = computeSynergy(inp.items, inp.cols, inp.rows, inp.open);
   const sorted = [...inp.items].sort((a, b) => a.y - b.y || a.x - b.x);
   const units: Unit[] = [];
   const potions: Derived[] = [];

@@ -1,7 +1,14 @@
 // ★ 唯一的玩法数值来源。所有可调数值集中在这里。
 import type { EnemyDef, ItemDef, ItemId } from './game/types.ts';
 
-export const BAG = { cols: 6, rows: 5 };
+export const BAG = {
+  cols: 6,
+  rows: 5,
+  /** 开局开放的格子（其余锁着，整理阶段点紧挨开放区的锁格花金币解锁） */
+  start: { x: 1, y: 0, w: 4, h: 4 },
+  /** 第 n 次解锁的价格（下标 = 已解锁次数，超出取最后一个） */
+  cellPrice: [1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4],
+};
 
 export const PLAYER = { hearts: 3, baseHp: 30, hpPerRound: 8 };
 
@@ -9,8 +16,8 @@ export const ROUNDS = 10;
 
 export const ECONOMY = {
   startGold: 12,
-  /** 第 r 轮（r≥2）整理开始时的基础收入 = 7 + ceil(r/2) */
-  incomeByRound: [0, 0, 8, 9, 9, 10, 10, 11, 11, 12, 12],
+  /** 第 r 轮（r≥2）整理开始时的基础收入 = 9 + ceil(r/2) */
+  incomeByRound: [0, 0, 10, 11, 11, 12, 12, 13, 13, 14, 14],
   winBonus: 2,
   lossBonus: 3,
   interestStep: 10,

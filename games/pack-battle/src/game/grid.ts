@@ -20,8 +20,25 @@ export class Occ {
   }
 }
 
-export function buildOcc(items: readonly Placed[], cols: number, rows: number): Occ {
+/** 背包开放格的位掩码（第 y*cols+x 位 = 1 表示开放） */
+export function fullMask(cols: number, rows: number): number {
+  return 2 ** (cols * rows) - 1;
+}
+
+export function rectMask(cols: number, r: { x: number; y: number; w: number; h: number }): number {
+  let m = 0;
+  for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) m += 2 ** (y * cols + x);
+  return m;
+}
+
+export function isOpen(mask: number, cols: number, x: number, y: number): boolean {
+  return Math.floor(mask / 2 ** (y * cols + x)) % 2 === 1;
+}
+
+/** 锁着的格子记为 -1（和越界一样放不进） */
+export function buildOcc(items: readonly Placed[], cols: number, rows: number, open = fullMask(cols, rows)): Occ {
   const o = new Occ(cols, rows);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (!isOpen(open, cols, x, y)) o.set(x, y, -1);
   for (const it of items) {
     const s = shapeOf(it.id, it.rot);
     for (const [cx, cy] of s.cells) {

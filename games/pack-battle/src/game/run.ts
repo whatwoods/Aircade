@@ -3,7 +3,7 @@ import { BAG, ECONOMY, ITEMS, PLAYER, ROUNDS, SCORE, SHOP } from '../config.ts';
 import { simulate } from './battle/sim.ts';
 import { receiptFor, sellPrice, type ReceiptLine } from './economy.ts';
 import { enemyBag, enemyFor, playerMaxHp } from './enemies.ts';
-import { buildOcc, canPlace, findFit, NUDGES, type Occ } from './grid.ts';
+import { buildOcc, canPlace, DIRS, findFit, isOpen, NUDGES, rectMask, type Occ } from './grid.ts';
 import { winScore } from './score.ts';
 import { rollShop } from './shop.ts';
 import { shapeOf } from './shapes.ts';
@@ -15,6 +15,7 @@ export function newRun(seed: number, tutorial: boolean): RunState {
     bag: [], stash: new Array<ItemInst | null>(SHOP.stashSlots).fill(null), shop: [], locked: false,
     refreshIndex: 0, phaseStamp: 0, lastResult: null, pouchGold: 0, savedGold: 0, lastHpRatio: 0,
     tutorial, cleared: false, stats: { bestHit: 0, merges: 0, spent: 0, roundScores: [], wins: 0 }, nextUid: 1,
+    open: rectMask(BAG.cols, BAG.start), unlocked: 0,
   };
 }
 
@@ -33,7 +34,7 @@ export function beginArrange(run: RunState): ReceiptLine[] {
 }
 
 export function bagOcc(run: RunState): Occ {
-  return buildOcc(run.bag, BAG.cols, BAG.rows);
+  return buildOcc(run.bag, BAG.cols, BAG.rows, run.open);
 }
 
 export function find(run: RunState, uid: number): ItemInst | null {
@@ -236,6 +237,39 @@ export function refresh(run: RunState): boolean {
   return true;
 }
 
+export function cellPrice(run: RunState): number {
+  const p = BAG.cellPrice;
+  return p[Math.min(run.unlocked, p.length - 1)];
+}
+
+/** 锁着、并且上下左右挨着开放格 */
+export function canUnlock(run: RunState, x: number, y: number): boolean {
+  if (x < 0 || y < 0 || x >= BAG.cols || y >= BAG.rows || isOpen(run.open, BAG.cols, x, y)) return false;
+  return DIRS.some(([dx, dy]) => {
+    const nx = x + dx;
+    const ny = y + dy;
+    return nx >= 0 && ny >= 0 && nx < BAG.cols && ny < BAG.rows && isOpen(run.open, BAG.cols, nx, ny);
+  });
+}
+
+export function unlockable(run: RunState): [number, number][] {
+  const out: [number, number][] = [];
+  for (let y = 0; y < BAG.rows; y++) for (let x = 0; x < BAG.cols; x++) if (canUnlock(run, x, y)) out.push([x, y]);
+  return out;
+}
+
+export function unlockCell(run: RunState, x: number, y: number): OpResult {
+  if (run.phase !== 'arrange') return { ok: false, reason: '只能在整理阶段操作' };
+  if (!canUnlock(run, x, y)) return { ok: false, reason: '要挨着已开放的格子' };
+  const price = cellPrice(run);
+  if (run.gold < price) return { ok: false, reason: '金币不足' };
+  run.gold -= price;
+  run.stats.spent += price;
+  run.open += 2 ** (y * BAG.cols + x);
+  run.unlocked++;
+  return { ok: true, uid: 0 };
+}
+
 export function hasWeapon(run: RunState): boolean {
   return run.bag.some((it) => ITEMS[it.id].tag === 'weapon');
 }
@@ -247,7 +281,7 @@ export function startBattle(run: RunState): BattleResult {
   run.pouchGold = pouch;
   const e = enemyFor(run.round);
   const res = simulate(
-    { items: run.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(run.round) },
+    { items: run.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(run.round), open: run.open },
     { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits },
   );
   run.phase = 'battle';

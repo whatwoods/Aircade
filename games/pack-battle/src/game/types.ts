@@ -131,6 +131,10 @@ export interface RunState {
   cleared: boolean;
   stats: RunStats;
   nextUid: number;
+  /** 背包开放格的位掩码（见 grid.ts isOpen） */
+  open: number;
+  /** 已花钱解锁的格数 */
+  unlocked: number;
   /** 被调试接口改过：不存档、不计最高分 */
   debug?: boolean;
 }

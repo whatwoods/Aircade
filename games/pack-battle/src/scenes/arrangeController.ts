@@ -368,7 +368,11 @@ export class ArrangeController {
     }
     const p = this.press;
     this.press = null;
-    if (!p || !tap || !p.src) return;
+    if (!p || !tap) return;
+    if (!p.src) {
+      this.gs.tapLocked(x, y);
+      return;
+    }
     const s = p.src;
     if (s.kind === 'card') this.openDetailFor(s, x, y, false);
     else this.tapRotate(s.uid);
@@ -648,7 +652,7 @@ export class ArrangeController {
     const items: Placed[] = [];
     for (const it of gs.run.bag) if (it.uid !== dragUid) items.push(it);
     items.push({ uid: dragUid, id: d.id, lv: d.lv, rot: d.rot, x: z.x, y: z.y });
-    const syn = computeSynergy(items, BAG.cols, BAG.rows);
+    const syn = computeSynergy(items, BAG.cols, BAG.rows, gs.run.open);
     const cur = new Set<string>();
     for (const l of gs.syn.links) cur.add(linkKey(l));
     d.prev = syn.links.filter((l) => l.from === dragUid || l.to === dragUid);

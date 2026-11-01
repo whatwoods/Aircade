@@ -83,7 +83,7 @@
 
 ### 3.2 背包、暂存与相邻
 
-- **背包**：6 列 × 5 行，共 30 格（`BAG.cols=6, rows=5`）。用户说的"5×6"在竖屏下按宽 6 高 5 实现，更省纵向空间；改 config 就能换成 5×6。
+- **背包**：6 列 × 5 行，共 30 格（`BAG.cols=6, rows=5`）。开局只开放中间 4×4 的 16 格，其余 14 格要花金币一格一格解锁（见 §12.5）。用户说的"5×6"在竖屏下按宽 6 高 5 实现，更省纵向空间；改 config 就能换成 5×6。
 - **桌边暂存**（stash）：背包下方的木桌上有 5 个槽位（`SHOP.stashSlots=5`）。暂存的装备**不参战**，跨轮保留；放进去不限形状，按比例缩小显示。
 - **相邻的精确定义**：A、B 两件装备只要有至少一对格子**共享一条边**（上下左右），就算相邻；只碰到对角不算。同一对装备不管共享几条边，都只算 **1 次**。只有背包内的装备参与相邻计算。
 - **方向性**：只有「号角」一件。号角占 2 格，有"尾"和"口"两端，从尾指向口就是号声方向。从口格沿这个方向一直到背包边缘，这条线上所有被占据的格子所属的装备（去重，不含号角自己）都获得加成。号声能穿过中间的装备。旋转号角就会改变方向。
@@ -94,7 +94,7 @@
 | 字段 | 值 | 说明 |
 |---|---|---|
 | `ECONOMY.startGold` | 12 | 第 1 轮初始金币 |
-| `ECONOMY.incomeByRound` | `[_,0,8,9,9,10,10,11,11,12,12]` | 第 r 轮整理开始时的基础收入（r≥2，也就是 7+⌈r/2⌉）；第 1 轮用 startGold |
+| `ECONOMY.incomeByRound` | `[_,0,10,11,11,12,12,13,13,14,14]` | 第 r 轮整理开始时的基础收入（r≥2，也就是 9+⌈r/2⌉；v1.2 为背包解锁各 +2）；第 1 轮用 startGold |
 | `ECONOMY.winBonus` | +2 | 上一场胜利 |
 | `ECONOMY.lossBonus` | +3 | 上一场失败（补偿，帮助翻盘） |
 | `ECONOMY.interestStep / interestCap` | 10 / 3 | 利息：按开战时手里的金币算，每 10 金 +1，最多 +3 |
@@ -362,7 +362,7 @@ G=时之沙漏 C(R10)=龙爪 X=龙鳞 P=治疗药水★★
 ```ts
 export const BAG = { cols: 6, rows: 5 };
 export const PLAYER = { hearts: 3, baseHp: 30, hpPerRound: 8 };
-export const ECONOMY = { startGold: 12, incomeByRound: [0,0,8,9,9,10,10,11,11,12,12],
+export const ECONOMY = { startGold: 12, incomeByRound: [0,0,10,11,11,12,12,13,13,14,14],
   winBonus: 2, lossBonus: 3, interestStep: 10, interestCap: 3, refreshCost: 1,
   sellRatio: 0.5, sameRoundFullRefund: true, undoSellMs: 4000 };
 export const SHOP = { slots: 5, stashSlots: 5, rarityWeights: [/* 3.3 表 */],
@@ -945,7 +945,7 @@ URL 参数：
 
 | API | 作用 |
 |---|---|
-| `state()` | 当前快照：阶段、轮次、attempt、心、金币、分数、背包（id/lv/rot/x/y）、暂存、商店、锁定、敌人 |
+| `state()` | 当前快照：阶段、轮次、attempt、心、金币、分数、背包（id/lv/rot/x/y）、暂存、商店、锁定、开放格掩码 `open` 与已解锁数 `unlocked`、敌人 |
 | `ui()` | 当前所有可交互元素 `{id, x, y, w, h, enabled}`，例如 `btn.start`、`btn.fight`、`btn.refresh`、`btn.lock`、`btn.pause`、`btn.speed`、`btn.continue`、`shop.0`…`shop.4`、`stash.0`…、`enemyCard` |
 | `cell(col,row)` / `shopSlot(i)` / `stashSlot(i)` / `itemRect(uid)` | 单个元素的屏幕矩形（中心可直接拖拽） |
 | `addGold(n)` / `setGold(n)` / `setHearts(n)` | 资源修改 |
@@ -954,6 +954,7 @@ URL 参数：
 | `give(id, lv?, where?)` | 给装备：`'stash'`（默认）/`'bag'`（自动找空位）/`{x,y,rot}` |
 | `place(id, x, y, rot?, lv?)` | 直接放进背包，返回 uid；位置非法时返回 null |
 | `clearBag()` / `clearStash()` | 清空 |
+| `openBag()` / `unlock(x, y)` | 背包全开 / 按玩家规则花钱解锁一格（v1.2） |
 | `setShop(ids[])` / `reroll()` | 指定商店货品 / 免费刷新 |
 | `startBattle()` | 等同点击开战 |
 | `winBattle()` / `loseBattle()` | 立刻以胜/负结束当前战斗（整理阶段调用则跳过战斗直接出结果） |
@@ -969,7 +970,7 @@ URL 参数：
 
 调用时机不合法（例如战斗中 `place`）返回 `{ok:false, reason}`，不会抛错，也不会产生控制台报错。
 
-**调试局**（v1.1）：凡是改状态的接口（`addGold`/`setGold`/`setHearts`/`gotoRound`/`boss`/`give`/`place`/`clearBag`/`clearStash`/`setShop`/`reroll`/`winBattle`/`loseBattle`，以及 `?round=`）都会把本局标记为 `run.debug`：不再写中途存档，结局不计最高分；`win()`/`lose()` 造出的结局同样不计。只读接口（`state`/`ui`/`simulate` 等）和 `startBattle` 不标记。
+**调试局**（v1.1）：凡是改状态的接口（`addGold`/`setGold`/`setHearts`/`gotoRound`/`boss`/`give`/`place`/`clearBag`/`clearStash`/`openBag`/`unlock`/`setShop`/`reroll`/`winBattle`/`loseBattle`，以及 `?round=`）都会把本局标记为 `run.debug`：不再写中途存档，结局不计最高分；`win()`/`lose()` 造出的结局同样不计。只读接口（`state`/`ui`/`simulate` 等）和 `startBattle` 不标记。
 
 ---
 
@@ -1038,7 +1039,7 @@ URL 参数：
 
 | 项目 | 文档 | 实现 | 原因 |
 |---|---|---|---|
-| 第 1 轮输后重打的收入 | 第 1 轮用 startGold | 重打第 1 轮时按 `incomeByRound[2]`（8 金）发放 | 不能再发一次 12 金开局钱，也不能发 0 |
+| 第 1 轮输后重打的收入 | 第 1 轮用 startGold | 重打第 1 轮时按 `incomeByRound[2]`（v1.2 起 10 金）发放 | 不能再发一次 12 金开局钱，也不能发 0 |
 | 锁定商店 | 保留未售出的货品 | 保留未售出的货品，**卖掉的空位补新货** | 锁定后买走一件，下轮只剩 4 张卡，体验像 bug |
 | 情境提示"第一次输" | "失去 1 颗心。调整背包，再战同一个对手" | "失去 1 颗心：调整背包，再战同一对手" | 缩短到一行，避免折行压到结算缎带 |
 | 情境提示排队 | 未定义 | 引导气泡（第 1–4 步、第 6 步）显示时，情境提示排队等待；战斗/结算阶段提示放在对决带下方 | 第 2 轮存款 ≥10 金时，利息提示会盖住第 6 步"合成"气泡 |
@@ -1159,3 +1160,25 @@ URL 参数：
 | 不看敌人 | 53% | 7265 | 87–100% | 66% / 55% / 57% | 0 | 28.8 / 30 |
 
 结论：前 7 轮几乎没有输的可能，难度全压在第 8–10 轮；背包第 8 轮就满了，之后只能换不能加；★★★ 一次都没出现（同名要 4 件，商店给不到）；每场战斗 5–20 秒、手里几乎不留钱，利息没起作用。这些是 B 批后续改动（背包扩展、轮间抉择、经济和配平）的依据，改完用同一组种子对比。
+
+### 12.5 背包解锁（B 批，v1.2）
+
+背包外框仍是 6×5，开局只开放 `BAG.start`（x 1–4、y 0–3 的 4×4 = 16 格），其余 14 格锁着：
+
+- 锁格画成深色皮面加交叉缝线，放不进装备（`buildOcc` 把锁格记成 -1，和越界一样；拖拽时显示红色斜线）。长弓的"相邻空格"不算锁格。
+- 整理阶段，上下左右挨着开放格的锁格画虚线框和"+"。点一下亮出价格，2.5 秒内再点同一格就解锁；钱不够时金币栏闪红、播放 noGold。首局引导期间不显示，也点不了。
+- 价格 `BAG.cellPrice[已解锁次数]`：1,1,1,2,2,2,2,3,3,3,3,4,4,4（全开共 35 金）。计入 `stats.spent`。
+- 状态存在 `RunState.open`（位掩码，第 y·6+x 位）和 `unlocked`；战斗模拟和加成计算都带上 `open`。v1.1 的存档没有这两个字段，读档时按全开处理。
+- 为了抵消解锁花的钱，第 2 轮起每轮基础收入 +2。
+- 调试：`__game.openBag()` 全开，`__game.unlock(x, y)` 按玩家规则解锁一格；`gotoRound(n)`（n>1）和 `boss()` 会先把背包全开，因为参考构筑是按 30 格摆的。`state()` 多了 `open`、`unlocked`。
+
+机器人（种子 1–200）：
+
+| | 通关 | 第 5 轮首战胜 | 第 8 / 9 / 10 轮首战胜 | 第 8 轮开放格 |
+|---|---|---|---|---|
+| v1.1 看敌人 | 93% | 97% | 73% / 76% / 81% | 30 |
+| v1.2 看敌人 | 74% | 77% | 49% / 65% / 76% | 26.6 |
+| v1.1 不看敌人 | 53% | 87% | 66% / 55% / 57% | 30 |
+| v1.2 不看敌人 | 46% | — | — | — |
+
+只加锁格、不加收入时，看敌人的机器人通关率掉到 23%（格子 2–6 金）或 38%（1–4 金），所以才加了收入。第 6 轮仍然 100% 首战胜、第 8 轮是断崖，留给配平那一步处理。机器人只在"有卡放不下"或"开放格只剩 ≤1 个空位"时才解锁，比真人保守。

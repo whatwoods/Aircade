@@ -4,7 +4,8 @@ import { BAG, ENEMIES, ITEMS, ROUNDS, SCORE } from '../config.ts';
 import { clock } from '../core/loop.ts';
 import { simulate as runSim } from '../game/battle/sim.ts';
 import { enemyBag, enemyFor, parseBag, playerMaxHp } from '../game/enemies.ts';
-import { giveItem } from '../game/run.ts';
+import { fullMask } from '../game/grid.ts';
+import { giveItem, unlockCell } from '../game/run.ts';
 import { rollShop } from '../game/shop.ts';
 import { markTutorialDone, resetHints, resetTutorialFlag } from '../game/tutorial.ts';
 import type { BattleEvent, BattleResult, ItemId, ItemInst, Lv, Rot } from '../game/types.ts';
@@ -78,9 +79,16 @@ function gotoRound(n: number, build: 'none' | 'weak' | 'mid' | 'strong' = 'mid')
   if (!(n >= 1 && n <= ROUNDS)) return fail('轮次应在 1–10');
   const g = ensureGame();
   g.gotoRoundDirect(n);
+  // 参考构筑按整个 6×5 摆：跳轮时背包全开
+  if (n > 1 || build !== 'none') openAll(g);
   applyBuild(g, n, build);
   g.rebuild();
   return { ok: true, round: n };
+}
+
+function openAll(g: GameScene): void {
+  g.run.open = fullMask(BAG.cols, BAG.rows);
+  g.run.unlocked = BAG.cols * BAG.rows - BAG.start.w * BAG.start.h;
 }
 
 /** 把当前战斗换成一个立即分出胜负的时间线 */
@@ -154,7 +162,7 @@ export function installDebug(): void {
         bag: r.bag.map((i) => ({ uid: i.uid, id: i.id, lv: i.lv, rot: i.rot, x: i.x, y: i.y })),
         stash: r.stash.map((i) => (i ? { uid: i.uid, id: i.id, lv: i.lv, rot: i.rot, slot: i.slot } : null)),
         shop: r.shop.map((s) => ({ id: s.id, price: s.price })),
-        locked: r.locked, enemy: { name: e.name, title: e.title, hp: e.hp, boss: !!e.boss },
+        locked: r.locked, open: r.open, unlocked: r.unlocked, enemy: { name: e.name, title: e.title, hp: e.hp, boss: !!e.boss },
         tutorial: g.tut.step, paused: g.paused, speed: g.bc.speed, overlay: g.ov.top ? g.ov.top.kind : null,
         dragging: !!g.ac.drag, links: g.syn.links.map((l) => ({ from: l.from, to: l.to, kind: l.kind, label: l.label })),
         maxHp: playerMaxHp(r.round), undo: !!g.undo, outcome: g.outcome,
@@ -229,6 +237,23 @@ export function installDebug(): void {
       g.syncViews(true);
       g.recompute(true);
       return r.uid;
+    }),
+    /** 背包全开 */
+    openBag: mut(() => {
+      const g = game();
+      if (!g) return fail('不在游戏中');
+      openAll(g);
+      g.rebuild();
+      return true;
+    }),
+    /** 花金币解锁一格（同玩家点锁格） */
+    unlock: mut((x: number, y: number) => {
+      const g = game();
+      if (!g) return fail('不在游戏中');
+      const r = unlockCell(g.run, x, y);
+      if (!r.ok) return fail(r.reason);
+      g.rebuild();
+      return true;
     }),
     clearBag: mut(() => {
       const g = game();
@@ -330,7 +355,7 @@ export function installDebug(): void {
       const r = g.run;
       const e = enemyFor(r.round);
       const res = runSim(
-        { items: r.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(r.round) },
+        { items: r.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(r.round), open: r.open },
         { items: enemyBag(r.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits },
       );
       return { winner: res.winner, duration: +res.duration.toFixed(2), hpEnd: res.hpEnd, events: res.events.length };

@@ -14,8 +14,10 @@ import { clearRun, saveRun, saveable } from '../game/save.ts';
 import { clearScore } from '../game/score.ts';
 import { enemyBag, enemyFor } from '../game/enemies.ts';
 import {
-  applyResult, beginArrange, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, type Outcome, type SellRecord,
+  applyResult, beginArrange, canUnlock, cellPrice, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, unlockable, unlockCell,
+  type Outcome, type SellRecord,
 } from '../game/run.ts';
+import { fullMask } from '../game/grid.ts';
 import { computeSynergy, type SynergyResult } from '../game/synergy.ts';
 import { hintSeen, markHint, markTutorialDone, resetTutorialFlag, HINT_TEXT, Tutorial, type HintId } from '../game/tutorial.ts';
 import type { ItemInst, Rot, RunState } from '../game/types.ts';
@@ -29,7 +31,7 @@ import { drawSprite, text } from '../render/text.ts';
 import { Button, drawToast, showToast, drawBubble, drawStamp, type UiEl } from '../render/ui/widgets.ts';
 import { setBackdrop } from '../render/views/background.ts';
 import { drawMapFlag } from '../render/views/desktopDecor.ts';
-import { drawPlayerBag } from '../render/views/bagView.ts';
+import { drawLockedCells, drawPlayerBag } from '../render/views/bagView.ts';
 import { drawDetailBar, drawEnemyCard, drawGold, drawHearts, drawRoundTag, type DetailInfo, type HeartBreak } from '../render/views/hudView.ts';
 import { LinkLayer, drawBowDots, drawHornWaves } from '../render/views/linkView.ts';
 import { ShopView } from '../render/views/shopView.ts';
@@ -90,6 +92,8 @@ export class GameScene implements Scene {
   stampT = -1;
   hint: { s: string; t: number } | null = null;
   undo: { rec: SellRecord; until: number; slide: number } | null = null;
+  cellPick: { cell: [number, number]; until: number } | null = null;
+  readonly fullOpen = fullMask(BAG.cols, BAG.rows);
   outcome: Outcome | null = null;
   collapse = new Spring(14, 0.45, 0);
   paused = false;
@@ -247,7 +251,7 @@ export class GameScene implements Scene {
 
   /** 重新计算加成；animate=true 时连线生长 / 断开有动画与音效 */
   recompute(animate: boolean, labelNew = true): void {
-    this.syn = computeSynergy(this.run.bag, BAG.cols, BAG.rows);
+    this.syn = computeSynergy(this.run.bag, BAG.cols, BAG.rows, this.run.open);
     const { added, removed } = this.links.sync(this.syn.links, animate);
     if (!animate) return;
     if (added.length) {
@@ -738,6 +742,12 @@ export class GameScene implements Scene {
       ctx.translate(-195, -(g.y + g.h));
     }
     drawPlayerBag(ctx, g, 1 - 0.1 * this.collapse.x);
+    if (this.run.open !== this.fullOpen) {
+      const can = this.phase === 'arrange' && !this.tut.arranging ? unlockable(this.run) : [];
+      const pick = this.cellPick && clock.real < this.cellPick.until ? this.cellPick.cell : null;
+      const price = cellPrice(this.run);
+      drawLockedCells(ctx, g, this.run.open, can, pick, price, this.run.gold >= price, time);
+    }
     this.ac.drawUnder(ctx, g, time);
     const hide = this.ac.hiddenUid();
     for (const v of this.views.values()) if (v.zone === 'bag') v.draw(ctx, g, time, true);
@@ -1297,6 +1307,42 @@ export class GameScene implements Scene {
     const [w, h] = v.dims();
     const c = v.cell.target;
     return { x: TMPP.x - (w * c) / 2, y: TMPP.y - (h * c) / 2, w: w * c, h: h * c };
+  }
+
+  /** 点锁格：第一下亮出价格，2.5 秒内再点同一格解锁 */
+  tapLocked(px: number, py: number): void {
+    const g = this.L.bag;
+    const x = Math.floor((px - g.gx) / g.cell);
+    const y = Math.floor((py - g.gy) / g.cell);
+    if (this.tut.arranging || !canUnlock(this.run, x, y)) {
+      this.cellPick = null;
+      return;
+    }
+    const p = this.cellPick;
+    if (!p || p.cell[0] !== x || p.cell[1] !== y || clock.real > p.until) {
+      this.cellPick = { cell: [x, y], until: clock.real + 2.5 };
+      sfx('tick');
+      return;
+    }
+    const price = cellPrice(this.run);
+    const r = unlockCell(this.run, x, y);
+    if (!r.ok) {
+      this.gold.flash = -0.45;
+      sfx('noGold');
+      p.until = clock.real + 2.5;
+      return;
+    }
+    this.cellPick = null;
+    this.setGold(this.run.gold);
+    sfx('buy');
+    sfx('drop', 0, 0.08);
+    tier('T1', false);
+    const cx = g.gx + (x + 0.5) * g.cell;
+    const cy = g.gy + (y + 0.5) * g.cell;
+    const gr = this.L.gold;
+    popup('−' + price, gr.x + gr.w - 20, gr.y + gr.h / 2, '#ffb4a0', 20, { ui: true, life: 0.9, vy: -26 });
+    emit('coin', cx, cy, 4, { speed: 90, life: 0.5 });
+    this.recompute(true);
   }
 
   /** 调试：全量重建视图 */

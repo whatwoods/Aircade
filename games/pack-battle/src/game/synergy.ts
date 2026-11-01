@@ -36,8 +36,8 @@ function matches(tag: Tag, want: Tag | 'any'): boolean {
   return want === 'any' || tag === want;
 }
 
-export function computeSynergy(items: readonly Placed[], cols: number, rows: number): SynergyResult {
-  const occ = buildOcc(items, cols, rows);
+export function computeSynergy(items: readonly Placed[], cols: number, rows: number, open?: number): SynergyResult {
+  const occ = buildOcc(items, cols, rows, open);
   const adj = adjacency(items, occ);
   const byUid = new Map<number, Placed>();
   for (const it of items) byUid.set(it.uid, it);

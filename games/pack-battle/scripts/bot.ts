@@ -4,13 +4,16 @@
 // 机器人的策略（每次整理阶段反复执行，直到没有更好的动作）：
 //   1. 对每张买得起的商店卡：能合成就试合成；否则在背包里找加成最高的位置；背包放不下就试"卖掉一件再放"
 //   2. 每个候选都对着本轮敌人真打一遍（模拟），选结果提升最大的那个
-//   3. 都没提升且钱多时刷新商店
+//   3. 有商店卡因为背包没位置放不下、钱又够：解锁一格（挑挨着开放格最多的）
+//   4. 都没提升且钱多时刷新商店
 // 它不会重新整理已经摆好的装备，所以比认真玩的人弱一些，可以看作"普通玩家"的下限。
 import { BAG, ECONOMY, ROUNDS } from '../src/config.ts';
 import { simulate } from '../src/game/battle/sim.ts';
 import { enemyBag, enemyFor, playerMaxHp } from '../src/game/enemies.ts';
-import { canPlace, buildOcc } from '../src/game/grid.ts';
-import { applyResult, beginArrange, buy, mergeTargetFor, move, newRun, refresh, sell, startBattle, type Dest } from '../src/game/run.ts';
+import { canPlace, buildOcc, DIRS, isOpen } from '../src/game/grid.ts';
+import {
+  applyResult, beginArrange, buy, cellPrice, mergeTargetFor, move, newRun, refresh, sell, startBattle, unlockable, unlockCell, type Dest,
+} from '../src/game/run.ts';
 import { computeSynergy } from '../src/game/synergy.ts';
 import type { ItemInst, Placed, Rot, RunState } from '../src/game/types.ts';
 
@@ -22,8 +25,8 @@ const N = nums[0] ?? 200;
 const SEED0 = nums[1] ?? 1;
 
 /** 背包强度的粗估（选摆放位置用，比真打一遍快得多） */
-function power(items: readonly Placed[]): number {
-  const syn = computeSynergy(items, BAG.cols, BAG.rows);
+function power(items: readonly Placed[], open: number): number {
+  const syn = computeSynergy(items, BAG.cols, BAG.rows, open);
   let p = 0;
   for (const d of syn.derived.values()) {
     const rate = d.cd > 0 ? d.speedMul / d.cd : 0;
@@ -37,19 +40,19 @@ function power(items: readonly Placed[]): number {
 
 /** 对着本轮敌人真打：赢了 1 + 剩余生命比例，输了 = 打掉敌人生命的比例 */
 function evaluate(run: RunState): number {
-  if (BLIND) return power(run.bag);
+  if (BLIND) return power(run.bag, run.open);
   const e = enemyFor(run.round);
   const maxHp = playerMaxHp(run.round);
   const res = simulate(
-    { items: run.bag, cols: BAG.cols, rows: BAG.rows, maxHp },
+    { items: run.bag, cols: BAG.cols, rows: BAG.rows, maxHp, open: run.open },
     { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits },
   );
   return res.winner === 0 ? 1 + res.hpEnd[0] / maxHp : 1 - Math.max(0, res.hpEnd[1]) / e.hp;
 }
 
 /** 在背包里给一件新装备找加成最高的位置 */
-function bestSpot(bag: readonly ItemInst[], id: Placed['id'], lv: Placed['lv']): Dest | null {
-  const o = buildOcc(bag, BAG.cols, BAG.rows);
+function bestSpot(bag: readonly ItemInst[], open: number, id: Placed['id'], lv: Placed['lv']): Dest | null {
+  const o = buildOcc(bag, BAG.cols, BAG.rows, open);
   let best: Dest | null = null;
   let bp = -1;
   const probe: Placed = { uid: -1, id, lv, rot: 0, x: 0, y: 0 };
@@ -61,7 +64,7 @@ function bestSpot(bag: readonly ItemInst[], id: Placed['id'], lv: Placed['lv']):
         probe.rot = rot;
         probe.x = x;
         probe.y = y;
-        const p = power(list);
+        const p = power(list, open);
         if (p > bp) {
           bp = p;
           best = { zone: 'bag', x, y, rot };
@@ -89,14 +92,14 @@ function arrange(run: RunState): void {
       const id = slot.id;
       const mt = mergeTargetFor(run, id, 1);
       if (mt) consider((r) => buy(r, i, { zone: 'merge', uid: mt.uid }).ok);
-      const spot = bestSpot(run.bag, id, 1);
+      const spot = bestSpot(run.bag, run.open, id, 1);
       if (spot) consider((r) => buy(r, i, spot).ok);
       else {
         // 背包满：试着卖掉一件再放
         for (const old of run.bag) {
           consider((r) => {
             if (!sell(r, old.uid, 0)) return false;
-            const sp = bestSpot(r.bag, id, 1);
+            const sp = bestSpot(r.bag, r.open, id, 1);
             return !!sp && r.gold >= slot.price && buy(r, i, sp).ok;
           });
         }
@@ -116,6 +119,17 @@ function arrange(run: RunState): void {
       pick.apply(run);
       continue;
     }
+    // 有放不下的卡：解锁一格
+    const unfit = run.shop.filter((s) => s.id && !mergeTargetFor(run, s.id, 1) && !bestSpot(run.bag, run.open, s.id, 1));
+    const cheapest = Math.min(...unfit.map((s) => s.price));
+    const free = buildOcc(run.bag, BAG.cols, BAG.rows, run.open).cells.filter((c) => c === 0).length;
+    if ((unfit.length && run.gold >= cellPrice(run) + cheapest) || (free <= 1 && run.gold >= cellPrice(run) + 3)) {
+      const cells = unlockable(run);
+      const near = ([x, y]: [number, number]): number =>
+        DIRS.filter(([dx, dy]) => x + dx >= 0 && y + dy >= 0 && x + dx < BAG.cols && y + dy < BAG.rows && isOpen(run.open, BAG.cols, x + dx, y + dy)).length;
+      cells.sort((a, b) => near(b) - near(a));
+      if (cells.length && unlockCell(run, cells[0][0], cells[0][1]).ok) continue;
+    }
     // 没有更好的买法：钱多就刷新
     if (run.gold >= ECONOMY.refreshCost + 5 && refresh(run)) continue;
     break;
@@ -134,9 +148,10 @@ interface RoundStat {
   lv2: number;
   lv3: number;
   goldLeft: number;
+  open: number;
 }
 const stats: RoundStat[] = Array.from({ length: ROUNDS + 1 }, () => ({
-  reach: 0, firstWin: 0, attempts: 0, hpWin: 0, wins: 0, dur: 0, items: 0, cells: 0, lv2: 0, lv3: 0, goldLeft: 0,
+  reach: 0, firstWin: 0, attempts: 0, hpWin: 0, wins: 0, dur: 0, items: 0, cells: 0, lv2: 0, lv3: 0, goldLeft: 0, open: 0,
 }));
 let clears = 0;
 let scoreSum = 0;
@@ -165,6 +180,7 @@ for (let n = 0; n < N; n++) {
       st.dur += res.duration;
       st.items += run.bag.length;
       st.cells += buildOcc(run.bag, BAG.cols, BAG.rows).cells.filter((c) => c !== 0).length;
+      st.open += BAG.start.w * BAG.start.h + run.unlocked;
       st.lv2 += run.bag.filter((i) => i.lv === 2).length;
       st.lv3 += run.bag.filter((i) => i.lv === 3).length;
       st.goldLeft += run.gold;
@@ -181,13 +197,13 @@ for (let n = 0; n < N; n++) {
 const pct = (a: number, b: number): string => (b ? Math.round((a / b) * 100) + '%' : '-');
 const avg = (a: number, b: number, d = 1): string => (b ? (a / b).toFixed(d) : '-');
 console.log(`机器人${BLIND ? '（不看敌人）' : ''} ${N} 局（种子 ${SEED0}–${SEED0 + N - 1}）  通关 ${pct(clears, N)}  平均分 ${Math.round(scoreSum / N)}`);
-console.log('轮  到达   首战胜  平均挑战  赢时剩血  用时s  件数  占格  ★★   ★★★  剩金  死在这轮');
+console.log('轮  到达   首战胜  平均挑战  赢时剩血  用时s  件数  占格  开放  ★★   ★★★  剩金  死在这轮');
 for (let r = 1; r <= ROUNDS; r++) {
   const s = stats[r];
   console.log(
     [
       String(r).padEnd(3), pct(s.reach, N).padEnd(6), pct(s.firstWin, s.reach).padEnd(7), avg(s.attempts, s.reach, 2).padEnd(9),
-      pct(s.hpWin, s.wins).padEnd(9), avg(s.dur, s.wins).padEnd(6), avg(s.items, s.wins).padEnd(5), avg(s.cells, s.wins).padEnd(5),
+      pct(s.hpWin, s.wins).padEnd(9), avg(s.dur, s.wins).padEnd(6), avg(s.items, s.wins).padEnd(5), avg(s.cells, s.wins).padEnd(5), avg(s.open, s.wins).padEnd(5),
       avg(s.lv2, s.wins).padEnd(5), avg(s.lv3, s.wins, 2).padEnd(6), avg(s.goldLeft, s.wins).padEnd(5), String(diedAt[r]),
     ].join(' '),
   );
