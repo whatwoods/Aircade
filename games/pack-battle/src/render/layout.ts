@@ -138,6 +138,8 @@ export interface BattleLayout {
   playerStatus: { x: number; y: number };
   speed: Rect;
   cont: Rect;
+  /** 结算时的广告按钮（压在变灰的背包下沿） */
+  ad: Rect;
 }
 
 export function battleLayout(H: number): BattleLayout {
@@ -176,6 +178,7 @@ export function battleLayout(H: number): BattleLayout {
     playerStatus: { x: 374, y: hpY + 2 },
     speed: R(302, btnY, 72, 48),
     cont: R(95, btnY - 6, 200, 60),
+    ad: R(65, hpY - 60, 260, 56),
   };
 }
 

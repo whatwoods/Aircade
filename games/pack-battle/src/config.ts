@@ -82,6 +82,20 @@ export const EVENTS = {
   cacheGold: 6,
 };
 
+/** 广告：激励点每局限次；数值是初始值，用 pnpm bot --ads 校准 */
+export const AD = {
+  /** 复活每局次数（进无尽后再多 1 次） */
+  revives: 1,
+  /** 两张都要、败北补给从第几轮起 */
+  fromRound: 3,
+  /** 败北补给：下次整理多给的金币 */
+  supplyGold: 6,
+  /** 插屏与上一条广告的最短间隔 */
+  interstitialGapMs: 180000,
+  /** 累计结束第几局起才放插屏（第一局不放） */
+  interstitialFromRun: 2,
+};
+
 /** 敌人词缀：第 fromRound 轮起非首领敌人带 perEnemy 个（按种子掷） */
 export const AFFIX = {
   fromRound: 4,

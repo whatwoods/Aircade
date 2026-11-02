@@ -53,6 +53,10 @@ export function loadRun(): RunState | null {
   r.eliteGold ??= 0;
   r.tier ??= 0;
   r.tierBonus ??= 0;
+  r.adRevives ??= 0;
+  r.adBoth ??= false;
+  r.adSupply ??= false;
+  r.adGold ??= 0;
   // v1.1 的存档没有锁格：背包全开
   if (typeof r.open !== 'number') {
     r.open = fullMask(BAG.cols, BAG.rows);

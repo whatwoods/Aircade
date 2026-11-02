@@ -61,6 +61,8 @@ pnpm dev                 # 开发服务器，固定端口，见上表；同时�
 | 命令 | 游戏 | 作用 |
 |---|---|---|
 | `pnpm balance` | pack-battle | 自动战斗数值平衡模拟 |
+| `pnpm ad-rules` | pack-battle | 广告奖励规则检查 |
+| `pnpm build:tap` | pack-battle | TapTap 独立构建，输出 `release/` 下的 H5 zip |
 | `pnpm sim` | chain-2048 / five-drop / hanzi-merge | 用不同水平的机器人跑难度曲线并检查验收阈值 |
 | `pnpm rules` | five-drop | 消除 / 重力 / 连锁规则单元测试 |
 | `pnpm verify` | hanzi-merge | 校验全部汉字配方（结构、偏旁变体、繁体、标签一致性） |

@@ -2,7 +2,8 @@
 import { duckMusic, au } from '../audio/audio.ts';
 import { setMusic } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
-import { BAG, ECONOMY, EVENTS, ITEMS, ROUNDS, SHOP } from '../config.ts';
+import { AD, BAG, ECONOMY, EVENTS, ITEMS, ROUNDS, SHOP } from '../config.ts';
+import { adPlaying, rewardedReady, showRewarded } from '../platform/ads.ts';
 import { input, type InputHandler } from '../core/input.ts';
 import { clock } from '../core/loop.ts';
 import { Spring } from '../core/spring.ts';
@@ -16,6 +17,7 @@ import { enemyBag, enemyFor, runEnemy } from '../game/enemies.ts';
 import {
   applyChoice, applyResult, beginArrange, canUnlock, mergeTargetFor, smithTarget, cellPrice, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, unlockable, unlockCell,
   type Outcome, type RunMode, type SellRecord,
+  canRevive, canSupply, canTakeBoth, revive, takeBoth, takeSupply,
 } from '../game/run.ts';
 import { fullMask } from '../game/grid.ts';
 import { computeSynergy, type SynergyResult } from '../game/synergy.ts';
@@ -110,6 +112,8 @@ export class GameScene implements Scene {
   speedB: Button;
   contB: Button;
   reportB: Button;
+  /** 结算时的广告按钮：心掉光是复活，否则是败北补给 */
+  adB: Button;
   /** 刚打完这场的战报（结算时可看） */
   report: [SideReport, SideReport] | null = null;
   private battleItems: ItemInst[] = [];
@@ -146,6 +150,10 @@ export class GameScene implements Scene {
     this.contB.visible = false;
     this.reportB = new Button('btn.report', { x: 302, y: 740, w: 72, h: 44 }, '战报', 'tag', 13);
     this.reportB.visible = false;
+    this.adB = new Button('btn.ad', { x: 65, y: 650, w: 260, h: 56 }, '', 'sealTag', 14);
+    this.adB.glyph = '▶';
+    this.adB.fontSize = 19;
+    this.adB.visible = false;
     this.nextB = new Button('btn.tutNext', { x: 150, y: 470, w: 90, h: 34 }, '下一步', 'tag', 12);
     this.nextB.visible = false;
     this.ac = new ArrangeController(this);
@@ -217,6 +225,7 @@ export class GameScene implements Scene {
     this.speedB.r = B.speed;
     this.reportB.r = { x: B.speed.x, y: B.cont.y + (B.cont.h - 44) / 2, w: B.speed.w, h: 44 };
     this.contB.r = B.cont;
+    this.adB.r = B.ad;
     this.nextB.r = { x: 150, y: L.bubbleY - 70, w: 90, h: 34 };
     // 桌边装备的像素位置跟着布局
     for (const v of this.views.values()) {
@@ -528,8 +537,51 @@ export class GameScene implements Scene {
     this.reportB.visible = !out.ending;
   }
 
+  /** 结算时能给什么广告奖励 */
+  adOffer(): 'revive' | 'supply' | null {
+    if (this.phase !== 'result' || !this.outcome || this.outcome.win) return null;
+    if (canRevive(this.run)) return 'revive';
+    return canSupply(this.run) ? 'supply' : null;
+  }
+
+  private async watchResultAd(): Promise<void> {
+    const offer = this.adOffer();
+    if (!offer || !(await showRewarded())) return;
+    if (offer === 'revive') {
+      if (!revive(this.run) || !this.outcome) return;
+      this.outcome.ending = false;
+      this.contB.label = '再战';
+      this.reportB.visible = true;
+      this.score.set(this.run.score);
+      sfx('heal');
+    } else {
+      if (!takeSupply(this.run)) return;
+      popup('+' + AD.supplyGold, this.B.ad.x + this.B.ad.w / 2, this.B.ad.y - 16, C.goldLight, 28, { ui: true, life: 1.2, vy: -40 });
+      sfx('buy');
+    }
+    saveRun(this.run);
+  }
+
+  private async watchBothAd(panel: ChoicePanel): Promise<void> {
+    const ids = this.run.choice;
+    if (!ids || !(await showRewarded())) return;
+    const smith = ids.includes('smith') ? smithTarget(this.run) : null;
+    if (!takeBoth(this.run)) return;
+    panel.close();
+    if (smith) {
+      this.syncViews(true);
+      sfx(smith.lv === 3 ? 'merge3' : 'merge2');
+    }
+    if (ids.includes('cache')) {
+      this.setGold(this.run.gold);
+      sfx('buy');
+    }
+    if (ids.includes('rest')) sfx('heal');
+    this.goArrange();
+  }
+
   continueFromResult(): void {
-    if (this.phase !== 'result' || !this.outcome) return;
+    if (this.phase !== 'result' || !this.outcome || adPlaying()) return;
     const out = this.outcome;
     if (out.ending) {
       const data = endingData(this.run);
@@ -538,7 +590,11 @@ export class GameScene implements Scene {
     }
     const ch = this.run.choice;
     if (ch && !this.ov.active) {
-      this.ov.open(new ChoicePanel(stage.H, ch.map((id) => ({ id, desc: this.choiceDesc(id) })), (id) => this.pickChoice(id)));
+      const panel: ChoicePanel = new ChoicePanel(stage.H, ch.map((id) => ({ id, desc: this.choiceDesc(id) })), (id) => this.pickChoice(id), {
+        ready: () => canTakeBoth(this.run) && rewardedReady(),
+        pick: () => void this.watchBothAd(panel),
+      });
+      this.ov.open(panel);
       return;
     }
     this.goArrange();
@@ -578,6 +634,7 @@ export class GameScene implements Scene {
     this.outcome = null;
     this.contB.visible = false;
     this.reportB.visible = false;
+    this.adB.visible = false;
     this.bc.leave();
     this.collapse.target = 0;
     for (const v of this.views.values()) v.gray = 0;
@@ -615,7 +672,7 @@ export class GameScene implements Scene {
   // ---------- 暂停 ----------
 
   openPause(): void {
-    if (this.paused) return;
+    if (this.paused || adPlaying()) return;
     this.ac.cancel();
     this.paused = true;
     this.ov.open(
@@ -723,6 +780,10 @@ export class GameScene implements Scene {
     this.lockB.icon = this.run.locked ? 'lock' : 'unlock';
     this.lockB.enabled = !(this.tut.arranging && this.tut.step < 4);
     if (this.phase === 'result') this.contB.alpha = Math.min(1, this.contB.alpha + dt / 0.3);
+    const offer = rewardedReady() ? this.adOffer() : null;
+    this.adB.visible = !!offer;
+    this.adB.label = offer === 'revive' ? '看广告复活' : `看广告 +${AD.supplyGold} 金`;
+    this.adB.alpha = this.contB.alpha;
     this.speedB.visible = this.phase === 'battle' || this.phase === 'toBattle';
     if (this.speedFlip < 1) this.speedFlip = Math.min(1, this.speedFlip + dt / 0.18);
     // 金币飞行
@@ -861,6 +922,7 @@ export class GameScene implements Scene {
     }
     if (this.speedB.visible) this.drawSpeed(ctx, time, real);
     if (this.contB.visible) this.contB.draw(ctx, time, real);
+    if (this.adB.visible) this.adB.draw(ctx, time, real);
     if (this.reportB.visible && this.phase === 'result') {
       ctx.save();
       ctx.globalAlpha *= this.contB.alpha;
@@ -1092,16 +1154,19 @@ export class GameScene implements Scene {
     if (this.speedB.visible && this.phase === 'battle') out.push(this.speedB);
     if (this.phase === 'result' && this.contB.visible && this.contB.alpha > 0.5) out.push(this.contB);
     if (this.phase === 'result' && this.reportB.visible && this.contB.alpha > 0.5) out.push(this.reportB);
+    if (this.phase === 'result' && this.adB.visible && this.contB.alpha > 0.5) out.push(this.adB);
     return out;
   }
 
   private activate(b: Button): void {
+    if (adPlaying()) return;
     const real = clock.real;
     if (b === this.pauseB) this.openPause();
     else if (b === this.fightB) this.tryFight();
     else if (b === this.contB) this.continueFromResult();
     else if (b === this.speedB) this.cycleSpeed();
     else if (b === this.reportB) this.openReport();
+    else if (b === this.adB) void this.watchResultAd();
     else if (b === this.skipB) {
       markTutorialDone();
       this.tut.stop();
@@ -1408,6 +1473,7 @@ export class GameScene implements Scene {
     this.outcome = null;
     this.contB.visible = false;
     this.reportB.visible = false;
+    this.adB.visible = false;
     this.run.round = n;
     this.run.attempt = 1;
     this.run.phase = 'result';

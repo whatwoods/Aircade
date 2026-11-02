@@ -3,6 +3,7 @@ import { musicInfo } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
 import { BAG, DIFFICULTY, ENEMIES, ITEMS, ROUNDS, SCORE } from '../config.ts';
 import { save } from '../core/storage.ts';
+import { setAdProvider, type AdProvider } from '../platform/ads.ts';
 import { clock } from '../core/loop.ts';
 import { simulate as runSim } from '../game/battle/sim.ts';
 import { enemyBag, enemyFor, parseBag, playerMaxHp, runEnemy } from '../game/enemies.ts';
@@ -20,6 +21,19 @@ import { EndingScene } from '../scenes/endingScene.ts';
 import { GameScene } from '../scenes/gameScene.ts';
 import { factories, gotoScene, setScene, sm } from '../scenes/sceneManager.ts';
 import { buildFor } from '../../scripts/balance-builds.ts';
+
+/** 假广告：ended 看完 / closed 中途关 / failed 拉不到 */
+type FakeAdMode = 'ended' | 'closed' | 'failed';
+
+function fakeAds(mode: FakeAdMode): AdProvider {
+  const wait = (): Promise<void> => new Promise((r) => setTimeout(r, 300));
+  return {
+    rewardedReady: () => mode !== 'failed',
+    showRewarded: () => wait().then(() => mode === 'ended'),
+    interstitialReady: () => mode !== 'failed',
+    showInterstitial: wait,
+  };
+}
 
 type Fail = { ok: false; reason: string };
 const fail = (reason: string): Fail => ({ ok: false, reason });
@@ -154,6 +168,8 @@ export function installDebug(): void {
     get seed(): number | null {
       return game()?.run.seed ?? null;
     },
+    /** 切假广告；null 关掉 */
+    ads: safe((mode: FakeAdMode | null) => setAdProvider(mode ? fakeAds(mode) : null)),
     state: safe(() => {
       const g = game();
       if (!g) return { scene: sm.cur?.name ?? null };
@@ -167,7 +183,7 @@ export function installDebug(): void {
         tier: r.tier, daily: r.daily ?? null, locked: r.locked, open: r.open, unlocked: r.unlocked, freeCells: r.freeCells, choice: r.choice, market: r.market, elite: r.elite, enemy: { name: e.name, title: e.title, hp: e.hp, boss: !!e.boss, affixes: e.affixes ?? [] },
         tutorial: g.tut.step, paused: g.paused, speed: g.bc.speed, overlay: g.ov.top ? g.ov.top.kind : null,
         dragging: !!g.ac.drag, links: g.syn.links.map((l) => ({ from: l.from, to: l.to, kind: l.kind, label: l.label })),
-        maxHp: playerMaxHp(r.round), undo: !!g.undo, outcome: g.outcome, hint: g.hintText(),
+        maxHp: playerMaxHp(r.round), adOffer: g.adOffer(), adRevives: r.adRevives ?? 0, adBoth: !!r.adBoth, adSupply: !!r.adSupply, adGold: r.adGold ?? 0, undo: !!g.undo, outcome: g.outcome, hint: g.hintText(),
       };
     }),
     /** 背景音乐：当前曲式、播的是文件还是程序化、哪些文件已解码 */

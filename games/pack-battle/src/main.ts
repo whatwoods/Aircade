@@ -3,6 +3,7 @@ import './styles.css';
 import { resumeAudio, suspendAudio, unlockAudio } from './audio/audio.ts';
 import { updateMusic } from './audio/music.ts';
 import { SHOP_POOL } from './config.ts';
+import { adPlaying, initAds } from './platform/ads.ts';
 import { cancelInput, initInput, input, setInputScale, updateInput } from './core/input.ts';
 import { clock, resetClock, startLoop } from './core/loop.ts';
 import { PHYS_H } from './core/spring.ts';
@@ -23,7 +24,8 @@ import { GameScene } from './scenes/gameScene.ts';
 import { factories, setScene, sm } from './scenes/sceneManager.ts';
 import { TitleScene } from './scenes/titleScene.ts';
 
-const params = new URLSearchParams(location.search);
+// TapTap 版不接受任何调试参数
+const params = new URLSearchParams(import.meta.env.MODE === 'tap' ? '' : location.search);
 const DEBUG = params.get('debug') === '1';
 const seedParam = params.get('seed');
 const urlSeed = seedParam !== null && /^\d+$/.test(seedParam) ? Number(seedParam) : undefined;
@@ -39,6 +41,7 @@ setInputScale(stage.s);
 factories.title = () => new TitleScene();
 factories.game = (o) => new GameScene({ ...o, seed: o.seed ?? urlSeed, tutorial: !!o.tutorial && !noTut });
 factories.ending = (d) => new EndingScene(d);
+void initAds();
 
 // 字体：最多等 300ms；加载完成后让文本缓存失效
 try {
@@ -61,18 +64,20 @@ window.addEventListener('keydown', unlock, true);
 
 // 失焦 / 切后台：自动暂停、取消拖拽、挂起音频
 const hide = (): void => {
+  if (adPlaying()) return;
   sm.cur?.autoPause();
   cancelInput();
   suspendAudio();
 };
 window.addEventListener('blur', hide);
 window.addEventListener('focus', () => {
+  if (adPlaying()) return;
   resetClock();
   resumeAudio();
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) hide();
-  else {
+  else if (!adPlaying()) {
     resetClock();
     resumeAudio();
   }
@@ -156,7 +161,7 @@ function frame(): void {
   adapt();
 }
 
-if (DEBUG) {
+if (import.meta.env.MODE !== 'tap' && DEBUG) {
   void import('./debug/debug.ts').then((m) => {
     m.installDebug();
     if (roundParam >= 1 && roundParam <= 10) {
