@@ -19,6 +19,7 @@ export function receiptFor(run: RunState): ReceiptLine[] {
   if (interest > 0) lines.push({ label: `利息（存 ${run.savedGold} 金）`, amount: interest });
   if (run.pouchGold > 0) lines.push({ label: '钱袋', amount: run.pouchGold });
   if (run.eliteGold > 0) lines.push({ label: '精英赏金', amount: run.eliteGold });
+  if (run.adGold) lines.push({ label: '败北补给', amount: run.adGold });
   return lines;
 }
 

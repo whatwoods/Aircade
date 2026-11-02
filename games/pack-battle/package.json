@@ -1,15 +1,17 @@
 {
   "name": "pack-battle",
   "private": true,
-  "version": "1.8.0",
+  "version": "1.9.0",
   "type": "module",
   "description": "行囊对决 PACK BATTLE — 俄罗斯方块 × 背包整理 × 自动战斗",
   "scripts": {
     "dev": "vite --port 5104 --strictPort --host",
     "build": "tsc --noEmit && vite build",
+    "build:tap": "tsc --noEmit && vite build --mode tap --outDir dist-tap && node scripts/pack-tap.ts",
     "preview": "vite preview --port 5104 --strictPort --host",
     "balance": "node scripts/balance.ts",
     "bot": "node scripts/bot.ts",
+    "ad-rules": "node scripts/ad-rules.ts",
     "icons": "node scripts/icons.ts"
   },
   "dependencies": {

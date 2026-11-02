@@ -1,5 +1,5 @@
 // 一局的状态与所有规则操作（纯逻辑，无 DOM）
-import { BAG, DIFFICULTY, ECONOMY, ENDLESS, EVENTS, ITEMS, PLAYER, ROUNDS, SCORE, SHOP } from '../config.ts';
+import { AD, BAG, DIFFICULTY, ECONOMY, ENDLESS, EVENTS, ITEMS, PLAYER, ROUNDS, SCORE, SHOP } from '../config.ts';
 import { derive } from '../core/rng.ts';
 import { simulate } from './battle/sim.ts';
 import { receiptFor, sellPrice, type ReceiptLine } from './economy.ts';
@@ -39,6 +39,7 @@ export function beginArrange(run: RunState): ReceiptLine[] {
   run.savedGold = 0;
   run.charmCap = 0;
   run.eliteGold = 0;
+  run.adGold = 0;
   run.phase = 'arrange';
   return lines;
 }
@@ -330,8 +331,9 @@ export function applyResult(run: RunState, res: BattleResult): Outcome {
     run.lastResult = 'win';
     if (run.round >= ROUNDS && !run.endless) {
       run.cleared = true;
-      run.clearHearts = run.hearts;
-      clearBonus = SCORE.clearBonus + SCORE.heartBonus * run.hearts;
+      // 广告复活的心不算通关奖励
+      run.clearHearts = Math.max(0, run.hearts - (run.adRevives ?? 0));
+      clearBonus = SCORE.clearBonus + SCORE.heartBonus * run.clearHearts;
       run.score += clearBonus;
       ending = true;
     } else {
@@ -353,6 +355,52 @@ export function applyResult(run: RunState, res: BattleResult): Outcome {
   }
   run.phase = ending ? 'ending' : 'result';
   return { win, gain, ending, clearBonus };
+}
+
+// ---------- 广告奖励（每日挑战全部不给，同一天大家打同一局） ----------
+
+/** 心掉光、还没结算时能不能复活 */
+export function canRevive(run: RunState): boolean {
+  return !run.daily && run.phase === 'ending' && run.hearts <= 0 && (run.adRevives ?? 0) < AD.revives + (run.endless ? 1 : 0);
+}
+
+/** 回 1 颗心，重打同一个敌人（失败补偿照发） */
+export function revive(run: RunState): boolean {
+  if (!canRevive(run)) return false;
+  run.adRevives = (run.adRevives ?? 0) + 1;
+  run.hearts = 1;
+  // 结局时算过的难度加成撤掉，下次结局再算；无尽里加成本来就在分数内，结局时会重算
+  if (!run.endless) {
+    run.score -= run.tierBonus;
+    run.tierBonus = 0;
+  }
+  run.phase = 'result';
+  return true;
+}
+
+export function canTakeBoth(run: RunState): boolean {
+  return !run.daily && !run.adBoth && !!run.choice && run.round >= AD.fromRound;
+}
+
+/** 岔路两张都拿 */
+export function takeBoth(run: RunState): boolean {
+  if (!canTakeBoth(run)) return false;
+  const ids = run.choice!;
+  run.adBoth = true;
+  run.choice = null;
+  for (const id of ids) applyEvent(run, id);
+  return true;
+}
+
+export function canSupply(run: RunState): boolean {
+  return !run.daily && !run.adSupply && run.phase === 'result' && run.lastResult === 'loss' && run.hearts > 0 && run.round >= AD.fromRound;
+}
+
+export function takeSupply(run: RunState): boolean {
+  if (!canSupply(run)) return false;
+  run.adSupply = true;
+  run.adGold = AD.supplyGold;
+  return true;
 }
 
 /** 通关后进入无尽：同一局接着打第 11 轮 */
@@ -394,6 +442,11 @@ export function rollChoices(run: RunState): EventId[] | null {
 export function applyChoice(run: RunState, id: EventId): boolean {
   if (!run.choice || !run.choice.includes(id)) return false;
   run.choice = null;
+  applyEvent(run, id);
+  return true;
+}
+
+function applyEvent(run: RunState, id: EventId): void {
   switch (id) {
     case 'smith': {
       const it = smithTarget(run);
@@ -419,7 +472,6 @@ export function applyChoice(run: RunState, id: EventId): boolean {
       run.gold += EVENTS.cacheGold;
       break;
   }
-  return true;
 }
 
 /** 调试：直接放置/给予 */

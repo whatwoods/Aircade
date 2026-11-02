@@ -13,7 +13,7 @@ import { simulate } from '../src/game/battle/sim.ts';
 import { enemyBag, playerMaxHp, runEnemy } from '../src/game/enemies.ts';
 import { canPlace, buildOcc, DIRS, isOpen } from '../src/game/grid.ts';
 import {
-  applyChoice, applyResult, beginArrange, buy, enterEndless, smithTarget, cellPrice, mergeTargetFor, move, newRun, refresh, sell, startBattle, unlockable, unlockCell, type Dest,
+  applyChoice, applyResult, beginArrange, buy, canRevive, canSupply, canTakeBoth, enterEndless, revive, takeBoth, takeSupply, smithTarget, cellPrice, mergeTargetFor, move, newRun, refresh, sell, startBattle, unlockable, unlockCell, type Dest,
 } from '../src/game/run.ts';
 import { computeSynergy } from '../src/game/synergy.ts';
 import type { EventId, ItemInst, Placed, Rot, RunState } from '../src/game/types.ts';
@@ -23,6 +23,8 @@ const args = process.argv.slice(2);
 const BLIND = args.includes('--blind');
 /** --tier N：难度等级 */
 const TIER = Number(args.find((a) => a.startsWith('--tier='))?.slice(7) ?? 0);
+/** --ads：所有广告奖励能拿就拿（看广告最勤的玩家） */
+const ADS = args.includes('--ads');
 /** --endless：通关后进入无尽 */
 const ENDLESS_MODE = args.includes('--endless');
 /** 统计表覆盖到第几轮（无尽最多看 40 轮） */
@@ -228,6 +230,12 @@ for (let n = 0; n < N; n++) {
       st.lv3 += run.bag.filter((i) => i.lv === 3).length;
       st.goldLeft += run.gold;
     }
+    if (ADS && out.ending && canRevive(run)) {
+      revive(run);
+      continue;
+    }
+    if (ADS && canSupply(run)) takeSupply(run);
+    if (ADS && canTakeBoth(run)) takeBoth(run);
     if (run.choice) {
       const id = pickEvent(run, run.choice);
       picks.set(id, (picks.get(id) ?? 0) + 1);
@@ -252,7 +260,7 @@ for (let n = 0; n < N; n++) {
 
 const pct = (a: number, b: number): string => (b ? Math.round((a / b) * 100) + '%' : '-');
 const avg = (a: number, b: number, d = 1): string => (b ? (a / b).toFixed(d) : '-');
-console.log(`机器人${BLIND ? '（不看敌人）' : ''}${TIER ? ' 难度 ' + TIER : ''} ${N} 局（种子 ${SEED0}–${SEED0 + N - 1}）  通关 ${pct(clears, N)}  平均分 ${Math.round(scoreSum / N)}`);
+console.log(`机器人${ADS ? '（全看广告）' : ''}${BLIND ? '（不看敌人）' : ''}${TIER ? ' 难度 ' + TIER : ''} ${N} 局（种子 ${SEED0}–${SEED0 + N - 1}）  通关 ${pct(clears, N)}  平均分 ${Math.round(scoreSum / N)}`);
 console.log('轮  到达   首战胜  平均挑战  赢时剩血  用时s  件数  占格  开放  ★★   ★★★  剩金  死在这轮');
 for (let r = 1; r <= MAXR; r++) {
   const s = stats[r];

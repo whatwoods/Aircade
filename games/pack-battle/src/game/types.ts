@@ -169,6 +169,14 @@ export interface RunState {
   tierBonus: number;
   /** 通关后进入了无尽模式 */
   endless?: boolean;
+  /** 已用的广告复活次数 */
+  adRevives?: number;
+  /** 本局用过「两张都要」 */
+  adBoth?: boolean;
+  /** 本局用过败北补给 */
+  adSupply?: boolean;
+  /** 败北补给，下次整理时发放 */
+  adGold?: number;
   /** 通关那一刻剩下的心（结算明细用；无尽里心会再掉） */
   clearHearts?: number;
   /** 被调试接口改过：不存档、不计最高分 */

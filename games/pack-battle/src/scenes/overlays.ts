@@ -2,6 +2,7 @@
 import { applyVolumes } from '../audio/audio.ts';
 import { setMusic, musicMode } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
+import { adPlaying } from '../platform/ads.ts';
 import { AFFIX_DEFS, BATTLE, DIFFICULTY, ENEMIES, EVENT_DEFS, ITEMS, RARITY_NAMES, ROUNDS, TAG_NAMES } from '../config.ts';
 import { saveSettings, settings } from '../core/storage.ts';
 import { ease } from '../core/tween.ts';
@@ -810,13 +811,24 @@ export class ChoicePanel extends Panel {
   private oy: number;
   private cards: ChoiceCard[];
   private onPick: (id: EventId) => void;
-  constructor(H: number, cards: ChoiceCard[], onPick: (id: EventId) => void) {
+  private both: { ready: () => boolean; pick: () => void } | null;
+  private bothB: Button;
+  constructor(H: number, cards: ChoiceCard[], onPick: (id: EventId) => void, both: { ready: () => boolean; pick: () => void } | null = null) {
     super();
     this.oy = (H - 844) / 2;
     this.cards = cards;
     this.onPick = onPick;
+    this.both = both;
     this.outsideCloses = false;
     this.buttons = cards.map((c, i) => new Button('choice.' + i, R(30 + i * 170, 300 + this.oy, 160, 230), EVENT_DEFS[c.id].name, 'paper', 70 + i));
+    this.bothB = new Button('choice.both', R(65, 572 + this.oy, 260, 56), '看广告两张都要', 'sealTag', 73);
+    this.bothB.glyph = '▶';
+    this.bothB.visible = false;
+    this.buttons.push(this.bothB);
+  }
+  update(dt: number): void {
+    super.update(dt);
+    this.bothB.visible = !this.closing && !!this.both?.ready();
   }
   rect(): Rect {
     return R(16, 230 + this.oy, 358, 330);
@@ -825,7 +837,11 @@ export class ChoicePanel extends Panel {
     if (code === 'Digit1' || code === 'Digit2') this.activate(this.buttons[code === 'Digit1' ? 0 : 1]);
   }
   activate(b: Button): void {
-    if (this.closing) return;
+    if (this.closing || adPlaying()) return;
+    if (b === this.bothB) {
+      this.both?.pick();
+      return;
+    }
     const c = this.cards[this.buttons.indexOf(b)];
     if (!c) return;
     sfx('page');
@@ -851,6 +867,7 @@ export class ChoicePanel extends Panel {
       c.desc.forEach((l, j) => text(ctx, l, br.x + br.w / 2, br.y + 160 + j * 24, { size: 15, weight: 700, color: C.inkSoft }));
       ctx.restore();
     });
+    this.bothB.draw(ctx, 0, 0);
   }
 }
 

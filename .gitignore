@@ -1,5 +1,7 @@
 node_modules/
 dist/
+dist-tap/
+release/
 *.log
 .DS_Store
 .vite/

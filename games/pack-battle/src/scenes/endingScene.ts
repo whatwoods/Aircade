@@ -1,7 +1,9 @@
 // 结局页：冒险者证书（分数逐行累加、总分、历史最高 / 新纪录印章、趣味统计、种子）+ 再来一局 / 标题
 import { setMusic } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
-import { DIFFICULTY, ROUNDS, SCORE } from '../config.ts';
+import { AD, DIFFICULTY, ROUNDS, SCORE } from '../config.ts';
+import { adPlaying, showInterstitial } from '../platform/ads.ts';
+import { load, save } from '../core/storage.ts';
 import type { InputHandler } from '../core/input.ts';
 import { clock } from '../core/loop.ts';
 import { Rolling, ease } from '../core/tween.ts';
@@ -17,6 +19,9 @@ import { HAND, drawSprite, num, text } from '../render/text.ts';
 import { Button, drawStamp, showToast, type UiEl } from '../render/ui/widgets.ts';
 import type { EndingData } from './sceneManager.ts';
 import { factories, gotoScene, type Scene } from './sceneManager.ts';
+
+/** 累计结束过几局（第一局不放插屏） */
+const RUNS_ENDED_KEY = 'runsEnded';
 
 interface Line {
   label: string;
@@ -88,6 +93,7 @@ export class EndingScene implements Scene {
   enter(): void {
     clearRun();
     const d = this.d;
+    if (!d.debug) save(RUNS_ENDED_KEY, load(RUNS_ENDED_KEY, 0) + 1);
     const prev = d.daily ? loadDaily(d.daily) : loadBest();
     this.prevBest = prev;
     if (d.debug) this.isRecord = false;
@@ -129,16 +135,23 @@ export class EndingScene implements Scene {
     return this.endlessB ? [this.endlessB, this.again, this.share, this.title] : [this.again, this.share, this.title];
   }
 
+  /** 离开结局页：够格就先放一条插屏 */
+  private async leave(go: () => void): Promise<void> {
+    if (load(RUNS_ENDED_KEY, 0) >= AD.interstitialFromRun) await showInterstitial();
+    go();
+  }
+
   private activate(b: Button): void {
+    if (adPlaying()) return;
     if (b === this.endlessB && this.d.resume) {
       const run = this.d.resume;
       if (enterEndless(run)) gotoScene(() => factories.game({ resume: run }));
     } else if (b === this.again) {
       const mode = { tier: this.d.tier, daily: this.d.daily };
-      gotoScene(() => factories.game({ tutorial: false, mode }));
+      void this.leave(() => gotoScene(() => factories.game({ tutorial: false, mode })));
     }
     else if (b === this.share) this.doShare();
-    else gotoScene(() => factories.title());
+    else void this.leave(() => gotoScene(() => factories.title()));
   }
 
   /** 证书出图：最终状态（明细全显示、印章已盖）画到离屏画布，下方加游戏名 */
