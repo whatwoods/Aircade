@@ -238,7 +238,7 @@ export class Director {
           vibrate(15);
           s.cam.add(0.15);
           s.hud.message(`巨龙之威：需要至少 ${s.game.diff.minHp} 点生命`, 'red', s.clock.real);
-          s.tip('disturb', '巨龙需要生命 ≥ 14 才能挑战：先升级吧', true);
+          s.tip('disturb', `巨龙需要生命 ≥ ${s.game.diff.minHp} 才能挑战：先升级吧`, true);
           break;
         case 'dragonFight':
           flushXp();

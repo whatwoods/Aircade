@@ -540,6 +540,7 @@ export class App implements Stage, InputHandler {
     this.dragon.reset();
     this.hud.dragonReady = false;
     this.hud.dragonHp = this.game.diff.minHp;
+    this.hud.dragonLevel = this.game.diff.dragonLevel;
     this.hud.setBase(`巨龙沉睡中 · 需 ${this.game.diff.minHp} 点生命`, 'normal');
     this.hud.clearMessage();
     this.hud.hidden = false;
