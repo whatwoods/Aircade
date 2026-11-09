@@ -58,6 +58,8 @@ export class Hud {
   hidden = false;
   /** 当前难度的屠龙血量线 */
   dragonHp = 14;
+  /** 当前难度的巨龙等级（图鉴龙格） */
+  dragonLevel = 13;
   /** 祝福带来的生命上限增减（§3.10） */
   bonusHp = 0;
   /** 已选祝福的印章字（分数行中间） */
@@ -199,10 +201,14 @@ export class Hud {
   private lb: { lv: Sprite; xp: Sprite; next: Sprite; score: Sprite; d13: Sprite; ready: Sprite; need: Sprite} | null = null;
   private lbS = -1;
   private lbD = -1;
+  /** 烘焙标签时的巨龙等级与挑战血量（换难度要重烘） */
+  private lbDragon = '';
   private bakeLabels(L: Layout): void {
-    if (this.lb && L.s === this.lbS && L.dpr === this.lbD) return;
+    const dk = `${this.dragonLevel}/${this.dragonHp}`;
+    if (this.lb && L.s === this.lbS && L.dpr === this.lbD && dk === this.lbDragon) return;
     this.lbS = L.s;
     this.lbD = L.dpr;
+    this.lbDragon = dk;
     const s = L.s;
     const G = this.gl;
     this.lb = {
@@ -210,9 +216,9 @@ export class Hud {
       xp: G.text.get('经验', 10.5 * s, PAL.ash, 600),
       next: G.text.get('下一级', 10.5 * s, 'rgba(156,142,122,0.7)', 500),
       score: G.text.get('分数', 11 * s, PAL.ash, 600),
-      d13: G.text.get('13', 11 * s, '#FF8A6A', 700, "'Cinzel', serif"),
+      d13: G.text.get(String(this.dragonLevel), 11 * s, '#FF8A6A', 700, "'Cinzel', serif"),
       ready: G.text.get('可战', 12 * s, PAL.gold, 700, FONT_CN, { glow: 'rgba(255,181,74,0.8)', glowBlur: 6 }),
-      need: G.text.get('需14', 11.5 * s, PAL.ash, 600),
+      need: G.text.get(`需${this.dragonHp}`, 11.5 * s, PAL.ash, 600),
     };
   }
 
