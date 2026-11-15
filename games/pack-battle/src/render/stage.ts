@@ -1,4 +1,6 @@
 // canvas、DPR、安全区、逻辑坐标（宽 390，高 Hlog）
+import { readSafe as yoolaSafe, viewport as yoolaViewport } from '../platform/yoola/viewport.ts';
+
 export const LW = 390;
 
 export const stage = {
@@ -22,6 +24,10 @@ export const stage = {
 let probe: HTMLDivElement | null = null;
 
 function readSafe(): void {
+  if (__YOOLA__) {
+    yoolaSafe(stage.safe);
+    return;
+  }
   if (!probe) {
     probe = document.createElement('div');
     probe.style.cssText =
@@ -36,9 +42,9 @@ function readSafe(): void {
   stage.safe.l = parseFloat(cs.paddingLeft) || 0;
 }
 
-export function initStage(canvas: HTMLCanvasElement): void {
+export function initStage(canvas: HTMLCanvasElement, claimed?: CanvasRenderingContext2D): void {
   stage.canvas = canvas;
-  const ctx = canvas.getContext('2d', { alpha: false });
+  const ctx = claimed ?? canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas 2D 不可用');
   stage.ctx = ctx;
   resizeStage();
@@ -46,9 +52,10 @@ export function initStage(canvas: HTMLCanvasElement): void {
 
 export function resizeStage(): boolean {
   readSafe();
-  const vw = Math.max(1, window.innerWidth);
-  const vh = Math.max(1, window.innerHeight);
-  let dpr = Math.min(stage.dprCap, window.devicePixelRatio || 1);
+  const vp = __YOOLA__ ? yoolaViewport() : null;
+  const vw = Math.max(1, vp ? vp.w : window.innerWidth);
+  const vh = Math.max(1, vp ? vp.h : window.innerHeight);
+  let dpr = Math.min(stage.dprCap, vp ? vp.dpr : window.devicePixelRatio || 1);
   if (vw * vh * dpr * dpr > 4.2e6) dpr = Math.max(1, Math.sqrt(4.2e6 / (vw * vh)));
   const { t, r, b, l } = stage.safe;
   const aw = vw - l - r;
@@ -78,8 +85,11 @@ export function resizeStage(): boolean {
     stage.canvas.width = cw;
     stage.canvas.height = ch;
   }
-  stage.canvas.style.width = vw + 'px';
-  stage.canvas.style.height = vh + 'px';
+  // 快手端画布由平台管理，不设 style
+  if (!__YOOLA__) {
+    stage.canvas.style.width = vw + 'px';
+    stage.canvas.style.height = vh + 'px';
+  }
   if (changed) stage.version++;
   return changed;
 }

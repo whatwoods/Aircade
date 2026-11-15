@@ -8,6 +8,8 @@
     "dev": "vite --port 5104 --strictPort --host",
     "build": "tsc --noEmit && vite build",
     "build:tap": "tsc --noEmit && vite build --mode tap --outDir dist-tap && node scripts/pack-tap.ts",
+    "build:yoola": "tsc --noEmit && node scripts/pack-yoola.ts",
+    "audio:yoola": "node scripts/yoola/audio.ts",
     "preview": "vite preview --port 5104 --strictPort --host",
     "balance": "node scripts/balance.ts",
     "bot": "node scripts/bot.ts",

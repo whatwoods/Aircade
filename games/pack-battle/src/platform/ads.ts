@@ -2,6 +2,8 @@
 import { resumeAudio, suspendAudio } from '../audio/audio.ts';
 import { AD } from '../config.ts';
 import { resetClock } from '../core/loop.ts';
+import { now } from './now.ts';
+import { createKwaiAds } from './yoola/ads.ts';
 
 export interface AdProvider {
   rewardedReady(): boolean;
@@ -17,7 +19,11 @@ let playing = false;
 let lastAdAt = -Infinity;
 
 export async function initAds(): Promise<void> {
-  // 判断在构建时求值，网页版里这段连同 tap.ts 一起被摇掉
+  // 判断在构建时求值，网页版里这段连同 tap.ts / yoola 实现一起被摇掉
+  if (__YOOLA__) {
+    provider = createKwaiAds();
+    return;
+  }
   if (import.meta.env.MODE !== 'tap') return;
   const { createTapAds } = await import('./tap.ts');
   try {
@@ -49,7 +55,7 @@ async function play<T>(show: () => Promise<T>): Promise<T> {
     return await show();
   } finally {
     playing = false;
-    lastAdAt = performance.now();
+    lastAdAt = now();
     resetClock();
     resumeAudio();
   }
@@ -64,6 +70,6 @@ export function showRewarded(): Promise<boolean> {
 /** 距上一条广告够久才放；不放或放完都会 resolve */
 export function showInterstitial(): Promise<void> {
   const p = provider;
-  if (!p || playing || !p.interstitialReady() || performance.now() - lastAdAt < AD.interstitialGapMs) return Promise.resolve();
+  if (!p || playing || !p.interstitialReady() || now() - lastAdAt < AD.interstitialGapMs) return Promise.resolve();
   return play(() => p.showInterstitial());
 }

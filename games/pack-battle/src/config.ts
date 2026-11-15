@@ -494,3 +494,10 @@ export const ENEMIES: EnemyDef[] = [
 ];
 
 export const SHOP_POOL: ItemId[] = (Object.keys(ITEMS) as ItemId[]).filter((k) => !ITEMS[k].enemyOnly);
+
+/** 快手 Yoola 版的屏幕避让（互动玩法设计规范：系统安全区之下留 32 间距 + 64 平台控件；底部不贴手势区） */
+export const YOOLA = {
+  topGap: 32,
+  topControls: 64,
+  minBottom: 20,
+};

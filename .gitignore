@@ -12,3 +12,9 @@ playwright-report/
 .claude/settings.local.json
 site/
 .wrangler/
+dist-yoola/
+games/pack-battle/yoola/*.zip
+games/pack-battle/yoola/.cache/
+games/pack-battle/yoola/package/gameplay/pack-battle.js
+games/pack-battle/yoola/package/res/Audio/
+games/pack-battle/yoola/package/res/Image/monster-*.webp

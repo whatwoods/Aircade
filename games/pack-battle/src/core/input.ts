@@ -1,5 +1,6 @@
 // 指针管理：轻点 / 长按 / 拖拽 / 第二指轻点；屏幕 → 逻辑坐标
 import { INPUT } from '../config.ts';
+import { now } from '../platform/now.ts';
 import { toLogical } from '../render/stage.ts';
 
 export interface InputHandler {
@@ -63,7 +64,7 @@ export function initInput(canvas: HTMLCanvasElement): void {
       input.type = e.pointerType;
       input.x = input.x0 = P.x;
       input.y = input.y0 = P.y;
-      input.t0 = performance.now();
+      input.t0 = now();
       input.dragging = false;
       input.longFired = false;
       input.pressed = true;
@@ -77,7 +78,7 @@ export function initInput(canvas: HTMLCanvasElement): void {
       input.id2 = e.pointerId;
       input.x2 = e.clientX;
       input.y2 = e.clientY;
-      input.t2 = performance.now();
+      input.t2 = now();
       input.moved2 = false;
     }
   });
@@ -107,7 +108,7 @@ export function initInput(canvas: HTMLCanvasElement): void {
   const end = (e: PointerEvent, cancelled: boolean): void => {
     logical(e);
     if (e.pointerId === input.id) {
-      const dur = performance.now() - input.t0;
+      const dur = now() - input.t0;
       const tap = !input.dragging && !input.longFired && dur <= INPUT.tapMaxMs;
       input.id = -1;
       input.pressed = false;
@@ -120,7 +121,7 @@ export function initInput(canvas: HTMLCanvasElement): void {
         input.hy = P.y;
       }
     } else if (e.pointerId === input.id2) {
-      const dur = performance.now() - input.t2;
+      const dur = now() - input.t2;
       if (!cancelled && !input.moved2 && dur <= INPUT.tapMaxMs + 100) input.handler?.rotate();
       input.id2 = -1;
     }
@@ -152,9 +153,9 @@ export function initInput(canvas: HTMLCanvasElement): void {
     'wheel',
     (e) => {
       e.preventDefault();
-      const now = performance.now();
-      if (now - input.lastWheel < 160) return;
-      input.lastWheel = now;
+      const t = now();
+      if (t - input.lastWheel < 160) return;
+      input.lastWheel = t;
       input.handler?.wheel();
     },
     { passive: false },
@@ -181,7 +182,7 @@ let cssScale = 1;
 export function setInputScale(s: number): void {
   cssScale = s;
 }
-function scaleToCss(): number {
+export function scaleToCss(): number {
   return cssScale;
 }
 
@@ -199,7 +200,7 @@ export function cancelInput(): void {
 /** 每帧检查长按 */
 export function updateInput(): void {
   if (input.id !== -1 && !input.dragging && !input.longFired) {
-    if (performance.now() - input.t0 >= INPUT.longPressMs) {
+    if (now() - input.t0 >= INPUT.longPressMs) {
       input.longFired = true;
       input.handler?.long(input.x, input.y);
     }

@@ -3,6 +3,7 @@ import { duckMusic } from '../audio/audio.ts';
 import { sfx } from '../audio/sfx.ts';
 import { BATTLE, ECONOMY, FX, ITEMS, TUTORIAL } from '../config.ts';
 import { Spring } from '../core/spring.ts';
+import { now } from '../platform/now.ts';
 import { Playback } from '../game/battle/playback.ts';
 import { interestCap } from '../game/economy.ts';
 import { enemyBag, enemyFor, runEnemy } from '../game/enemies.ts';
@@ -803,7 +804,7 @@ export class BattleController {
   drawScreen(ctx: CanvasRenderingContext2D): void {
     if (this.flashA > 0) drawFlash(ctx, this.flashColor, this.flashA * 0.6);
     let v = this.vignette;
-    if (this.lowHp()) v = Math.max(v, 0.35 + 0.25 * Math.sin(performance.now() / 160));
+    if (this.lowHp()) v = Math.max(v, 0.35 + 0.25 * Math.sin(now() / 160));
     if (v > 0) drawRedVignette(ctx, v);
   }
 
@@ -848,9 +849,9 @@ const laneT: Record<string, number> = {};
 const laneI: Record<string, number> = {};
 const LANE_DX = [0, -22, 22, -11, 11];
 function lane(key: string, x: number, y: number, dy = 14, win = 380, kx = 1): { x: number; y: number } {
-  const now = performance.now();
-  const i = now - (laneT[key] ?? -1e9) < win ? ((laneI[key] ?? 0) + 1) % LANE_DX.length : 0;
-  laneT[key] = now;
+  const t = now();
+  const i = t - (laneT[key] ?? -1e9) < win ? ((laneI[key] ?? 0) + 1) % LANE_DX.length : 0;
+  laneT[key] = t;
   laneI[key] = i;
   LANE.x = x + LANE_DX[i] * kx;
   LANE.y = y - i * dy;

@@ -1,6 +1,8 @@
 // 10 个纸板立牌 + 玩家徽记（冒险者帽）+ 头像徽章。全部启动后按需生成为精灵。
 // 立牌优先用 src/assets/monsters/<id>.webp 的手绘图（自带米色模切边）；图没加载好时用下面的程序化画法顶上。
 import type { PortraitId } from '../game/types.ts';
+import { kw } from '../platform/yoola/kwai.ts';
+import { ART_URLS } from './artUrls.ts';
 import { blade, gem, grip, guard, leaf, lin, line, outline, paint, rad, shine, steel, type Pen } from './icons/primitives.ts';
 import { bez, ellipsePts, fillPts, inkStroke, quad, rectPts, xform, type Pts } from './ink.ts';
 import { C, cached } from './kit.ts';
@@ -28,10 +30,21 @@ interface PDef {
 
 // ---------- 手绘立牌图 ----------
 
-const ART_URLS = import.meta.glob('../assets/monsters/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 const art = new Map<PortraitId, HTMLImageElement>();
-for (const [path, url] of Object.entries(ART_URLS)) {
-  const id = path.slice(path.lastIndexOf('/') + 1, -5) as PortraitId;
+for (const [key, url] of Object.entries(ART_URLS)) {
+  const id = key as PortraitId;
+  if (__YOOLA__) {
+    // 快手端不能 new Image，走 KwaiRender.loadImage；加载完才登记
+    kw().KwaiRender.loadImage({
+      src: url,
+      onSuccess: (img) => {
+        art.set(id, img);
+        standees.delete(id);
+        building.delete(id);
+      },
+    });
+    continue;
+  }
   const img = new Image();
   img.decoding = 'async';
   img.onload = () => {
@@ -43,16 +56,21 @@ for (const [path, url] of Object.entries(ART_URLS)) {
   art.set(id, img);
 }
 
+/** 快手的图片对象可能只有 width / height */
+const imgW = (img: HTMLImageElement): number => img.naturalWidth || img.width;
+const imgH = (img: HTMLImageElement): number => img.naturalHeight || img.height;
+
 function artOf(id: PortraitId): HTMLImageElement | null {
   const img = art.get(id);
+  if (__YOOLA__) return img ?? null;
   return img && img.complete && img.naturalWidth > 0 ? img : null;
 }
 
 /** 图在角色框里的位置：等比缩放到框内，底边落在底座上 */
 function artRect(img: HTMLImageElement): [number, number, number, number] {
-  const k = Math.min(PH / img.naturalHeight, (PW + PADP * 2 - 4) / img.naturalWidth);
-  const w = img.naturalWidth * k;
-  const h = img.naturalHeight * k;
+  const k = Math.min(PH / imgH(img), (PW + PADP * 2 - 4) / imgW(img));
+  const w = imgW(img) * k;
+  const h = imgH(img) * k;
   return [PW / 2 - w / 2, PH + 2 - h, w, h];
 }
 
@@ -813,10 +831,10 @@ export function badge(id: PortraitId | 'player', r: number): Sprite {
     if (id === 'player') drawHat({ ctx, k: 1, seed: 3 }, r, r, r * 1.6);
     else if (img) {
       const [fx, fy, fr] = DEFS[id].face ?? [0.5, 0.3, 0.25];
-      const iw = img.naturalWidth;
+      const iw = imgW(img);
       const k = (r * 0.95) / (fr * iw);
       ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, r - fx * iw * k, r - fy * iw * k, iw * k, img.naturalHeight * k);
+      ctx.drawImage(img, r - fx * iw * k, r - fy * iw * k, iw * k, imgH(img) * k);
     } else {
       const d = DEFS[id];
       const k = (r * 0.92) / d.head[2];

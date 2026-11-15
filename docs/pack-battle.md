@@ -1391,3 +1391,30 @@ URL 参数：
 | 普通 | 94% | 100% | 66% | 81% |
 | 难度 2 | 93% | 99% | 53% | 70% |
 | 难度 4 | 78% | 95% | — | — |
+
+## 19. 快手 Yoola 版（v2.0）
+
+第三个构建目标：`pnpm build:yoola`（`tsc --noEmit` → `scripts/pack-yoola.ts`）。产物是 `yoola/package/gameplay/pack-battle.js`（单文件 ES5 IIFE，`ts.transpileModule` 降级，不引入运行时 polyfill）、`yoola/package/res/{Image,Audio}`、`yoola/行囊对决.zip`，之后跑官方 `validate-package.mjs` 与 `build-zip.mjs`。脚手架在 `yoola/`（`scaffold-init.mjs` 生成，示例分包已删），`kwaiStandard/main.js` 只改 `draw()`：调 `AIGCUtils.Render.draw`。
+
+**平台开关**：`vite.config.ts` 在 yoola 模式下定义 `__YOOLA__`，并用插件把 `audio/{audio,sfx,music}.ts`、`render/artUrls.ts` 换成 `src/platform/yoola/*` 同名实现，`styles.css` 置空。网页与 TapTap 包里 `__YOOLA__` 是 `false`，分支被消除。调试接口、URL 参数、键盘不进快手包（打包脚本检查 `__game`、`createElement`、`fetch`、`AudioContext` 不在产物里）。
+
+| 能力 | 网页 | 快手 |
+|---|---|---|
+| 帧循环 | `requestAnimationFrame` | `AIGCUtils.Render.draw`（`core/loop.ts`） |
+| 时间 | `performance.now` | `AIGCUtils._now`（`platform/now.ts`，开头 200ms 校准单位） |
+| 画布 | `#game` | `window.canvas`，先于 `main.js` 抢 2D 上下文，首帧再启动游戏 |
+| 输入 | pointer + 键盘 | `touchstart/move/end/cancel`（`yoola/touch.ts`），预览里额外认鼠标 |
+| 存档 | `localStorage` | `KwaiStorage.*Sync` |
+| 离屏画布 | `createElement('canvas')` | `KwaiRender.createOffscreenCanvas`（`render/text.ts` 的 `newCanvas`） |
+| 立牌 | 动态 import | `KwaiRender.loadImage('res/Image/monster-<id>.webp')` |
+| 字体 | `@fontsource` | `KwaiRender.loadFont` 加载 `res/fonts/*.ttf` |
+| 前后台 | `visibilitychange` / `blur` / `focus` | `KwaiBase.onHide` / `onShow` |
+| 广告 | TapTap 广告 | `KwaiAd.showRewarded`，插屏空实现 |
+| 震动 | `navigator.vibrate` | `KwaiDevice.vibrateShort` |
+| 分享 | 导出证书图 | `KwaiRepost.shareAppMessage` |
+
+**音频**：文档没有明确 Kwai 支持 WebAudio，所以不赌。`pnpm audio:yoola` 在无头 Chrome 里用 `OfflineAudioContext` 把现有合成配方（`RECIPES` + 共用的 `initGraph` 总线）逐个离线渲染成 32 kHz 单声道 wav（带参数的音效如 `coinUp`、`speed` 每档一个文件，命名见 `src/audio/sfxFiles.ts`），背景音乐 m4a 转 mp3（Kwai 只认 wav/mp3），走 `KwaiMedia.Audio`。合成代码仍是唯一来源，结果按内容哈希缓存在 `yoola/.cache/`，生成的音频和 `gameplay/pack-battle.js` 不进 git。需要本机 Chrome 与 ffmpeg（`CHROME_PATH` 可覆盖路径）。
+
+**安全区**：顶部让开胶囊按钮（`config.ts` 的 `YOOLA`：`Layout.safeTop` + 32 + 64），底部取真机 inset 与 20 的较大值。
+
+**未在真机验证**：主画布 2D 上下文、离屏画布数量与内存、`KwaiMedia` 的 10 个音频上下文池在 64 个音效下的轮换、mp3 循环接缝、`_now` 单位、ttf 家族名、触摸坐标映射、胶囊布局常量、分享模板 ID、占位广告位行为。待用户补：`yoola-assets/share-image.png`（510×350）、`loading-image.png`（640×1400）。

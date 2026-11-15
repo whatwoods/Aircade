@@ -31,7 +31,7 @@ export function whenReady(fn: () => void): void {
   else onReady.push(fn);
 }
 
-function impulse(ctx: AudioContext, sec: number): AudioBuffer {
+function impulse(ctx: BaseAudioContext, sec: number): AudioBuffer {
   const len = Math.floor(ctx.sampleRate * sec);
   const b = ctx.createBuffer(2, len, ctx.sampleRate);
   for (let ch = 0; ch < 2; ch++) {
@@ -47,45 +47,49 @@ function impulse(ctx: AudioContext, sec: number): AudioBuffer {
   return b;
 }
 
+/** 搭总线：压缩器 → 总音量 → 音效 / 音乐两路 + 混响发送。网页实时播放和 pnpm audio:yoola 离线渲染共用 */
+export function initGraph(ctx: BaseAudioContext): void {
+  au.ctx = ctx as AudioContext;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -14;
+  comp.knee.value = 10;
+  comp.ratio.value = 4;
+  comp.attack.value = 0.004;
+  comp.release.value = 0.18;
+  comp.connect(ctx.destination);
+  au.master = ctx.createGain();
+  au.master.gain.value = 0.9;
+  au.master.connect(comp);
+  au.sfx = ctx.createGain();
+  au.sfx.gain.value = settings.sfx ? SFX_GAIN : 0;
+  au.sfx.connect(au.master);
+  au.music = ctx.createGain();
+  au.music.gain.value = settings.music ? MUSIC_GAIN : 0;
+  au.music.connect(au.master);
+  au.reverb = ctx.createConvolver();
+  au.reverb.buffer = impulse(ctx, 1.2);
+  au.send = ctx.createGain();
+  au.send.gain.value = 0.32;
+  au.send.connect(au.reverb);
+  au.reverb.connect(au.master);
+  const nb = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+  const d = nb.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  au.noise = nb;
+}
+
 export function unlockAudio(): void {
   try {
     if (!au.ctx) {
       const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AC) return;
-      const ctx = new AC({ latencyHint: 'interactive' });
-      au.ctx = ctx;
-      const comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = -14;
-      comp.knee.value = 10;
-      comp.ratio.value = 4;
-      comp.attack.value = 0.004;
-      comp.release.value = 0.18;
-      comp.connect(ctx.destination);
-      au.master = ctx.createGain();
-      au.master.gain.value = 0.9;
-      au.master.connect(comp);
-      au.sfx = ctx.createGain();
-      au.sfx.gain.value = settings.sfx ? SFX_GAIN : 0;
-      au.sfx.connect(au.master);
-      au.music = ctx.createGain();
-      au.music.gain.value = settings.music ? MUSIC_GAIN : 0;
-      au.music.connect(au.master);
-      au.reverb = ctx.createConvolver();
-      au.reverb.buffer = impulse(ctx, 1.2);
-      au.send = ctx.createGain();
-      au.send.gain.value = 0.32;
-      au.send.connect(au.reverb);
-      au.reverb.connect(au.master);
-      const nb = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-      const d = nb.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-      au.noise = nb;
+      initGraph(new AC({ latencyHint: 'interactive' }));
       au.ready = true;
       const l = onReady;
       onReady = [];
       for (const f of l) f();
     }
-    if (au.ctx.state === 'suspended' && !document.hidden) void au.ctx.resume().catch(() => undefined);
+    if (au.ctx && au.ctx.state === 'suspended' && !document.hidden) void au.ctx.resume().catch(() => undefined);
   } catch {
     /* 音频不可用时静默 */
   }

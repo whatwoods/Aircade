@@ -59,6 +59,37 @@ export function noise(dur: number, type: BiquadFilterType, f0: number, f1: numbe
 /** 拨弦缓冲（Karplus-Strong），由 music.ts 生成后注册 */
 export const plucks = new Map<number, AudioBuffer>();
 
+/** 生成某个 MIDI 音高的拨弦缓冲 */
+export function makePluckBuffer(ctx: BaseAudioContext, m: number): AudioBuffer {
+  const sr = ctx.sampleRate;
+  const f = 440 * 2 ** ((m - 69) / 12);
+  const dur = m < 50 ? 1.1 : 0.8;
+  const len = Math.floor(sr * dur);
+  const b = ctx.createBuffer(1, len, sr);
+  const d = b.getChannelData(0);
+  const N = Math.max(2, Math.round(sr / f));
+  const ring = new Float32Array(N);
+  let lp = 0;
+  for (let k = 0; k < N; k++) {
+    const n = Math.random() * 2 - 1;
+    lp += (n - lp) * (m < 50 ? 0.35 : 0.6);
+    ring[k] = lp;
+  }
+  const decay = m < 50 ? 0.9985 : 0.996 - (m - 50) * 0.00004;
+  let idx = 0;
+  let prev = 0;
+  for (let k = 0; k < len; k++) {
+    const cur = ring[idx];
+    const nv = (cur + prev) * 0.5 * decay;
+    prev = cur;
+    ring[idx] = nv;
+    d[k] = cur * (k < len - 2000 ? 1 : (len - k) / 2000);
+    idx++;
+    if (idx >= N) idx = 0;
+  }
+  return b;
+}
+
 export function pluck(midi: number, peak: number, t: number, dest: Dest, rate = 1, rev = 0.25): AudioBufferSourceNode | null {
   const b = plucks.get(midi);
   if (!b || !au.ctx) return null;
@@ -286,6 +317,9 @@ const R: Record<string, Recipe> = {
   hum: (t, d) => [tone('sawtooth', 55, 55, 1.2, 0.06, t, d, 0.3), tone('sawtooth', 55.6, 55.6, 1.2, 0.06, t, d, 0.3)],
   cloth: (t, d) => [noise(0.08, 'bandpass', 1500, 1200, 0.7, 0.05, t, d, 0.03)],
 };
+
+/** 配方表：pnpm audio:yoola 离线渲染用，它是快手版音效的唯一来源 */
+export const RECIPES = R;
 
 const MINOR = new Set(['hit', 'shield', 'swish', 'tick', 'cloth', 'bubble', 'gulp', 'coinUp']);
 

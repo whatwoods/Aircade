@@ -3,7 +3,7 @@
 // 两种来源都走同一套 600ms 交叉淡化。
 import { AUDIO } from '../config.ts';
 import { au, whenReady } from './audio.ts';
-import { plucks } from './sfx.ts';
+import { makePluckBuffer, plucks } from './sfx.ts';
 
 export type MusicMode = 'arrange' | 'battle' | 'boss' | null;
 
@@ -88,39 +88,13 @@ function buildPlucks(): void {
   if (built || !au.ctx) return;
   built = true;
   const ctx = au.ctx;
-  const sr = ctx.sampleRate;
   const notes: number[] = [];
   for (let m = 38; m <= 76; m++) notes.push(m);
   // 分三批生成，避免一帧内卡顿
   const batch = (from: number): void => {
     for (let i = from; i < Math.min(notes.length, from + 13); i++) {
       const m = notes[i];
-      const f = 440 * 2 ** ((m - 69) / 12);
-      const dur = m < 50 ? 1.1 : 0.8;
-      const len = Math.floor(sr * dur);
-      const b = ctx.createBuffer(1, len, sr);
-      const d = b.getChannelData(0);
-      const N = Math.max(2, Math.round(sr / f));
-      const ring = new Float32Array(N);
-      let lp = 0;
-      for (let k = 0; k < N; k++) {
-        const n = Math.random() * 2 - 1;
-        lp += (n - lp) * (m < 50 ? 0.35 : 0.6);
-        ring[k] = lp;
-      }
-      const decay = m < 50 ? 0.9985 : 0.996 - (m - 50) * 0.00004;
-      let idx = 0;
-      let prev = 0;
-      for (let k = 0; k < len; k++) {
-        const cur = ring[idx];
-        const nv = (cur + prev) * 0.5 * decay;
-        prev = cur;
-        ring[idx] = nv;
-        d[k] = cur * (k < len - 2000 ? 1 : (len - k) / 2000);
-        idx++;
-        if (idx >= N) idx = 0;
-      }
-      plucks.set(m, b);
+      plucks.set(m, makePluckBuffer(ctx, m));
     }
     if (from + 13 < notes.length) setTimeout(() => batch(from + 13), 0);
   };

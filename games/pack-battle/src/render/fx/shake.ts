@@ -1,6 +1,8 @@
 // trauma 震屏 + hitstop + 手机震动（分级 T0–T4）
 import { FX } from '../../config.ts';
 import { settings } from '../../core/storage.ts';
+import { now } from '../../platform/now.ts';
+import { kw } from '../../platform/yoola/kwai.ts';
 import { noise1 } from '../noise.ts';
 
 export type Tier = 'T0' | 'T1' | 'T2' | 'T3' | 'T4';
@@ -26,11 +28,15 @@ export function addTrauma(v: number): void {
 
 export function vibrate(p: number | number[]): void {
   if (!settings.vibrate) return;
-  const now = performance.now();
-  if (now - shake.lastVib < FX.vibrateGapMs) return;
-  shake.lastVib = now;
+  const t = now();
+  if (t - shake.lastVib < FX.vibrateGapMs) return;
+  shake.lastVib = t;
   try {
-    if (typeof navigator.vibrate === 'function') navigator.vibrate(p);
+    if (__YOOLA__) {
+      // 快手没有 navigator.vibrate：按总时长挑强度
+      const ms = Array.isArray(p) ? p.reduce((a, b) => a + b, 0) : p;
+      kw().KwaiDevice.vibrateShort(ms >= 60 ? 'heavy' : ms >= 20 ? 'medium' : 'light');
+    } else if (typeof navigator.vibrate === 'function') navigator.vibrate(p);
   } catch {
     /* ignore */
   }

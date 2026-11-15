@@ -15,7 +15,8 @@ import { tier } from '../render/fx/shake.ts';
 import { C, paper } from '../render/kit.ts';
 import { drawStandee, standeeHeight } from '../render/portraits.ts';
 import { LW, pxRatio, stage } from '../render/stage.ts';
-import { HAND, drawSprite, num, text } from '../render/text.ts';
+import { HAND, drawSprite, newCanvas, num, text } from '../render/text.ts';
+import { kw } from '../platform/yoola/kwai.ts';
 import { Button, drawStamp, showToast, type UiEl } from '../render/ui/widgets.ts';
 import type { EndingData } from './sceneManager.ts';
 import { factories, gotoScene, type Scene } from './sceneManager.ts';
@@ -161,7 +162,7 @@ export class EndingScene implements Scene {
     const foot = 34;
     const w = 350 + m * 2;
     const h = this.ph + m * 2 + foot;
-    const c = document.createElement('canvas');
+    const c = newCanvas();
     c.width = Math.round(w * k);
     c.height = Math.round(h * k);
     const ctx = c.getContext('2d')!;
@@ -185,6 +186,8 @@ export class EndingScene implements Scene {
   }
 
   private prepareShare(): void {
+    // 快手端不出图：分享走平台转发
+    if (__YOOLA__) return;
     try {
       this.renderCert().toBlob((b) => {
         if (b) this.shareFile = new File([b], 'pack-battle.png', { type: 'image/png' });
@@ -202,6 +205,14 @@ export class EndingScene implements Scene {
 
   /** 系统分享面板（带图）；不支持时下载图片 */
   private doShare(): void {
+    if (__YOOLA__) {
+      try {
+        kw().KwaiRepost.shareAppMessage({ query: { from: 'pack-battle' } });
+      } catch {
+        /* 转发不可用就算了 */
+      }
+      return;
+    }
     const f = this.shareFile;
     if (!f) {
       showToast('证书还在生成', 195, this.share.r.y - 20);

@@ -1,7 +1,10 @@
 // 字体栈、文字绘制、离屏画布工具
+import { yoolaFamily } from '../platform/yoola/fonts.ts';
+import { kw } from '../platform/yoola/kwai.ts';
+
 export const CN = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC","Noto Sans SC","WenQuanYi Zen Hei",sans-serif';
-export const HAND = '"Patrick Hand",' + CN;
-export const LOGO = '"Kalam",' + CN;
+export const HAND = (__YOOLA__ ? yoolaFamily('hand') : '"Patrick Hand"') + ',' + CN;
+export const LOGO = (__YOOLA__ ? yoolaFamily('logo') : '"Kalam"') + ',' + CN;
 
 const fontCache = new Map<string, string>();
 export function font(size: number, weight: number | string = 400, family = CN): string {
@@ -96,8 +99,13 @@ export function cstr(key: string): string {
   return s;
 }
 
+/** 新建空离屏画布：快手端走 KwaiRender 的离屏画布 */
+export function newCanvas(): HTMLCanvasElement {
+  return __YOOLA__ ? kw().KwaiRender.createOffscreenCanvas(1, 1) : document.createElement('canvas');
+}
+
 export function makeCanvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
-  const c = document.createElement('canvas');
+  const c = newCanvas();
   c.width = Math.max(1, Math.ceil(w));
   c.height = Math.max(1, Math.ceil(h));
   const ctx = c.getContext('2d')!;
