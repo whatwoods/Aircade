@@ -1417,4 +1417,4 @@ URL 参数：
 
 **安全区**：顶部让开胶囊按钮（`config.ts` 的 `YOOLA`：`Layout.safeTop` + 32 + 64），底部取真机 inset 与 20 的较大值。
 
-**未在真机验证**：主画布 2D 上下文、离屏画布数量与内存、`KwaiMedia` 的 10 个音频上下文池在 64 个音效下的轮换、mp3 循环接缝、`_now` 单位、ttf 家族名、触摸坐标映射、胶囊布局常量、分享模板 ID、占位广告位行为。待用户补：`yoola-assets/share-image.png`（510×350）、`loading-image.png`（640×1400）。
+**未在真机验证**：主画布 2D 上下文、离屏画布数量与内存、`KwaiMedia` 的 10 个音频上下文池在 64 个音效下的轮换、mp3 循环接缝、`_now` 单位、ttf 家族名、触摸坐标映射、胶囊布局常量、分享模板 ID、占位广告位行为。`yoola-assets/` 的分享图（510×350）和加载图（640×1400，256 色压到 1 MiB 内）由 GPT Image 按 TapTap 横幅画风生成，源图与提示词在 `games/pack-battle/marketing/yoola/`（不入库）。
