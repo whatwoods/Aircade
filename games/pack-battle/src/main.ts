@@ -29,7 +29,9 @@ import { factories, setScene, sm } from './scenes/sceneManager.ts';
 import { TitleScene } from './scenes/titleScene.ts';
 
 // TapTap / 快手版不接受任何调试参数
-const params = new URLSearchParams(import.meta.env.MODE === 'tap' || __YOOLA__ ? '' : location.search);
+// 快手运行时没有 URLSearchParams，必须在构造之前就短路
+const params: { get(k: string): string | null } =
+  import.meta.env.MODE === 'tap' || __YOOLA__ ? { get: () => null } : new URLSearchParams(location.search);
 const DEBUG = params.get('debug') === '1';
 const seedParam = params.get('seed');
 const urlSeed = seedParam !== null && /^\d+$/.test(seedParam) ? Number(seedParam) : undefined;

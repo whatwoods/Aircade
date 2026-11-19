@@ -1,6 +1,7 @@
 // 字体栈、文字绘制、离屏画布工具
 import { yoolaFamily } from '../platform/yoola/fonts.ts';
 import { kw } from '../platform/yoola/kwai.ts';
+import { patch2d } from '../platform/yoola/render.ts';
 
 export const CN = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC","Noto Sans SC","WenQuanYi Zen Hei",sans-serif';
 export const HAND = (__YOOLA__ ? yoolaFamily('hand') : '"Patrick Hand"') + ',' + CN;
@@ -101,7 +102,10 @@ export function cstr(key: string): string {
 
 /** 新建空离屏画布：快手端走 KwaiRender 的离屏画布 */
 export function newCanvas(): HTMLCanvasElement {
-  return __YOOLA__ ? kw().KwaiRender.createOffscreenCanvas(1, 1) : document.createElement('canvas');
+  if (!__YOOLA__) return document.createElement('canvas');
+  const c = kw().KwaiRender.createOffscreenCanvas(1, 1);
+  patch2d(c.getContext('2d')); // 离屏画布全是 2D，先取一次顺便补上缺的方法
+  return c;
 }
 
 export function makeCanvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {

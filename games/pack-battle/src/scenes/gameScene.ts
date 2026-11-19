@@ -458,7 +458,8 @@ export class GameScene implements Scene {
     this.report = null;
     // 存"打完之后"的状态：战斗中关掉页面也不能换装重打
     if (saveable(this.run)) {
-      const after = structuredClone(this.run);
+      // 不用 structuredClone：快手运行时没有；RunState 本来就按 JSON 存
+      const after = JSON.parse(JSON.stringify(this.run)) as typeof this.run;
       applyResult(after, res);
       saveRun(after);
       this.lastSave = '';

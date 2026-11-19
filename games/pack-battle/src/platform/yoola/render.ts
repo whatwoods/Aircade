@@ -19,6 +19,7 @@ export function claimCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRendering
   const canvas = w.canvas || w.kshelper!.GetMainCanvas('canvas');
   const ctx = canvas.getContext('2d', { alpha: false }) as CanvasRenderingContext2D | null;
   if (!ctx) throw new Error('Canvas 2D 不可用');
+  patch2d(ctx);
   return { canvas, ctx };
 }
 
@@ -35,5 +36,27 @@ export function bootOnFirstDraw(boot: () => void): void {
       return;
     }
     render().draw?.();
+  };
+}
+
+/**
+ * 快手的 2D 实现不是浏览器，较新的 roundRect 未必有；缺了就补在原型上（补不上原型就补实例）。
+ * 只覆盖本游戏用到的写法：半径是一个数或数组的第一个数。
+ */
+export function patch2d(ctx: CanvasRenderingContext2D | null): void {
+  if (!ctx || typeof ctx.roundRect === 'function') return;
+  const proto = Object.getPrototypeOf(ctx) as object | null;
+  const target = (proto && proto !== Object.prototype ? proto : ctx) as { roundRect?: unknown };
+  target.roundRect = function (this: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, radii?: number | number[]): void {
+    let r = typeof radii === 'number' ? radii : Array.isArray(radii) && typeof radii[0] === 'number' ? radii[0] : 0;
+    if (w < 0) { x += w; w = -w; }
+    if (h < 0) { y += h; h = -h; }
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    this.moveTo(x + r, y);
+    this.arcTo(x + w, y, x + w, y + h, r);
+    this.arcTo(x + w, y + h, x, y + h, r);
+    this.arcTo(x, y + h, x, y, r);
+    this.arcTo(x, y, x + w, y, r);
+    this.closePath();
   };
 }

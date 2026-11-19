@@ -2,7 +2,7 @@
 import { deckledRect, ellipsePts, fillPts, inkStroke, INK, pathPts, rectPts, type Pts } from './ink.ts';
 import { hashf } from './noise.ts';
 import { pxRatio, stage } from './stage.ts';
-import { HAND, CN, sprite, SpriteCache, text, type Sprite, drawSprite } from './text.ts';
+import { HAND, CN, makeCanvas, sprite, SpriteCache, text, type Sprite, drawSprite } from './text.ts';
 import { leatherTile, metalTile, mixHex, parchmentTile, rgba, weaveTile } from './textures.ts';
 
 export const C = {
@@ -81,9 +81,26 @@ export function tile(name: string): HTMLCanvasElement {
 
 /** pattern：纹素对齐设备像素 */
 export function pat(ctx: CanvasRenderingContext2D, name: string, ratio: number, scale = 1): CanvasPattern {
+  const k = scale / ratio;
+  // 快手运行时没有 DOMMatrix；setTransform 本来就接受 {a..f} 普通对象
   const p = ctx.createPattern(tile(name), 'repeat')!;
-  p.setTransform(new DOMMatrix([scale / ratio, 0, 0, scale / ratio, 0, 0]));
-  return p;
+  if (typeof p.setTransform === 'function') {
+    p.setTransform({ a: k, b: 0, c: 0, d: k, e: 0, f: 0 });
+    return p;
+  }
+  // pattern 连 setTransform 都没有时，退回预先缩好的纹理
+  return ctx.createPattern(scaledTile(name, k), 'repeat')!;
+}
+
+const scaledTiles: Record<string, HTMLCanvasElement> = {};
+function scaledTile(name: string, k: number): HTMLCanvasElement {
+  const key = name + '@' + k.toFixed(4);
+  let t = scaledTiles[key];
+  if (t) return t;
+  const src = tile(name);
+  const [c, cx] = makeCanvas(Math.max(1, Math.round(src.width * k)), Math.max(1, Math.round(src.height * k)));
+  cx.drawImage(src, 0, 0, c.width, c.height);
+  return (scaledTiles[key] = c);
 }
 
 const cache = new SpriteCache();
