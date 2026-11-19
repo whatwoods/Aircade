@@ -6,6 +6,8 @@ import { patch2d } from '../platform/yoola/render.ts';
 export const CN = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC","Noto Sans SC","WenQuanYi Zen Hei",sans-serif';
 export const HAND = (__YOOLA__ ? yoolaFamily('hand') : '"Patrick Hand"') + ',' + CN;
 export const LOGO = (__YOOLA__ ? yoolaFamily('logo') : '"Kalam"') + ',' + CN;
+/** 标题毛笔字：只含「行囊对决」四字，别的字会落到系统字体 */
+export const BRUSH = (__YOOLA__ ? yoolaFamily('brush') : '"Title Brush"') + ',' + CN;
 
 const fontCache = new Map<string, string>();
 export function font(size: number, weight: number | string = 400, family = CN): string {

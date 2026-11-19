@@ -15,6 +15,9 @@ importers:
         specifier: 5.3.0
         version: 5.3.0
     devDependencies:
+      '@fontsource/ma-shan-zheng':
+        specifier: 5.3.1
+        version: 5.3.1
       '@types/node':
         specifier: ~24.19.2
         version: 24.19.2
@@ -29,6 +32,9 @@ packages:
 
   '@fontsource/kalam@5.3.0':
     resolution: {integrity: sha512-FDkVoDfPDCSN/eO81FOYtUI67eMgpVBJmjBtAqSL0PmEhJyeFY2biC+CR+yEttksgXR9+swpFdYmQTyjwBq80Q==}
+
+  '@fontsource/ma-shan-zheng@5.3.1':
+    resolution: {integrity: sha512-cGGn7Yje2RSduXVxEk+rCfNZyD/T/7FMGj03LNPiK8TRL9Sing0tq1zJF3n+W29szPqgb2RNs5oIvmm+ikeI+Q==}
 
   '@fontsource/patrick-hand@5.3.0':
     resolution: {integrity: sha512-V8C38IlIFfdWg0Xtri3F7sLCVpm069rUwn6w4n+oyn38gt7H4arOJmuReg3tAw1Q6jHqZp89wTnAAJagq4Atxw==}
@@ -313,6 +319,8 @@ packages:
 snapshots:
 
   '@fontsource/kalam@5.3.0': {}
+
+  '@fontsource/ma-shan-zheng@5.3.1': {}
 
   '@fontsource/patrick-hand@5.3.0': {}
 

@@ -40,7 +40,7 @@
 | 拖拽 | 原生 Pointer Events + `setPointerCapture`，自写手势识别（轻点/长按/拖拽/第二指轻点） | 鼠标、触屏、Playwright 共用一套代码 |
 | 音频 | 原生 WebAudio 实时合成（振荡器、噪声、滤波、包络、Karplus-Strong 拨弦、生成的混响脉冲） | 共同约定要求全程序化，不需要 Tone.js（太大） |
 | 随机 | 自写 sfc32 + 字符串哈希派生流 | 支持 `?seed=`，商店掷骰可复现 |
-| 字体 | `@fontsource/patrick-hand@5.3.0`（latin 400，woff2 24KB）用于数字和英文；`@fontsource/kalam@5.3.0`（latin 700，woff2 22KB）用于 Logo 和大标题 | 合计 46KB，低于 150KB 上限。**不 import 包里自带的 css**（它会把 .woff 一起打包），而是在 `styles.css` 里自写 `@font-face`，只 `url()` 引用 woff2 文件 |
+| 字体 | Logo 中文毛笔字：`@fontsource/ma-shan-zheng@5.3.1`（OFL-1.1），`scripts/title-font.py` 从 unicode-range 分片里取出"行囊对决"四个字合并子集化，输出 `src/assets/fonts/title-brush.woff2` 和快手用的 `yoola/package/res/fonts/title-brush.ttf`（约 4KB），改字要重跑；`@fontsource/patrick-hand@5.3.0`（latin 400，woff2 24KB）用于数字和英文；`@fontsource/kalam@5.3.0`（latin 700，woff2 22KB）用于 Logo 和大标题 | 合计 46KB，低于 150KB 上限。**不 import 包里自带的 css**（它会把 .woff 一起打包），而是在 `styles.css` 里自写 `@font-face`，只 `url()` 引用 woff2 文件 |
 | 数值验证 | `scripts/balance.ts`，用 Node 22 直接跑 TS（已实测原生类型剥离可用） | 战斗模拟是纯函数，可以离线批量跑参考构筑。需要 `allowImportingTsExtensions` + `erasableSyntaxOnly`，不用 enum/namespace |
 
 **依赖清单**
@@ -499,11 +499,13 @@ export const ENEMIES: EnemyDef[] = [ /* 3.7 表 */ ];
 
 **标题页（390×844）**
 - 背景：木桌全屏，暖灯在 (195, 300) 处最亮，四周暗角；灯光里飘着 12–20 粒金色灰尘（缓慢、加色、低透明度）。
-- **Logo 横幅**：羊皮纸横幅 x30–360、y120–300，两角各钉一颗黄铜图钉，整体缓慢摆动 ±0.6°（周期 4s）。"PACK BATTLE"（Kalam 56px）在 y≈190；"行囊对决"（系统字体 900，44px，字距 6px）在 y≈258。Logo 墨线持续"沸腾"。
-- **合着的行囊**：中心 (195, 470)，约 220×190。皮革包，翻盖上有黄铜扣，顶部露出剑柄和弓梢。待机：呼吸（scaleY 1→1.012，周期 2.8s），黄铜扣每 4 秒闪一次高光。
+- **Logo 横幅**：羊皮纸横幅 x30–360、y120–300，两角各钉一颗黄铜图钉，整体缓慢摆动 ±0.6°（周期 4s）。"PACK BATTLE"（Kalam 54px，按横幅宽度收到 ≤288px）在 y≈184：深墨描边、蜡红上亮下暗渐变、顶缘高光、右下错位墨影，描边持续"沸腾"（3 帧）。中间一道分隔饰线（两道收尖墨线 + 蜡红菱形 + 两粒小点）。"行囊对决"用毛笔字（马善政子集，58px，字距 2px，每字上下错落 1–2px，带淡墨影）在 y≈261。
+- **合着的行囊**：GPT Image 出的手绘图（`src/assets/title/bag.webp`，透明底，600×485），画宽 276、底边中心 (195, 582)；翻盖、黄铜扣、两条侧带，顶部露出剑柄和弓梢。图没加载好时用程序化的 `closedBag()` 顶上。包下有一圈接触阴影，包后有一团缓慢起伏的暖光。
+- **入场**（场景计时 t）：横幅 0–0.55s 从上方落下（回弹）并阻尼摆几下；行囊 0.18–0.58s 从横幅后面落到桌上，落地压扁回弹并在两侧扬尘；主按钮 0.55–0.87s 弹出（入场期间照样能点）。
+- **待机**：行囊呼吸（±0.6%，周期 2.8s）；从 2.4s 起每 6 秒原地一蹦（蓄力压扁 → 腾空 10px，阴影随高度缩小变淡 → 落地回弹 + 小扬尘）；黄铜扣每 4 秒闪一颗四角星。
 - **「开始冒险」按钮**：x95–295、y610–680，左边一枚蜡封（刻"⚔"），右边纸签写字；缓慢脉动（1→1.03，周期 1.6s）。首帧就能点。
-- 有记录时，按钮下方 y700–724 挂一张纸签："最高分 4,320 · 最远第 7 轮"。
-- 底部 y760–804：左边齿轮（设置），右边"?"（规则速览卡）。两个都是 44×44 的木质圆币按钮。
+- 有记录时，按钮下方 y694–720 挂一张纸签："最高分 4,320 · 最远第 7 轮"。
+- 底部：左边齿轮（设置），右边"?"（规则速览卡），44×44 木质圆币按钮，不带文字标签。
 
 **整理阶段**（坐标见 §6.3）
 - 木桌背景。**行囊**：皮革外框带双行缝线、四个黄铜包角；顶部有向后翻折的翻盖（比外框高出约 12px 的暗皮带，正中一枚黄铜扣，扣在 y≈120）；左右两侧各有一条竖向皮带伸出外框 6px。内部是深色内衬，格子是压纹。
@@ -833,6 +835,7 @@ games/pack-battle/
    │  ├─ textures.ts       # 木桌、皮革、麻布、柳条、铁皮、羊皮纸、蜡封
    │  ├─ ink.ts            # 抖动墨线、变宽笔触、排线、沸腾、手绘矩形/圆
    │  ├─ text.ts           # 文本精灵缓存、描边文字、混排字体栈
+   │  ├─ titleArt.ts       # 标题页行囊手绘图的加载（快手走 KwaiRender.loadImage）
    │  ├─ sprites.ts        # 装备卡片精灵（tile + 图标 + 等级装饰）、阴影精灵
    │  ├─ icons/
    │  │  ├─ primitives.ts  # 刃、柄、宝石、瓶、木、金属、布、叶
@@ -1285,7 +1288,7 @@ URL 参数：
 
 ## 14. 手绘立牌（v1.5）
 
-10 个敌人立牌从程序化画法换成 Midjourney 出的手绘图（对比过 GPT Image 一稿，选了 Midjourney 的画风）。图打包在本地 `src/assets/monsters/<portrait>.webp`，运行时不请求外部资源。
+10 个敌人立牌从程序化画法换成 Midjourney 出的手绘图（对比过 GPT Image 一稿，选了 Midjourney 的画风）。图打包在本地 `src/assets/monsters/<portrait>.webp`，运行时不请求外部资源。标题页的合着行囊（v2.1）用 GPT Image 出图（参考程序化行囊定构图、古龙立牌定画风，透明底，两版里选了皮色更暖的一版），裁到不透明区域后缩到 600px 宽存为 `src/assets/title/bag.webp`（84KB）；源图和提示词在 `games/pack-battle/marketing/title-bag/`（不入库）。快手包里是 `res/Image/title-bag.webp`。
 
 **出图**：Midjourney V8.2（MuleRun），每个怪物一条提示词，共用同一段画风描述和 `--seed 4242 --ar 2:3`。要求带米色模切边、纯蓝底，方便抠图。提示词、任务记录在 `art/mj/prompt-<id>.txt`、`task-<id>.json`；每个怪物 4 张候选图只留在本地（`art/.gitignore`）。选用：史莱姆 2、地精 3、毒蛛 3、骷髅 3、食人魔 1、鼠群 3、女巫 4、黑骑士 3、游侠 2、古龙 1。
 

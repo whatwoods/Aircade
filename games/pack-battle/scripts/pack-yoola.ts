@@ -55,8 +55,9 @@ for (const d of [img, aud]) {
 }
 const art = join(root, 'src/assets/monsters');
 for (const f of readdirSync(art)) copyFileSync(join(art, f), join(img, 'monster-' + f));
+copyFileSync(join(root, 'src/assets/title/bag.webp'), join(img, 'title-bag.webp'));
 for (const f of readdirSync(audioDir)) copyFileSync(join(audioDir, f), join(aud, f));
-console.log(`✓ pack-battle.js ${(code.length / 1024).toFixed(0)} KB（ES5），立牌 ${readdirSync(img).length}，音频 ${readdirSync(aud).length}`);
+console.log(`✓ pack-battle.js ${(code.length / 1024).toFixed(0)} KB（ES5），图片 ${readdirSync(img).length}，音频 ${readdirSync(aud).length}`);
 
 // 4. 校验 + 打 zip
 let report: { passed: boolean; errors: { rule: string; message: string }[]; warnings: { rule: string; message: string }[] };

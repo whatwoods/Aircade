@@ -3,3 +3,4 @@ export const ART_URLS: Record<string, string> = {};
 for (const id of ['slime', 'goblin', 'spider', 'skeleton', 'ogre', 'rats', 'witch', 'knight', 'ranger', 'dragon']) {
   ART_URLS[id] = 'res/Image/monster-' + id + '.webp';
 }
+export const TITLE_BAG_URL = 'res/Image/title-bag.webp';
