@@ -1,4 +1,5 @@
-// 标题页：Logo 横幅（钉子 + 缓慢摆动 + 墨线沸腾）、合着的行囊（呼吸 + 扣具闪光）、开始按钮、最高分签、设置 / 规则
+// 标题页：桌面小场景——毛笔字羊皮纸标题、打开的行囊（格子里码好装备）、对面的古龙立牌，
+// 装备每隔几秒向龙打出金色连击（命中闪白 + 后仰）；下面是开始按钮、最高分签、设置 / 规则
 import { ROUNDS } from '../config.ts';
 import { setMusic } from '../audio/music.ts';
 import { sfx } from '../audio/sfx.ts';
@@ -10,10 +11,12 @@ import type { RunState } from '../game/types.ts';
 import { endingData } from './gameScene.ts';
 import type { InputHandler } from '../core/input.ts';
 import { glowOf } from '../render/fx/particles.ts';
-import { ellipsePts, inkStroke, rectPts, type Pts } from '../render/ink.ts';
-import { C, cached, drawPaper, pat, rivet } from '../render/kit.ts';
+import { C, bagFrame, cached, drawPaper, rivet, type BagFrameOpts } from '../render/kit.ts';
+import { drawStandee, warmPortrait } from '../render/portraits.ts';
+import { drawItem, warmItem } from '../render/sprites.ts';
 import { LW, stage } from '../render/stage.ts';
-import { LOGO, drawSprite, num, text, type Sprite } from '../render/text.ts';
+import { BRUSH, drawSprite, num, text, type Sprite } from '../render/text.ts';
+import type { ItemId, Lv, Rot } from '../game/types.ts';
 import { Button, type UiEl } from '../render/ui/widgets.ts';
 import { RulesPanel, Overlays, SettingsPanel, StartPanel } from './overlays.ts';
 import { factories, gotoScene, type Scene } from './sceneManager.ts';
@@ -42,11 +45,13 @@ export class TitleScene implements Scene {
   private motes: Mote[] = [];
   private time = 0;
   private oy = 0;
+  /** 古龙立牌建好的真实时间；-1 = 还在建 */
+  private dragonAt = -1;
 
   constructor() {
-    this.start = new Button('btn.start', { x: 95, y: 610, w: 200, h: 70 }, '开始冒险', 'sealTag', 21);
+    this.start = new Button('btn.start', { x: 95, y: START_Y, w: 200, h: 70 }, '开始冒险', 'sealTag', 21);
     this.start.fontSize = 22;
-    this.cont = new Button('btn.continue', { x: 95, y: 596, w: 200, h: 70 }, '继续冒险', 'sealTag', 24);
+    this.cont = new Button('btn.continue', { x: 95, y: CONT_Y, w: 200, h: 70 }, '继续冒险', 'sealTag', 24);
     this.cont.fontSize = 18;
     this.gear = new Button('btn.settings', { x: 24, y: 760, w: 44, h: 44 }, '', 'coin', 22);
     this.gear.icon = 'gear';
@@ -54,19 +59,20 @@ export class TitleScene implements Scene {
     this.help.icon = 'help';
     for (let i = 0; i < 16; i++) {
       this.motes.push({
-        x: 60 + ((i * 97) % 270), y: 160 + ((i * 131) % 380), vx: ((i % 5) - 2) * 3, vy: -4 - (i % 4) * 2, ph: i * 1.7, r: 2 + (i % 3),
+        x: 60 + ((i * 97) % 270), y: 200 + ((i * 131) % 400), vx: ((i % 5) - 2) * 3, vy: -4 - (i % 4) * 2, ph: i * 1.7, r: 2 + (i % 3),
       });
     }
     this.handler = this.makeHandler();
   }
 
   enter(): void {
+    for (const it of PACK) warmItem(it.id, it.lv);
     this.best = loadBest();
     this.saved = loadRun();
     if (this.saved) {
       const r = this.saved;
       this.cont.label = r.phase === 'ending' ? '查看结算' : `继续 · 第${r.round}轮`;
-      this.start = new Button('btn.start', { x: 125, y: 678, w: 140, h: 44 }, '新的冒险', 'paper', 21);
+      this.start = new Button('btn.start', { x: 125, y: NEW_Y, w: 140, h: 44 }, '新的冒险', 'paper', 21);
       this.start.fontSize = 17;
     }
     setMusic('arrange');
@@ -82,9 +88,9 @@ export class TitleScene implements Scene {
     this.oy = (H - 844) / 2;
     const oy = this.oy;
     if (this.saved) {
-      this.cont.r = { x: 95, y: 596 + oy, w: 200, h: 70 };
-      this.start.r = { x: 125, y: 678 + oy, w: 140, h: 44 };
-    } else this.start.r = { x: 95, y: 610 + oy, w: 200, h: 70 };
+      this.cont.r = { x: 95, y: CONT_Y + oy, w: 200, h: 70 };
+      this.start.r = { x: 125, y: NEW_Y + oy, w: 140, h: 44 };
+    } else this.start.r = { x: 95, y: START_Y + oy, w: 200, h: 70 };
     this.gear.r = { x: 24, y: H - 84, w: 44, h: 44 };
     this.help.r = { x: 322, y: H - 84, w: 44, h: 44 };
   }
@@ -94,10 +100,10 @@ export class TitleScene implements Scene {
     const saved = this.saved;
     if (saved) {
       if (saved.phase === 'ending') gotoScene(() => factories.ending(endingData(saved)));
-      else gotoScene(() => factories.game({ resume: saved }), 0.5, (596 + this.oy + 35) / stage.H);
+      else gotoScene(() => factories.game({ resume: saved }), 0.5, (CONT_Y + this.oy + 35) / stage.H);
       return;
     }
-    this.pickMode((610 + this.oy + 35) / stage.H);
+    this.pickMode((START_Y + this.oy + 35) / stage.H);
   }
 
   /** 打过引导后：先选难度 / 每日挑战 */
@@ -126,7 +132,7 @@ export class TitleScene implements Scene {
     }
     this.start.confirmUntil = 0;
     sfx('click');
-    this.pickMode((678 + this.oy + 22) / stage.H);
+    this.pickMode((NEW_Y + this.oy + 22) / stage.H);
   }
 
   private buttons(): Button[] {
@@ -204,13 +210,15 @@ export class TitleScene implements Scene {
   update(dt: number, raw: number): void {
     if (this.oy !== (stage.H - 844) / 2) this.layout();
     this.time += dt;
+    // 立牌分几帧建好再淡入，避免进标题页那一帧卡顿；淡入按真实时间算，暂停（失焦）时也能出来
+    if (this.dragonAt < 0 && warmPortrait(FOE)) this.dragonAt = clock.real;
     this.ov.update(raw);
     (this.saved ? this.cont : this.start).pulse = 0.035;
     for (const m of this.motes) {
       m.x += (m.vx + Math.sin(this.time * 0.7 + m.ph) * 4) * dt;
       m.y += m.vy * dt;
-      if (m.y < 140 + this.oy) {
-        m.y = 560 + this.oy;
+      if (m.y < 190 + this.oy) {
+        m.y = 600 + this.oy;
         m.x = 60 + Math.random() * 270;
       }
       if (m.x < 30) m.x = 360;
@@ -235,38 +243,12 @@ export class TitleScene implements Scene {
       ctx.drawImage(glow, m.x - s, m.y + oy * 0 - s, s * 2, s * 2);
     }
     ctx.restore();
-    // 横幅：缓慢摆动 ±0.6°
+    this.drawDiorama(ctx, t, oy);
+    // 标题牌：缓慢摆动 ±0.6°
     ctx.save();
-    ctx.translate(195, 120 + oy);
+    ctx.translate(195, SIGN_Y + oy);
     ctx.rotate(Math.sin((t / 4) * Math.PI * 2) * 0.0105);
-    ctx.translate(-195, -(120 + oy));
-    drawSprite(ctx, bannerSprite(), 30, 120 + oy);
-    const frame = Math.floor(t * 10) % 3;
-    drawSprite(ctx, logoSprite(frame), 30, 120 + oy);
-    ctx.restore();
-    // 合着的行囊：呼吸
-    const breath = 1 + 0.012 * (0.5 + 0.5 * Math.sin((t / 2.8) * Math.PI * 2));
-    const bagS = closedBag();
-    ctx.save();
-    ctx.translate(195, 565 + oy);
-    ctx.scale(1, breath);
-    drawSprite(ctx, bagS, -130, -205);
-    // 扣具高光：每 4 秒一次
-    const gk = (t % 4) / 4;
-    if (gk < 0.12) {
-      const a = Math.sin((gk / 0.12) * Math.PI);
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = a * 0.9;
-      ctx.drawImage(glowOf('#fff3c4'), -16, -114, 32, 32);
-      ctx.strokeStyle = 'rgba(255,250,220,' + (a * 0.9).toFixed(3) + ')';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(-10, -98);
-      ctx.lineTo(10, -98);
-      ctx.moveTo(0, -108);
-      ctx.lineTo(0, -88);
-      ctx.stroke();
-    }
+    drawSprite(ctx, signSprite(), -SIGN_W / 2, 0);
     ctx.restore();
     // 按钮
     if (this.saved) this.cont.draw(ctx, t, real);
@@ -274,15 +256,156 @@ export class TitleScene implements Scene {
     if (this.best && this.best.score > 0) {
       const b = this.best;
       const s = `最高分 ${num(b.score)} · ${b.round > ROUNDS ? '无尽第 ' + b.round + ' 轮' : b.cleared ? '已通关' : '最远第 ' + b.round + ' 轮'}`;
-      const by = this.saved ? 734 : 694;
+      const by = this.saved ? NEW_Y + 54 : START_Y + 82;
       drawSprite(ctx, bestTag(), 105, by + oy);
       text(ctx, s, 195, by + 13 + oy, { size: 13, weight: 700, color: C.ink });
     }
     this.gear.draw(ctx, t, real);
     this.help.draw(ctx, t, real);
-    text(ctx, '设置', this.gear.r.x + 22, this.gear.r.y + 52, { size: 11, weight: 700, color: C.chalk, alpha: 0.7 });
-    text(ctx, '规则', this.help.r.x + 22, this.help.r.y + 52, { size: 11, weight: 700, color: C.chalk, alpha: 0.7 });
     this.ov.draw(ctx, LW, stage.H, t, real);
+  }
+
+  /** 桌面小场景：古龙立牌（后）→ 连击光线 → 行囊与装备（前）→ 命中火花 */
+  private drawDiorama(ctx: CanvasRenderingContext2D, t: number, oy: number): void {
+    const k = CELL / 54;
+    const gx = BAG_X + 16 * k;
+    const gy = BAG_Y + oy + 16 * k;
+    // 一轮连击：u ∈ [0,1) 的时间轴，三道光依次出手
+    const u = (t % STRIKE_T) / STRIKE_T;
+    const hits = PACK.filter((it) => it.target).map((it, i) => {
+      const t0 = 0.3 + i * 0.045;
+      return { it, p: (u - t0) / 0.11 };
+    });
+    // 命中后的余震：最后一道光到达后 0.3 个周期内衰减
+    const lastHit = 0.3 + (hits.length - 1) * 0.045 + 0.11;
+    const after = u >= lastHit ? Math.max(0, 1 - (u - lastHit) / 0.22) : 0;
+    const firstHit = 0.3 + 0.11;
+    const shake = u >= firstHit && u < lastHit + 0.22 ? Math.max(after, u < lastHit ? 1 : 0) : 0;
+
+    // 台灯暖光
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.22;
+    ctx.drawImage(glowOf('#ffb35a'), 195 - 230, 300 + oy - 230, 460, 460);
+    ctx.restore();
+
+    // 古龙立牌
+    if (this.dragonAt >= 0) {
+      const ease = 1 - Math.pow(1 - Math.min(1, (clock.real - this.dragonAt) / 0.4), 3);
+      const lean = -0.07 * shake * Math.sin(Math.min(1, (u - firstHit) / 0.05) * Math.PI * 0.5) + Math.sin(t * 0.9) * 0.008;
+      // 镜像：让龙面朝行囊；后仰方向随之取反
+      ctx.save();
+      ctx.translate(FOE_X, 0);
+      ctx.scale(-1, 1);
+      ctx.globalAlpha = ease;
+      drawStandee(ctx, FOE, 0, FOE_Y + oy + (1 - ease) * 18, FOE_SCALE, 1, -lean);
+      if (shake > 0) {
+        ctx.globalAlpha = ease * 0.28 * shake * shake;
+        drawStandee(ctx, FOE, 0, FOE_Y + oy, FOE_SCALE, 1, -lean, 'white');
+      }
+      ctx.restore();
+    }
+
+    // 连线：常亮的细金线（正常混合 + 深色描边，压在浅色立牌上也看得见）+ 出手时的光弹
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const h of hits) {
+      const [sx, sy] = itemCenter(h.it, gx, gy);
+      const [tx, ty] = [FOE_X + h.it.target![0], FOE_Y + oy + h.it.target![1]];
+      const mx = (sx + tx) / 2;
+      const my = Math.min(sy, ty) - 46;
+      const idle = 0.16 + 0.06 * Math.sin(t * 2 + sx * 0.05);
+      const live = h.p > 0 && h.p < 1.6 ? Math.max(0, 1 - Math.abs(h.p - 0.6)) : 0;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.quadraticCurveTo(mx, my, tx, ty);
+      ctx.strokeStyle = 'rgba(70,36,14,1)';
+      ctx.globalAlpha = (idle + live * 0.4) * 1.4;
+      ctx.lineWidth = 4.2;
+      ctx.stroke();
+      ctx.strokeStyle = C.gold;
+      ctx.globalAlpha = Math.min(1, (idle + live * 0.6) * 2.6);
+      ctx.lineWidth = 2;
+      ctx.setLineDash([7, 9]);
+      ctx.lineDashOffset = -t * 40;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (h.p > 0 && h.p < 1) {
+        ctx.globalCompositeOperation = 'lighter';
+        // 光弹：沿二次曲线飞，带两段拖尾
+        for (let j = 0; j < 3; j++) {
+          const q = Math.max(0, h.p - j * 0.09);
+          const x = (1 - q) * (1 - q) * sx + 2 * (1 - q) * q * mx + q * q * tx;
+          const y = (1 - q) * (1 - q) * sy + 2 * (1 - q) * q * my + q * q * ty;
+          const r = 15 - j * 4;
+          ctx.globalAlpha = 0.9 - j * 0.28;
+          ctx.drawImage(glowOf('#ffe08a'), x - r, y - r, r * 2, r * 2);
+        }
+        // 光弹核心：正常混合的实心金点
+        const q = h.p;
+        const x = (1 - q) * (1 - q) * sx + 2 * (1 - q) * q * mx + q * q * tx;
+        const y = (1 - q) * (1 - q) * sy + 2 * (1 - q) * q * my + q * q * ty;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(70,36,14,1)';
+        ctx.beginPath();
+        ctx.arc(x, y, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = C.goldLight;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    // 行囊 + 装备
+    drawSprite(ctx, bagFrame(PACK_FRAME), BAG_X, BAG_Y + oy, k);
+    const flash = hits.map((h) => (h.p > -0.4 && h.p < 0.2 ? 1 - Math.abs(h.p + 0.1) / 0.3 : 0));
+    let fi = 0;
+    for (const it of PACK) {
+      const x = gx + it.x * CELL;
+      const y = gy + it.y * CELL;
+      drawItem(ctx, it.id, it.lv, it.rot, x, y, CELL);
+      if (it.target) {
+        const f = Math.max(0, flash[fi++]);
+        if (f > 0) {
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = f * 0.35;
+          drawItem(ctx, it.id, it.lv, it.rot, x, y, CELL, 'white');
+          ctx.restore();
+        }
+      }
+    }
+
+    // 命中火花
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const h of hits) {
+      if (h.p < 1 || h.p > 2.2) continue;
+      const a = 1 - (h.p - 1) / 1.2;
+      const [tx, ty] = [FOE_X + h.it.target![0], FOE_Y + oy + h.it.target![1]];
+      const r = 18 + (1 - a) * 22;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = a;
+      ctx.drawImage(glowOf('#fff3c4'), tx - r, ty - r, r * 2, r * 2);
+      // 火花射线：正常混合的橙金色，浅色背景上也清楚
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = '#e8862a';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      for (let j = 0; j < 6; j++) {
+        const ang = j * 1.047 + h.it.x;
+        const r0 = 6 + (1 - a) * 10;
+        const r1 = r0 + 8 * a + 4;
+        ctx.moveTo(tx + Math.cos(ang) * r0, ty + Math.sin(ang) * r0);
+        ctx.lineTo(tx + Math.cos(ang) * r1, ty + Math.sin(ang) * r1);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   ui(): UiEl[] {
@@ -297,211 +420,80 @@ export class TitleScene implements Scene {
   }
 }
 
+// ---------- 场景布置（逻辑坐标，竖屏 390×844 基准，整体随 oy 居中） ----------
+
+const SIGN_W = 330;
+const SIGN_H = 128;
+const SIGN_Y = 48;
+const START_Y = 636;
+const CONT_Y = 624;
+const NEW_Y = 702;
+const CELL = 50;
+const BAG_X = 26;
+const BAG_Y = 420;
+const FOE = 'dragon' as const;
+const FOE_X = 270;
+const FOE_Y = 486;
+const FOE_SCALE = 1.16;
+const STRIKE_T = 3.2;
+
+const PACK_FRAME: BagFrameOpts = { cols: 4, rows: 3, cell: 54, frame: 16, style: 'leather', flap: true, straps: true, corners: 'brass' };
+
+interface PackItem {
+  id: ItemId;
+  lv: Lv;
+  rot: Rot;
+  x: number;
+  y: number;
+  /** 打向立牌的落点（相对立牌底座中心） */
+  target?: [number, number];
+}
+
+/** 4×3 码满：剑 | 盾 | 磨刀石 / 药水，手套横放在盾下 */
+const PACK: PackItem[] = [
+  { id: 'sword', lv: 2, rot: 0, x: 0, y: 0, target: [-6, -196] },
+  { id: 'buckler', lv: 1, rot: 0, x: 1, y: 0, target: [10, -160] },
+  { id: 'whetstone', lv: 1, rot: 0, x: 3, y: 0 },
+  { id: 'potion', lv: 1, rot: 0, x: 3, y: 1 },
+  { id: 'glove', lv: 1, rot: 1, x: 1, y: 2, target: [-4, -124] },
+];
+
+function itemCenter(it: PackItem, gx: number, gy: number): [number, number] {
+  const w = it.rot % 2 === 1 ? 2 : 1;
+  const sizes: Record<string, [number, number]> = { sword: [1, 3], buckler: [2, 2], whetstone: [1, 1], potion: [1, 2], glove: [w, 3 - w] };
+  const [cw, ch] = sizes[it.id] ?? [1, 1];
+  return [gx + (it.x + cw / 2) * CELL, gy + (it.y + ch / 2) * CELL];
+}
+
 // ---------- 静态精灵 ----------
 
-function bannerSprite(): Sprite {
-  return cached('title.banner', 330, 180, 16, (ctx, r) => {
-    // 羊皮纸横幅（两端卷边）
-    drawPaper(ctx, r, 0, 0, 330, 180, { seed: 41, burn: 0.9, r: 6 });
-    // 卷边阴影
-    for (const x of [0, 318]) {
-      const g = ctx.createLinearGradient(x, 0, x + 12, 0);
-      g.addColorStop(x === 0 ? 0 : 1, 'rgba(90,60,30,0.35)');
-      g.addColorStop(x === 0 ? 1 : 0, 'rgba(90,60,30,0)');
-      ctx.fillStyle = g;
-      ctx.fillRect(x, 4, 12, 172);
-    }
-    // 两颗黄铜图钉
+/** 标题牌：撕边羊皮纸 + 两颗图钉 + 毛笔字「行囊对决」 */
+function signSprite(): Sprite {
+  return cached('title.sign', SIGN_W, SIGN_H, 16, (ctx, r) => {
+    drawPaper(ctx, r, 0, 0, SIGN_W, SIGN_H, { seed: 41, burn: 0.9, r: 6 });
     rivet(ctx, 22, 20, 7);
-    rivet(ctx, 308, 20, 7);
-    // 分隔小饰线
-    ctx.strokeStyle = 'rgba(93,72,55,0.6)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(70, 102);
-    ctx.lineTo(140, 102);
-    ctx.moveTo(190, 102);
-    ctx.lineTo(260, 102);
-    ctx.stroke();
-    ctx.fillStyle = C.wax;
-    ctx.beginPath();
-    ctx.moveTo(165, 96);
-    ctx.lineTo(171, 102);
-    ctx.lineTo(165, 108);
-    ctx.lineTo(159, 102);
-    ctx.closePath();
-    ctx.fill();
-  });
-}
-
-/** Logo 字（3 帧沸腾：每帧不同的描边抖动） */
-function logoSprite(frame: number): Sprite {
-  return cached('title.logo' + frame, 330, 180, 16, (ctx) => {
-    const jx = [0, 0.6, -0.5][frame];
-    const jy = [0, -0.4, 0.5][frame];
-    // PACK BATTLE
-    ctx.save();
-    ctx.translate(165 + jx, 70 + jy);
-    ctx.font = `700 56px ${LOGO}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = 'rgba(43,29,20,0.95)';
-    ctx.lineWidth = 7 + frame * 0.4;
-    ctx.strokeText('PACK BATTLE', 0, 0);
-    ctx.fillStyle = C.wax;
-    ctx.fillText('PACK BATTLE', 0, 0);
-    ctx.fillStyle = 'rgba(255,220,180,0.35)';
-    ctx.fillText('PACK BATTLE', -1.2, -1.6);
-    ctx.restore();
-    // 行囊对决
-    ctx.save();
-    ctx.translate(165 - jx * 0.6, 138 - jy * 0.6);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `900 44px "PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC","Noto Sans SC",sans-serif`;
+    rivet(ctx, SIGN_W - 22, 20, 7);
     const s = '行囊对决';
-    // 字距 6px：逐字绘制
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `400 86px ${BRUSH}`;
+    // 字距收紧一点：逐字放
+    const gap = -4;
     const widths = [...s].map((ch) => ctx.measureText(ch).width);
-    const total = widths.reduce((a, b) => a + b, 0) + 6 * (s.length - 1);
-    let x = -total / 2;
+    const total = widths.reduce((a, b) => a + b, 0) + gap * (s.length - 1);
+    let x = SIGN_W / 2 - total / 2;
+    const y = SIGN_H / 2 + 6;
     for (let i = 0; i < s.length; i++) {
       const cx = x + widths[i] / 2;
-      ctx.lineWidth = 5;
-      ctx.strokeStyle = 'rgba(244,234,208,0.9)';
-      ctx.strokeText(s[i], cx, 0);
+      // 墨晕：淡色偏移一层
+      ctx.fillStyle = 'rgba(43,29,20,0.18)';
+      ctx.fillText(s[i], cx + 1.5, y + 2);
       ctx.fillStyle = C.ink;
-      ctx.fillText(s[i], cx, 0);
-      x += widths[i] + 6;
+      ctx.fillText(s[i], cx, y);
+      x += widths[i] + gap;
     }
     ctx.restore();
-  });
-}
-
-/** 合着的行囊：皮革包身 + 翻盖 + 黄铜扣 + 露出的剑柄和弓梢（中心在 (130, 205-?)） */
-export function closedBag(): Sprite {
-  return cached('title.bag', 260, 230, 16, (ctx, r) => {
-    const T = (p: Pts): Pts => p;
-    // 弓梢（在包后面）
-    ctx.save();
-    ctx.strokeStyle = '#7a4a24';
-    ctx.lineWidth = 7;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(196, 70);
-    ctx.quadraticCurveTo(214, 30, 196, 0);
-    ctx.stroke();
-    ctx.strokeStyle = '#e9d8b0';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(196, 2);
-    ctx.lineTo(192, 70);
-    ctx.stroke();
-    inkStroke(ctx, [196, 70, 210, 40, 204, 16, 196, 0], false, 1.6, C.ink, 9, { unit: 1, jitter: 0.3, dry: false });
-    ctx.restore();
-    // 剑柄（在包后面）
-    ctx.save();
-    ctx.translate(74, 0);
-    ctx.rotate(-0.18);
-    ctx.fillStyle = '#5a3a20';
-    ctx.fillRect(-5, 14, 10, 44);
-    ctx.strokeStyle = '#3a2213';
-    ctx.lineWidth = 1;
-    for (let y = 18; y < 56; y += 6) {
-      ctx.beginPath();
-      ctx.moveTo(-5, y);
-      ctx.lineTo(5, y + 3);
-      ctx.stroke();
-    }
-    ctx.fillStyle = C.brass;
-    ctx.beginPath();
-    ctx.roundRect(-22, 56, 44, 9, 4);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(0, 10, 7, 0, Math.PI * 2);
-    ctx.fill();
-    inkStroke(ctx, rectPts(-22, 56, 44, 9, 4), true, 1.4, C.ink, 3, { unit: 1, jitter: 0.3, dry: false });
-    inkStroke(ctx, ellipsePts(0, 10, 7, 7, 14), true, 1.4, C.ink, 4, { unit: 1, jitter: 0.3, dry: false });
-    ctx.restore();
-    // 包身
-    const body = T(rectPts(14, 62, 232, 160, 26));
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(14, 62, 232, 160, 26);
-    ctx.fillStyle = C.leather;
-    ctx.fill();
-    ctx.fillStyle = pat(ctx, 'leather', r);
-    ctx.fill();
-    const sh = ctx.createLinearGradient(0, 62, 0, 222);
-    sh.addColorStop(0, 'rgba(255,220,170,0.12)');
-    sh.addColorStop(1, 'rgba(20,8,2,0.35)');
-    ctx.fillStyle = sh;
-    ctx.fill();
-    ctx.restore();
-    // 缝线
-    ctx.save();
-    ctx.strokeStyle = C.stitch;
-    ctx.lineWidth = 1.6;
-    ctx.setLineDash([5, 4]);
-    ctx.beginPath();
-    ctx.roundRect(24, 72, 212, 140, 20);
-    ctx.stroke();
-    ctx.restore();
-    inkStroke(ctx, body, true, 2.4, C.ink, 11, { unit: 1, jitter: 0.5, dry: false });
-    // 侧带
-    for (const x of [44, 202]) {
-      ctx.fillStyle = C.leatherDark;
-      ctx.fillRect(x, 58, 14, 166);
-      inkStroke(ctx, rectPts(x, 58, 14, 166, 3), true, 1.4, C.ink, x, { unit: 1, jitter: 0.3, dry: false });
-      rivet(ctx, x + 7, 200, 3.5);
-    }
-    // 翻盖
-    const flap: Pts = [];
-    flap.push(10, 60);
-    flap.push(250, 60);
-    flap.push(246, 120);
-    flap.push(170, 146);
-    flap.push(130, 150);
-    flap.push(90, 146);
-    flap.push(14, 120);
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(flap[0], flap[1]);
-    for (let i = 2; i < flap.length; i += 2) ctx.lineTo(flap[i], flap[i + 1]);
-    ctx.closePath();
-    ctx.fillStyle = C.leatherDark;
-    ctx.fill();
-    ctx.fillStyle = pat(ctx, 'leatherDark', r);
-    ctx.fill();
-    ctx.restore();
-    ctx.save();
-    ctx.strokeStyle = C.stitch;
-    ctx.lineWidth = 1.4;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(20, 68);
-    ctx.lineTo(240, 68);
-    ctx.lineTo(237, 114);
-    ctx.lineTo(130, 141);
-    ctx.lineTo(23, 114);
-    ctx.closePath();
-    ctx.stroke();
-    ctx.restore();
-    inkStroke(ctx, flap, true, 2.2, C.ink, 13, { unit: 1, jitter: 0.5, dry: false });
-    // 黄铜扣
-    ctx.save();
-    ctx.fillStyle = C.brass;
-    ctx.beginPath();
-    ctx.roundRect(116, 126, 28, 34, 6);
-    ctx.fill();
-    ctx.fillStyle = C.brassLight;
-    ctx.fillRect(121, 131, 18, 4);
-    ctx.fillStyle = '#3a2213';
-    ctx.beginPath();
-    ctx.roundRect(126, 142, 8, 12, 3);
-    ctx.fill();
-    ctx.restore();
-    inkStroke(ctx, rectPts(116, 126, 28, 34, 6), true, 1.6, C.ink, 17, { unit: 1, jitter: 0.3, dry: false });
   });
 }
 

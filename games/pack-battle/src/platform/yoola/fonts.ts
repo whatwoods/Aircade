@@ -5,6 +5,7 @@ import { kw } from './kwai.ts';
 const FONTS = {
   hand: { alias: 'pb-hand', path: 'res/fonts/patrick-hand-regular.ttf' },
   logo: { alias: 'pb-logo', path: 'res/fonts/kalam-bold.ttf' },
+  brush: { alias: 'pb-brush', path: 'res/fonts/title-brush.ttf' },
 } as const;
 
 const cache: Record<string, string> = {};

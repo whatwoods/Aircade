@@ -1,9 +1,9 @@
-// 图标：用标题页的合着的行囊 + 木桌纹理画出来（开发服务器打开 /scripts/icon/?size=512）
+// 图标：用合着的行囊 + 木桌纹理画出来（开发服务器打开 /scripts/icon/?size=512）
 // pnpm icons 用无头 Chrome 截下来存到 public/icons/
 import { initKit } from '../../src/render/kit.ts';
 import { stage } from '../../src/render/stage.ts';
 import { woodField } from '../../src/render/textures.ts';
-import { closedBag } from '../../src/scenes/titleScene.ts';
+import { closedBag } from '../../src/render/closedBag.ts';
 
 const q = new URLSearchParams(location.search);
 const size = Number(q.get('size') ?? 512);

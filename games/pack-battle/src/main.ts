@@ -59,7 +59,7 @@ function boot(): void {
     try {
       const fonts = document.fonts;
       if (fonts && typeof fonts.load === 'function') {
-        void Promise.all([fonts.load('700 56px "Kalam"'), fonts.load('400 20px "Patrick Hand"')])
+        void Promise.all([fonts.load('700 56px "Kalam"'), fonts.load('400 20px "Patrick Hand"'), fonts.load('400 80px "Title Brush"')])
           .then(() => {
             stage.version++;
           })
