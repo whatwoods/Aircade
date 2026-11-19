@@ -1,18 +1,10 @@
-/* 字体：只用 woff2 的 latin 子集（中文走系统字体栈；标题四字单独子集） */
+/* 字体：只用 woff2 的 latin 子集（中文走系统字体栈） */
 @font-face {
   font-family: 'Kalam';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
   src: url('../node_modules/@fontsource/kalam/files/kalam-latin-700-normal.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Title Brush';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  /* 马善政（OFL）只取「行囊对决」四字，scripts/title-font.py 生成 */
-  src: url('./assets/fonts/title-brush.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Patrick Hand';
