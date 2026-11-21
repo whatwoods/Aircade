@@ -497,6 +497,8 @@ export const SHOP_POOL: ItemId[] = (Object.keys(ITEMS) as ItemId[]).filter((k) =
 
 /** 快手 Yoola 版的屏幕避让（互动玩法设计规范：系统安全区之下留 32 间距 + 64 平台控件；底部不贴手势区） */
 export const YOOLA = {
+  /** 快手端画布 DPR 上限（网页版是 2）：手机多是 3 倍屏，2 倍会发软；卡顿时自适应画质照样往下降 */
+  dprCap: 3,
   topGap: 32,
   topControls: 64,
   minBottom: 20,

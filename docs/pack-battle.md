@@ -500,7 +500,7 @@ export const ENEMIES: EnemyDef[] = [ /* 3.7 表 */ ];
 **标题页（390×844）**
 - 背景：木桌全屏，暖灯在 (195, 300) 处最亮，四周暗角；灯光里飘着 12–20 粒金色灰尘（缓慢、加色、低透明度）。
 - **Logo 横幅**：羊皮纸横幅 x30–360、y120–300，两角各钉一颗黄铜图钉，整体缓慢摆动 ±0.6°（周期 4s）。"PACK BATTLE"（Kalam 54px，按横幅宽度收到 ≤288px）在 y≈184：深墨描边、蜡红上亮下暗渐变、顶缘高光、右下错位墨影，描边持续"沸腾"（3 帧）。中间一道分隔饰线（两道收尖墨线 + 蜡红菱形 + 两粒小点）。"行囊对决"用毛笔字（马善政子集，58px，字距 2px，每字上下错落 1–2px，带淡墨影）在 y≈261。
-- **合着的行囊**：GPT Image 出的手绘图（`src/assets/title/bag.webp`，透明底，600×485），画宽 276、底边中心 (195, 582)；翻盖、黄铜扣、两条侧带，顶部露出剑柄和弓梢。图没加载好时用程序化的 `closedBag()` 顶上。包下有一圈接触阴影，包后有一团缓慢起伏的暖光。
+- **合着的行囊**：GPT Image 出的手绘图（`src/assets/title/bag.webp`，透明底，840×679），画宽 276、底边中心 (195, 582)；翻盖、黄铜扣、两条侧带，顶部露出剑柄和弓梢。图没加载好时用程序化的 `closedBag()` 顶上。包下有一圈接触阴影，包后有一团缓慢起伏的暖光。
 - **入场**（场景计时 t）：横幅 0–0.55s 从上方落下（回弹）并阻尼摆几下；行囊 0.18–0.58s 从横幅后面落到桌上，落地压扁回弹并在两侧扬尘；主按钮 0.55–0.87s 弹出（入场期间照样能点）。
 - **待机**：行囊呼吸（±0.6%，周期 2.8s）；从 2.4s 起每 6 秒原地一蹦（蓄力压扁 → 腾空 10px，阴影随高度缩小变淡 → 落地回弹 + 小扬尘）；黄铜扣每 4 秒闪一颗四角星。
 - **「开始冒险」按钮**：x95–295、y610–680，左边一枚蜡封（刻"⚔"），右边纸签写字；缓慢脉动（1→1.03，周期 1.6s）。首帧就能点。
@@ -1288,7 +1288,7 @@ URL 参数：
 
 ## 14. 手绘立牌（v1.5）
 
-10 个敌人立牌从程序化画法换成 Midjourney 出的手绘图（对比过 GPT Image 一稿，选了 Midjourney 的画风）。图打包在本地 `src/assets/monsters/<portrait>.webp`，运行时不请求外部资源。标题页的合着行囊（v2.1）用 GPT Image 出图（参考程序化行囊定构图、古龙立牌定画风，透明底，两版里选了皮色更暖的一版），裁到不透明区域后缩到 600px 宽存为 `src/assets/title/bag.webp`（84KB）；源图和提示词在 `games/pack-battle/marketing/title-bag/`（不入库）。快手包里是 `res/Image/title-bag.webp`。
+10 个敌人立牌从程序化画法换成 Midjourney 出的手绘图（对比过 GPT Image 一稿，选了 Midjourney 的画风）。图打包在本地 `src/assets/monsters/<portrait>.webp`，运行时不请求外部资源。标题页的合着行囊（v2.1）用 GPT Image 出图（参考程序化行囊定构图、古龙立牌定画风，透明底，两版里选了皮色更暖的一版），裁到不透明区域后缩到 840px 宽（画宽 276 × 3 倍屏）存为 `src/assets/title/bag.webp`（167KB）；源图和提示词在 `games/pack-battle/marketing/title-bag/`（不入库）。快手包里是 `res/Image/title-bag.webp`。
 
 **出图**：Midjourney V8.2（MuleRun），每个怪物一条提示词，共用同一段画风描述和 `--seed 4242 --ar 2:3`。要求带米色模切边、纯蓝底，方便抠图。提示词、任务记录在 `art/mj/prompt-<id>.txt`、`task-<id>.json`；每个怪物 4 张候选图只留在本地（`art/.gitignore`）。选用：史莱姆 2、地精 3、毒蛛 3、骷髅 3、食人魔 1、鼠群 3、女巫 4、黑骑士 3、游侠 2、古龙 1。
 
@@ -1419,6 +1419,8 @@ URL 参数：
 **音频**：文档没有明确 Kwai 支持 WebAudio，所以不赌。`pnpm audio:yoola` 在无头 Chrome 里用 `OfflineAudioContext` 把现有合成配方（`RECIPES` + 共用的 `initGraph` 总线）逐个离线渲染成 32 kHz 单声道 wav（带参数的音效如 `coinUp`、`speed` 每档一个文件，命名见 `src/audio/sfxFiles.ts`），背景音乐 m4a 转 mp3（Kwai 只认 wav/mp3），走 `KwaiMedia.Audio`。合成代码仍是唯一来源，结果按内容哈希缓存在 `yoola/.cache/`，生成的音频和 `gameplay/pack-battle.js` 不进 git。需要本机 Chrome 与 ffmpeg（`CHROME_PATH` 可覆盖路径）。
 
 **运行时冒烟**（`scripts/yoola/smoke.mjs`，`build:yoola` 最后一步）：快手运行时不是浏览器，没有 `URLSearchParams`、`structuredClone`、`DOMMatrix` 这类全局，H5 预览发现不了。脚本在只有 ECMAScript 内置对象的 `node:vm` 里按 `game.js` 的 `require` 顺序执行整个包（`ks` 用最小桩），跑标题页、点「开始冒险」进整理背包，任何异常或 `console.error` 即失败；再用 TypeScript 只带 ES 标准库检查产物，列出所有要靠运行时提供的全局名，白名单外的一律报错。v2.0 首次提审因顶层 `new URLSearchParams` 在加载时抛错被拒（「游戏无法正常加载」），同时修了战斗存档的 `structuredClone`（改 JSON 深拷贝）和纹理 pattern 的 `DOMMatrix`（改传 `{a..f}`，pattern 没有 `setTransform` 时退回预缩放纹理）。快手 2D 上下文若缺 `roundRect`，`platform/yoola/render.ts` 的 `patch2d` 在主画布和每块离屏画布上补一个 `arcTo` 实现。
+
+**清晰度**：快手端 DPR 上限是 `YOOLA.dprCap`=3（网页版 2），卡顿时自适应画质照样往下降。`ks-adapter.js` 的 `window.devicePixelRatio` 取自 `getSystemInfoSync().devicePixelRatio`，这只是兼容字段，部分快手版本不返回，于是是 `undefined`，画布会按 1 倍渲染、整屏发糊（v2.1 上线后发现）；`platform/yoola/viewport.ts` 缺值时回退到正式字段 `pixelRatio`。冒烟脚本的桩只给 `pixelRatio`，并检查主画布宽 = 414×3。
 
 **安全区**：顶部让开胶囊按钮（`config.ts` 的 `YOOLA`：`Layout.safeTop` + 32 + 64），底部取真机 inset 与 20 的较大值。
 

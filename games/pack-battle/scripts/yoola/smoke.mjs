@@ -58,6 +58,7 @@ function makeCanvas(main) {
 }
 
 let canvasCount = 0;
+let mainCanvas = null;
 const touchHandlers = { start: [], move: [], end: [], cancel: [] };
 const timers = [];
 let rafQueue = [];
@@ -66,7 +67,11 @@ let clock = 0;
 const storage = new Map();
 const ks = {
   env: { USER_DATA_PATH: 'ksfile://usr' },
-  createCanvas: () => makeCanvas(canvasCount++ === 0),
+  createCanvas: () => {
+    const c = makeCanvas(canvasCount++ === 0);
+    mainCanvas ??= c;
+    return c;
+  },
   createImage() {
     const img = { width: 64, height: 64, onload: null, onerror: null };
     let src = '';
@@ -195,6 +200,8 @@ try {
   req('game.js');
   step(120);
   if (!drawn.has('开始冒险')) problems.push('标题页没画出来');
+  // 桩里的 getSystemInfoSync 故意只给 pixelRatio（部分快手版本就是这样），画布仍要按 3 倍渲染
+  if (mainCanvas && mainCanvas.width !== W * DPR) problems.push(`主画布宽 ${mainCanvas.width}，应为 ${W * DPR}（DPR 没取到，画面会发糊）`);
   drawn.clear();
   tap(W / 2, H * 0.796); // 开始冒险（比例按 414×896 预览量的）
   step(120);

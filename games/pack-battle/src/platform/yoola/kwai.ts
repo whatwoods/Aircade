@@ -12,7 +12,7 @@ export interface KwaiGlobals {
   KwaiBase: {
     onShow(cb: () => void): void;
     onHide(cb: () => void): void;
-    getSystemInfo(): { windowWidth?: number; windowHeight?: number; safeArea?: { top: number; bottom: number } };
+    getSystemInfo(): { windowWidth?: number; windowHeight?: number; pixelRatio?: number; devicePixelRatio?: number; safeArea?: { top: number; bottom: number } };
   };
   KwaiRender: {
     createOffscreenCanvas(w: number, h: number): HTMLCanvasElement;
