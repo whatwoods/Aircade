@@ -1137,7 +1137,7 @@ URL 参数：
 |---|---|---|
 | 情境提示气泡位置 | 整理阶段从背包底部移到桌边那一排的中线；拖拽时淡到 30% | 原位置压住背包最底一行，正好是玩家要放东西的地方 |
 | 金币栏数字 | Patrick Hand 28px → 无衬线粗体 24px（与价签一致） | Patrick Hand 的 7 像"ʔ"（17 看成 1ʔ） |
-| 图标 | `public/icons/`：`favicon-32.png`（透明底，行囊撑满）、`apple-touch-icon.png`（180）、`icon-512.png`（分享卡片用）。由标题页行囊的绘制代码 + 木桌纹理生成（`scripts/icon/`），`pnpm icons` 用本机 Chrome 无头截图导出 | 美术全程序化的约定；改了行囊画法后重跑 |
+| 图标 | `public/icons/`：`favicon-32.png`（透明底，行囊撑满）、`apple-touch-icon.png`（180）、`icon-512.png`（分享卡片用），以及快手平台素材 `yoola/package/yoola-assets/icon.png`（220）。v2.1 起用标题页的手绘行囊图（`src/assets/title/bag.webp`）+ 木桌纹理 + 暖光暗角 + 接触阴影生成（`scripts/icon/`），`pnpm icons` 用本机 Chrome 无头截图导出 | 美术全程序化的约定（行囊图除外）；换了行囊图后重跑 |
 | 分享卡片 | `index.html` 加 og:title / og:description / og:image、twitter:card | og:image 目前是相对路径，多数抓取器要绝对地址，等确定发布域名后改 |
 | 版本号 | `package.json` 的 version 经 Vite `define` 注入为 `__APP_VERSION__`，设置面板底部显示 | 原先写死 v1.0 |
 | PWA | 不做 | 产品决定 |

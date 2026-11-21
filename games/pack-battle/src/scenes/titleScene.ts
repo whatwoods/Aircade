@@ -526,7 +526,7 @@ function logoSprite(frame: number): Sprite {
 }
 
 /** 合着的行囊：皮革包身 + 翻盖 + 黄铜扣 + 露出的剑柄和弓梢（中心在 (130, 205-?)） */
-export function closedBag(): Sprite {
+function closedBag(): Sprite {
   return cached('title.bag', 260, 230, 16, (ctx, r) => {
     const T = (p: Pts): Pts => p;
     // 弓梢（在包后面）

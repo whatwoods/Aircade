@@ -1,5 +1,5 @@
-// 导出应用图标：起一个临时 Vite 开发服务器，用无头 Chrome 截 scripts/icon/ 页面，存到 public/icons/
-// 用法：pnpm icons（需要本机装有 Chrome；改了行囊画法后重跑一次）
+// 导出应用图标：起一个临时 Vite 开发服务器，用无头 Chrome 截 scripts/icon/ 页面，存到 public/icons/ 和快手 yoola-assets/
+// 用法：pnpm icons（需要本机装有 Chrome；换了行囊图后重跑一次）
 import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,10 +16,13 @@ if (!existsSync(CHROME)) {
 const OUT = resolve(import.meta.dirname, '../public/icons');
 mkdirSync(OUT, { recursive: true });
 
+const KWAI = resolve(import.meta.dirname, '../yoola/package/yoola-assets');
 const ICONS: { file: string; size: number; bare?: boolean }[] = [
-  { file: 'icon-512.png', size: 512 },
-  { file: 'apple-touch-icon.png', size: 180 },
-  { file: 'favicon-32.png', size: 32, bare: true },
+  { file: resolve(OUT, 'icon-512.png'), size: 512 },
+  { file: resolve(OUT, 'apple-touch-icon.png'), size: 180 },
+  { file: resolve(OUT, 'favicon-32.png'), size: 32, bare: true },
+  // 快手平台素材：220×220 PNG
+  { file: resolve(KWAI, 'icon.png'), size: 220 },
 ];
 
 // 独立的用户目录：否则本机已开着的 Chrome 会接管这次启动，截图不落盘
@@ -33,9 +36,9 @@ try {
     await promisify(execFile)(CHROME, [
       '--headless=new', '--default-background-color=00000000', `--user-data-dir=${profile}`, '--no-first-run', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1',
       `--window-size=${ic.size},${ic.size}`,
-      `--screenshot=${resolve(OUT, ic.file)}`, url,
+      '--virtual-time-budget=5000', `--screenshot=${ic.file}`, url,
     ], { timeout: 60000 });
-    console.log('✓', ic.file);
+    console.log('✓', ic.file.slice(ic.file.indexOf('pack-battle/') + 12));
   }
 } finally {
   await server.close();
