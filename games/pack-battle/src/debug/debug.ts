@@ -168,6 +168,8 @@ export function installDebug(): void {
     get seed(): number | null {
       return game()?.run.seed ?? null;
     },
+    /** 当前画布 DPR 与自适应画质上限 */
+    quality: () => ({ dpr: stage.dpr, dprCap: stage.dprCap, version: stage.version, fps: Math.round(clock.fps), frameMs: +clock.frameMs.toFixed(1) }),
     /** 切假广告；null 关掉 */
     ads: safe((mode: FakeAdMode | null) => setAdProvider(mode ? fakeAds(mode) : null)),
     state: safe(() => {

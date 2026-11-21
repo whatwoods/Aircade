@@ -994,7 +994,8 @@ URL 参数：
 - **运行时不用** `shadowBlur`、`filter`、`getImageData`；发光用预渲染的径向渐变精灵 + `lighter` 叠加；阴影用预模糊的剪影精灵。
 - **零分配热路径**：粒子、跳字、投射物、Tween 都走对象池；每帧复用数组；事件回放用游标，不 splice。
 - **逻辑**：rAF 中 dt 限幅 50ms；弹簧固定 120Hz 子步（每帧最多 4 步）；战斗是预先模拟好的，回放没有计算压力。
-- **自适应画质**：连续 2 秒平均帧时间 > 18ms → DPR 下调 0.25（最低 1），粒子上限减半，关闭线条沸腾。
+- **自适应画质**（`config.ts` 的 `QUALITY`）：DPR 上限 2，网页和快手一样。连续 2 秒平均帧时间 > 18ms 且本帧 CPU > 8ms → 粒子上限立刻减半，DPR 记下要降 0.5（最低 1.5），等下一次墨渍转场盖满屏幕时才真的改画布尺寸（改尺寸会重建所有缓存，快手上会整屏闪一下「放大再恢复」，v2.1 上线后玩家反馈过）；DPR 降到 2 以下后加成连线停止沸腾。启动预热队列没跑完时不计（预热每帧占 ≤4ms，会被误判成卡）。
+- **文字缓存**：主画布上的 `text()` 同一段文字（内容 + 字号字重字体 + 颜色描边投影 + 对齐字距）第二次画时光栅化成小精灵，之后每帧只 `drawImage`；每帧在变的文字达不到第二次命中，照旧直接画。上限 500 条，满了清空，`stage.version` 变了清空。一帧的 `fillText`/`strokeText` 从约 40 次降到 0–1 次（原生画布上文字绘制很贵）。
 - **后台**：页面隐藏时停止 rAF，挂起 AudioContext。
 - **字体**：`document.fonts.load` 最多等 300ms，超时先用回退字体绘制，加载完成后让文本缓存失效并重绘。
 
@@ -1111,7 +1112,7 @@ URL 参数：
 
 ### 11.7 测试方式
 
-`?debug=1` 打开 FPS 浮层和 `window.__game`（`state()`、`ui()`、`gotoRound()`、`winBattle()`/`loseBattle()` 等，见 §8）。Playwright 脚本用 CDP `Input.dispatchTouchEvent` 模拟真实多指触摸（第二指轻点、捏合），在 390×844（isMobile、hasTouch、DPR 2）和 1280×800 下走完：标题 → 引导 4 步（含上抬 48px 落位、拿错装备被拒、先放不相邻再改正）→ 战斗 → 第 2 轮合成 ★★ → 出售与撤销 → 桌边暂存 → 非法落点飞回 → 暂停 / 失焦暂停 / 设置 → 第 5 轮首领 4× → 输一轮扣心 → 失败结局 → 再来一局 → 通关结局 → 标题；桌面端验证鼠标拖拽（不上抬）、右键 / R 键旋转、空格开战、Esc 暂停。全程控制台零错误零警告。
+`?debug=1` 打开 FPS 浮层和 `window.__game`（`state()`、`quality()`（DPR、上限、fps、帧耗时）、`ui()`、`gotoRound()`、`winBattle()`/`loseBattle()` 等，见 §8）。Playwright 脚本用 CDP `Input.dispatchTouchEvent` 模拟真实多指触摸（第二指轻点、捏合），在 390×844（isMobile、hasTouch、DPR 2）和 1280×800 下走完：标题 → 引导 4 步（含上抬 48px 落位、拿错装备被拒、先放不相邻再改正）→ 战斗 → 第 2 轮合成 ★★ → 出售与撤销 → 桌边暂存 → 非法落点飞回 → 暂停 / 失焦暂停 / 设置 → 第 5 轮首领 4× → 输一轮扣心 → 失败结局 → 再来一局 → 通关结局 → 标题；桌面端验证鼠标拖拽（不上抬）、右键 / R 键旋转、空格开战、Esc 暂停。全程控制台零错误零警告。
 
 ---
 
@@ -1360,7 +1361,7 @@ URL 参数：
 
 只在 TapTap 构建（见下方「TapTap 构建」）里生效，还要有全局 `tap` 和广告单元 ID。普通网页版（`games.wayai.cc`）没有广告按钮，TapTap 的代码也不进网页包。界面只调 `src/platform/ads.ts`，TapTap 实现在 `src/platform/tap.ts`，数值在 `config.ts` 的 `AD`。
 
-**激励视频**（三处都由玩家主动点，按钮文字带"广告"，每局各限次）：
+**激励视频**（三处都由玩家主动点，按钮文字带"广告"，每局各限次；按钮用 `reward` 样式：金牌 + 呼吸光晕 + 每 2.4 秒一道扫光 + 轻微脉动，左边红蜡封"▶"，比同屏的结算木牌更抢眼）：
 
 | 点位 | 时机 | 奖励 | 限制 |
 |---|---|---|---|
@@ -1420,7 +1421,7 @@ URL 参数：
 
 **运行时冒烟**（`scripts/yoola/smoke.mjs`，`build:yoola` 最后一步）：快手运行时不是浏览器，没有 `URLSearchParams`、`structuredClone`、`DOMMatrix` 这类全局，H5 预览发现不了。脚本在只有 ECMAScript 内置对象的 `node:vm` 里按 `game.js` 的 `require` 顺序执行整个包（`ks` 用最小桩），跑标题页、点「开始冒险」进整理背包，任何异常或 `console.error` 即失败；再用 TypeScript 只带 ES 标准库检查产物，列出所有要靠运行时提供的全局名，白名单外的一律报错。v2.0 首次提审因顶层 `new URLSearchParams` 在加载时抛错被拒（「游戏无法正常加载」），同时修了战斗存档的 `structuredClone`（改 JSON 深拷贝）和纹理 pattern 的 `DOMMatrix`（改传 `{a..f}`，pattern 没有 `setTransform` 时退回预缩放纹理）。快手 2D 上下文若缺 `roundRect`，`platform/yoola/render.ts` 的 `patch2d` 在主画布和每块离屏画布上补一个 `arcTo` 实现。
 
-**清晰度**：快手端 DPR 上限是 `YOOLA.dprCap`=3（网页版 2），卡顿时自适应画质照样往下降。`ks-adapter.js` 的 `window.devicePixelRatio` 取自 `getSystemInfoSync().devicePixelRatio`，这只是兼容字段，部分快手版本不返回，于是是 `undefined`，画布会按 1 倍渲染、整屏发糊（v2.1 上线后发现）；`platform/yoola/viewport.ts` 缺值时回退到正式字段 `pixelRatio`。冒烟脚本的桩只给 `pixelRatio`，并检查主画布宽 = 414×3。
+**清晰度**：快手端 DPR 上限和网页一样是 2（试过 3，像素数是 2 倍的 2.25 倍，快手里明显不流畅）。`ks-adapter.js` 的 `window.devicePixelRatio` 取自 `getSystemInfoSync().devicePixelRatio`，这只是兼容字段，部分快手版本不返回，于是是 `undefined`，画布会按 1 倍渲染、整屏发糊（v2.1 上线后发现）；`platform/yoola/viewport.ts` 缺值时回退到正式字段 `pixelRatio`。冒烟脚本的桩只给 `pixelRatio`，并检查主画布宽 = 414×2。
 
 **安全区**：顶部让开胶囊按钮（`config.ts` 的 `YOOLA`：`Layout.safeTop` + 32 + 64），底部取真机 inset 与 20 的较大值。
 

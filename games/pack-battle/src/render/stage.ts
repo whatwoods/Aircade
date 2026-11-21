@@ -1,5 +1,5 @@
 // canvas、DPR、安全区、逻辑坐标（宽 390，高 Hlog）
-import { YOOLA } from '../config.ts';
+import { QUALITY } from '../config.ts';
 import { readSafe as yoolaSafe, viewport as yoolaViewport } from '../platform/yoola/viewport.ts';
 
 export const LW = 390;
@@ -9,7 +9,7 @@ export const stage = {
   ctx: null as unknown as CanvasRenderingContext2D,
   dpr: 1,
   /** 自适应画质的 DPR 上限 */
-  dprCap: __YOOLA__ ? YOOLA.dprCap : 2,
+  dprCap: QUALITY.dprCap,
   vw: 390,
   vh: 844,
   s: 1,

@@ -2,7 +2,7 @@
 import './styles.css';
 import { resumeAudio, suspendAudio, unlockAudio } from './audio/audio.ts';
 import { updateMusic } from './audio/music.ts';
-import { SHOP_POOL } from './config.ts';
+import { QUALITY, SHOP_POOL } from './config.ts';
 import { now } from './platform/now.ts';
 import { adPlaying, initAds } from './platform/ads.ts';
 import { bootOnFirstDraw, claimCanvas } from './platform/yoola/render.ts';
@@ -15,7 +15,7 @@ import type { PortraitId } from './game/types.ts';
 import { setParticleCap, updateParticles } from './render/fx/particles.ts';
 import { updatePopups } from './render/fx/popups.ts';
 import { shake, updateShake } from './render/fx/shake.ts';
-import { drawBlot, updateBlot } from './render/fx/transitions.ts';
+import { blot, drawBlot, updateBlot } from './render/fx/transitions.ts';
 import { initKit } from './render/kit.ts';
 import { warmPortrait } from './render/portraits.ts';
 import { warmItem } from './render/sprites.ts';
@@ -120,20 +120,33 @@ function boot(): void {
     while (warm.length && now() - t0 < 4) warm.shift()!();
   }
 
-  // 自适应画质：连续 2 秒平均帧间隔 > 18ms 且本帧 CPU 偏高 → 降 DPR、粒子减半
+  // 自适应画质：连续 2 秒平均帧间隔 > 18ms 且本帧 CPU 偏高 → 粒子减半，DPR 降一档。
+  // 换 DPR 要改画布尺寸、重建所有缓存，快手上会闪一下「放大再恢复」，所以只在墨渍转场盖满屏幕时换；
+  // 启动预热（每帧 ≤ 4ms 生成精灵）算在帧耗时里，预热没跑完不计，免得一开局就误判
   let slowAcc = 0;
   let slowFrames = 0;
   let slowSum = 0;
+  let pendingCap = 0;
   function adapt(): void {
+    if (pendingCap && blot.active && blot.phase === 1 && blot.t < 0.12) {
+      stage.dprCap = pendingCap;
+      pendingCap = 0;
+      if (resizeStage()) setInputScale(stage.s);
+    }
+    if (warm.length) {
+      slowAcc = slowSum = 0;
+      slowFrames = 0;
+      return;
+    }
     slowAcc += clock.raw;
     slowFrames++;
     slowSum += clock.raw;
     if (slowAcc < 2) return;
     const avg = slowSum / slowFrames;
-    if (avg > 0.018 && clock.frameMs > 8 && stage.dprCap > 1) {
-      stage.dprCap = Math.max(1, stage.dprCap - 0.25);
+    const cap = pendingCap || stage.dprCap;
+    if (avg > 0.018 && clock.frameMs > 8 && cap > QUALITY.minDpr) {
       setParticleCap(0.5);
-      if (resizeStage()) setInputScale(stage.s);
+      pendingCap = Math.max(QUALITY.minDpr, cap - 0.5);
     }
     slowAcc = slowSum = 0;
     slowFrames = 0;

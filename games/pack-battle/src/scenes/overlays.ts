@@ -821,7 +821,7 @@ export class ChoicePanel extends Panel {
     this.both = both;
     this.outsideCloses = false;
     this.buttons = cards.map((c, i) => new Button('choice.' + i, R(30 + i * 170, 300 + this.oy, 160, 230), EVENT_DEFS[c.id].name, 'paper', 70 + i));
-    this.bothB = new Button('choice.both', R(65, 572 + this.oy, 260, 56), '看广告两张都要', 'sealTag', 73);
+    this.bothB = new Button('choice.both', R(65, 572 + this.oy, 260, 56), '看广告两张都要', 'reward', 73);
     this.bothB.glyph = '▶';
     this.bothB.visible = false;
     this.buttons.push(this.bothB);
@@ -848,7 +848,7 @@ export class ChoicePanel extends Panel {
     this.close();
     this.onPick(c.id);
   }
-  drawBody(ctx: CanvasRenderingContext2D): void {
+  drawBody(ctx: CanvasRenderingContext2D, time: number, real: number): void {
     const r = this.rect();
     titleText(ctx, '岔路', 195, r.y + 2, 30, C.paper, true);
     this.cards.forEach((c, i) => {
@@ -867,7 +867,7 @@ export class ChoicePanel extends Panel {
       c.desc.forEach((l, j) => text(ctx, l, br.x + br.w / 2, br.y + 160 + j * 24, { size: 15, weight: 700, color: C.inkSoft }));
       ctx.restore();
     });
-    this.bothB.draw(ctx, 0, 0);
+    this.bothB.draw(ctx, time, real);
   }
 }
 

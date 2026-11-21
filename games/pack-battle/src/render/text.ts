@@ -2,6 +2,7 @@
 import { yoolaFamily } from '../platform/yoola/fonts.ts';
 import { kw } from '../platform/yoola/kwai.ts';
 import { patch2d } from '../platform/yoola/render.ts';
+import { pxRatio, stage } from './stage.ts';
 
 export const CN = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC","Noto Sans SC","WenQuanYi Zen Hei",sans-serif';
 export const HAND = (__YOOLA__ ? yoolaFamily('hand') : '"Patrick Hand"') + ',' + CN;
@@ -39,7 +40,63 @@ export interface TextOpts {
 type LS = CanvasRenderingContext2D & { letterSpacing?: string };
 const spacingStr = new Map<number, string>();
 
+/**
+ * 主画布上的文字走缓存：同一段文字连续画到第 2 帧起，就光栅化成小精灵，之后每帧只 drawImage。
+ * 原生画布（快手）上 fillText / strokeText 很贵，一帧四五十段文字是主要开销；浏览器里也省。
+ * 每帧都在变的文字（滚动数字等）达不到第 2 次命中，照旧直接画，不会反复建画布。
+ */
+const textCache = new Map<string, Sprite | number>();
+let textVer = -1;
+const TEXT_CACHE_MAX = 500;
+let measureCtx: CanvasRenderingContext2D | null = null;
+
 export function text(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, o: TextOpts = {}): void {
+  if (ctx === stage.ctx && s && (!o.baseline || o.baseline === 'middle')) {
+    if (textVer !== stage.version) {
+      textCache.clear();
+      textVer = stage.version;
+    }
+    const key = s + '\u0001' + (o.size ?? 14) + '|' + (o.weight ?? 400) + '|' + (o.family ?? CN) + '|' + (o.color ?? '') + '|' + (o.align ?? 'center') + '|' +
+      (o.stroke ?? '') + '|' + (o.strokeW ?? 3) + '|' + (o.spacing ?? 0) + '|' + (o.maxW ?? 0) + '|' + (o.shadow ? o.shadow.join(',') : '');
+    const hit = textCache.get(key);
+    if (hit === undefined) {
+      if (textCache.size >= TEXT_CACHE_MAX) textCache.clear();
+      textCache.set(key, 1);
+    } else {
+      const sp = typeof hit === 'number' ? buildText(key, s, o) : hit;
+      const a0 = ctx.globalAlpha;
+      if (o.alpha !== undefined) ctx.globalAlpha = a0 * o.alpha;
+      const al = o.align ?? 'center';
+      const ax = al === 'left' || al === 'start' ? sp.pad : al === 'right' || al === 'end' ? sp.w + sp.pad : sp.w / 2 + sp.pad;
+      ctx.drawImage(sp.c, x - ax, y - (sp.h / 2 + sp.pad), sp.w + sp.pad * 2, sp.h + sp.pad * 2);
+      ctx.globalAlpha = a0;
+      return;
+    }
+  }
+  drawText(ctx, s, x, y, o);
+}
+
+function buildText(key: string, s: string, o: TextOpts): Sprite {
+  if (!measureCtx) measureCtx = makeCanvas(1, 1)[1];
+  const size = o.size ?? 14;
+  measureCtx.font = font(size, o.weight ?? 400, o.family ?? CN);
+  const lm = measureCtx as LS;
+  if (o.spacing) lm.letterSpacing = o.spacing + 'px';
+  let w = measureCtx.measureText(s).width;
+  if (o.spacing) lm.letterSpacing = '0px';
+  if (o.maxW !== undefined) w = Math.min(w, o.maxW);
+  const sw = o.stroke ? (o.strokeW ?? 3) : 0;
+  const sh = o.shadow ? Math.max(Math.abs(o.shadow[0]), Math.abs(o.shadow[1])) : 0;
+  const pad = Math.ceil(sw / 2 + sh + 2);
+  const h = Math.ceil(size * 1.5);
+  const al = o.align ?? 'center';
+  const ax = al === 'left' || al === 'start' ? 0 : al === 'right' || al === 'end' ? w : w / 2;
+  const sp = sprite(w, h, pxRatio(), pad, (c) => drawText(c, s, ax, h / 2, { ...o, alpha: undefined, baseline: 'middle' }));
+  textCache.set(key, sp);
+  return sp;
+}
+
+function drawText(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, o: TextOpts): void {
   ctx.font = font(o.size ?? 14, o.weight ?? 400, o.family ?? CN);
   ctx.textAlign = o.align ?? 'center';
   ctx.textBaseline = o.baseline ?? 'middle';

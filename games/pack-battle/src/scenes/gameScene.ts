@@ -150,9 +150,10 @@ export class GameScene implements Scene {
     this.contB.visible = false;
     this.reportB = new Button('btn.report', { x: 302, y: 740, w: 72, h: 44 }, '战报', 'tag', 13);
     this.reportB.visible = false;
-    this.adB = new Button('btn.ad', { x: 65, y: 650, w: 260, h: 56 }, '', 'sealTag', 14);
+    this.adB = new Button('btn.ad', { x: 65, y: 650, w: 260, h: 56 }, '', 'reward', 14);
     this.adB.glyph = '▶';
     this.adB.fontSize = 19;
+    this.adB.pulse = 0.04;
     this.adB.visible = false;
     this.nextB = new Button('btn.tutNext', { x: 150, y: 470, w: 90, h: 34 }, '下一步', 'tag', 12);
     this.nextB.visible = false;

@@ -27,7 +27,8 @@ export interface UiEl {
   enabled: boolean;
 }
 
-export type BtnKind = 'plank' | 'sealTag' | 'coin' | 'paper' | 'tag' | 'speed';
+/** reward：看广告领奖励的按钮（金牌 + 光晕 + 扫光），要比同屏别的按钮更抢眼 */
+export type BtnKind = 'plank' | 'sealTag' | 'coin' | 'paper' | 'tag' | 'speed' | 'reward';
 
 export class Button {
   id: string;
@@ -123,6 +124,33 @@ export class Button {
         text(ctx, label, x + 26 + (r.w - 30) / 2 + 12, 1, { size: this.fontSize, weight: 900, color: C.ink, spacing: 3 });
         break;
       }
+      case 'reward': {
+        // 呼吸光晕
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha *= 0.55 + 0.3 * Math.sin(time * 3.4);
+        drawSprite(ctx, glowRect(r.w, r.h), x, y);
+        ctx.restore();
+        const bx = x + 22;
+        const bw = r.w - 22;
+        drawSprite(ctx, rewardPlate(bw, r.h - 8), bx, y + 4);
+        // 扫光：每 2.4 秒从左扫到右
+        const sk = (time % 2.4) / 0.7;
+        if (sk < 1) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(bx, y + 4, bw, r.h - 8, 12);
+          ctx.clip();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha *= Math.sin(sk * Math.PI) * 0.8;
+          drawSprite(ctx, shineBand(r.h), bx - 40 + sk * (bw + 40), y);
+          ctx.restore();
+        }
+        const sr = r.h * 0.46;
+        drawSprite(ctx, seal(this.glyph, sr, this.seed + 1), x, -sr);
+        text(ctx, label, bx + bw / 2 + sr * 0.55, 1, { size: this.fontSize + 2, weight: 900, color: '#fffaf0', stroke: '#5a2e0c', strokeW: 5, spacing: 3 });
+        break;
+      }
       case 'coin': {
         const rr = Math.min(r.w, r.h) / 2;
         drawSprite(ctx, coin(this.icon, rr, this.seed), -rr, -rr);
@@ -163,6 +191,46 @@ function glowRect(w: number, h: number) {
       ctx.roundRect(-14 + i * 2.5, -14 + i * 2.5, w + 28 - i * 5, h + 28 - i * 5, 18);
       ctx.fill();
     }
+  });
+}
+
+/** 金牌：上亮下暗的金色渐变 + 内高光线 + 深棕描边 */
+function rewardPlate(w: number, h: number) {
+  return cached('rplate|' + w + 'x' + h, w, h, 6, (ctx) => {
+    ctx.beginPath();
+    ctx.roundRect(0, 0, w, h, 12);
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#ffe9a3');
+    g.addColorStop(0.45, C.gold);
+    g.addColorStop(1, '#b87518');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#5a2e0c';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.roundRect(4, 4, w - 8, h - 8, 9);
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = 'rgba(255,248,215,0.75)';
+    ctx.stroke();
+  });
+}
+
+/** 斜向扫光带 */
+function shineBand(h: number) {
+  return cached('shine|' + h, 40, h, 0, (ctx) => {
+    const g = ctx.createLinearGradient(0, 0, 40, 0);
+    g.addColorStop(0, 'rgba(255,255,240,0)');
+    g.addColorStop(0.5, 'rgba(255,255,240,0.85)');
+    g.addColorStop(1, 'rgba(255,255,240,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(14, 0);
+    ctx.lineTo(40, 0);
+    ctx.lineTo(26, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    ctx.fill();
   });
 }
 
