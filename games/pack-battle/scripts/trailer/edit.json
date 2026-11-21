@@ -1,0 +1,33 @@
+{
+  "out": "marketing/trailer/pack-battle-20s.mp4",
+  "size": [1080, 2338],
+  "fps": 60,
+  "bpm": 110,
+  "music": { "file": "src/assets/music/battle.m4a", "from": 84.01, "gain": 0.3 },
+  "sfxGain": 1.4,
+  "segments": [
+    { "note": "1 龙炎，血条见底", "src": "boss", "beats": [0, 2], "in": 7.80, "out": 9.90, "zoom": 1.06, "focus": [0.5, 0.55] },
+    { "note": "2 凤凰复活", "src": "boss", "beats": [2, 3.5], "in": 10.44, "out": 11.09, "flash": 0.3 },
+    { "note": "3 倒带回空背包", "src": "arrange", "gain": 2, "beats": [3.5, 4.5], "in": 0.2, "out": 4.1, "rewind": true, "zoom": 1.15, "focus": [0.5, 0.3] },
+    { "note": "4 磨刀石卡到剑旁，流光", "src": "arrange", "gain": 2, "beats": [4.5, 6.5], "in": 0.138, "out": 1.229, "zoom": 1.15, "focus": [0.5, 0.3] },
+    { "note": "5 连放四件", "src": "arrange", "gain": 2, "beats": [6.5, 11], "in": 1.288, "out": 3.743, "zoom": 1.15, "focus": [0.5, 0.3], "kick": 0 },
+    { "note": "6 ★★ → ★★★", "src": "merge", "gain": 2, "beats": [11, 15], "in": 0.272, "out": 2.454, "focus": [0.5, 0.5] },
+    { "note": "7 第 1 → 10 轮", "src": "rounds", "gain": 2, "beats": [15, 17], "in": 0, "out": 1.867, "zoom": 1.2, "focus": [0.5, 0.3], "kick": 0 },
+    { "note": "8 拍火漆开战", "src": "fight", "beats": [17, 19], "in": 0.25, "out": 1.341 },
+    { "note": "9 毒蛛", "src": "foe3", "beats": [19, 20], "in": 2.577, "out": 3.122 },
+    { "note": "9 骷髅", "src": "foe4", "beats": [20, 21], "in": 2.593, "out": 3.138 },
+    { "note": "9 食人魔狂暴", "src": "foe5", "beats": [21, 22], "in": 6.90, "out": 7.445 },
+    { "note": "9 鼠群倒下", "src": "foe6", "beats": [22, 23], "in": 6.75, "out": 7.295 },
+    { "note": "9 黑骑士", "src": "foe8", "beats": [23, 24], "in": 2.593, "out": 3.138 },
+    { "note": "10 古龙登场", "src": "boss", "beats": [24, 27], "in": 0.90, "out": 2.536 },
+    { "note": "11 反打", "src": "boss", "beats": [27, 32], "in": 9.47, "out": 12.197 },
+    { "note": "11 最后一击慢放", "src": "boss", "beats": [32, 33], "in": 12.197, "out": 12.47, "zoom": 1.25, "focus": [0.35, 0.3], "flash": 0.6 },
+    { "note": "11 胜利", "src": "boss", "beats": [33, 34.5], "in": 12.47, "out": 13.288 },
+    { "note": "12 字标", "src": "title", "beats": [34.5, 36.6667], "in": 0, "out": 1.182, "zoom": 1.1, "focus": [0.5, 0.44], "flash": 0.5 }
+  ],
+  "captions": [
+    { "text": "要输了？", "size": 170, "beats": [0.05, 2], "y": 0.5 },
+    { "text": "全靠这么摆", "size": 150, "beats": [3.5, 6.5], "y": 0.72 },
+    { "text": "开打！", "size": 170, "beats": [17.3, 19], "y": 0.47 }
+  ]
+}

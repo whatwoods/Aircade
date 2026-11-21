@@ -326,9 +326,13 @@ const MINOR = new Set(['hit', 'shield', 'swish', 'tick', 'cloth', 'bubble', 'gul
 export type SfxName = keyof typeof R;
 
 /** 播放音效；arg 为音高偏移等参数 */
+/** 调试：每次真正播出的音效（拍摄模式记时间轴用） */
+export const sfxHook = { fn: null as ((name: string, delay: number) => void) | null };
+
 export function sfx(name: string, arg = 0, delay = 0): void {
   const r = R[name];
   if (!r || !gate(name, MINOR.has(name))) return;
+  sfxHook.fn?.(name, delay);
   try {
     const ctx = au.ctx!;
     const t = ctx.currentTime + 0.005 + delay;

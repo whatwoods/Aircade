@@ -977,6 +977,17 @@ URL 参数：
 
 **调试局**（v1.1）：凡是改状态的接口（`addGold`/`setGold`/`setHearts`/`gotoRound`/`boss`/`give`/`place`/`clearBag`/`clearStash`/`openBag`/`unlock`/`setShop`/`reroll`/`winBattle`/`loseBattle`，以及 `?round=`）都会把本局标记为 `run.debug`：不再写中途存档，结局不计最高分；`win()`/`lose()` 造出的结局同样不计。只读接口（`state`/`ui`/`simulate` 等）和 `startBattle` 不标记。
 
+### 8.1 拍摄模式（宣传片采集）
+
+`?debug=1&film=1` 额外挂载 `window.__film`（`src/debug/film.ts`，只在调试包里，TapTap / 快手版不含）。由 `scripts/trailer/shoot.ts` 通过 Playwright 驱动本机 Chrome，按 390×844 视口、DPR 4（画布 1560×3376）逐帧录制：
+
+- **逐帧时钟**：`enter(dpr)` 后主循环停用 rAF，`core/loop.ts` 的 `manualTick` 每次推进精确的 1/60 秒；`platform/now.ts` 的 `filmClock` 让输入长按、震屏等也走拍摄时钟，同一种子每次画面一致。
+- **画面**：每帧 `new VideoFrame(canvas)` 交给 WebCodecs（H.264 High），裸流写回 Node，再用 ffmpeg 封装（不重编码）。
+- **声音**：每个镜头一个 `OfflineAudioContext`（`audio.ts` 的 `initFilmAudio`），每帧 `suspend(t)` / `resume()` 与画面同步，录下的就是游戏原声；拍摄时不放背景音乐（`au.film` 下 `setMusic`/`updateMusic` 直接返回）。`sfx.ts` 的 `sfxHook` 记下每个音效的时刻，输出 `<镜头>.events.json`，剪辑时用来卡点。
+- **API**：`enter(dpr)`、`idle(n)`（不录、空转 n 帧）、`begin(name, maxSec)` / `step(n)` / `end()`、`press/moveTo/release/tap`（CSS 坐标，按帧推进，叠画手指圆点）、`rotate()`、`setBag(layout, legend)`、`setRot(uid, rot)`、`title()`、`snap(name)`（当前画面存 PNG）、`logo(name)`（标题横幅字标，透明 PNG）、`ticks`（拍摄模式累计帧数）。没在录时 `step` 等同空转，可用来彩排。
+
+宣传片流水线（`marketing/trailer/plan.md`）：`pnpm trailer:shoot [镜头…]` → `marketing/trailer/raw/*.mov`；`pnpm trailer:captions` 渲染字幕 PNG；`pnpm trailer:edit` 按 `scripts/trailer/edit.json`（按 110 BPM 的拍子排段落、入出点、推镜、白闪、倒带、字幕）出 `pack-battle-20s.mp4` 和无字幕版；`pnpm trailer:cover` 按 600×800 视口重演龙战、停在复活前血条 9/102 那一帧，叠字标、「要输了？」和血条红圈，出 3:4 封面 `cover-3x4.jpg`（1080×1440）。`scripts/trailer/find-boss.ts` 用模拟器挑「龙炎打到见底 → 凤凰复活 → 反杀」的第 10 轮背包。
+
 ---
 
 ## 9. 性能预算与策略

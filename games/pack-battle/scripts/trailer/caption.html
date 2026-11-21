@@ -1,0 +1,129 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>captions</title>
+<body style="margin:0;background:#000">
+<script type="module">
+  import '@fontsource/ma-shan-zheng/chinese-simplified-400.css';
+  // 字幕卡：毛笔字、奶油色字身、深棕粗描边 + 投影；返回透明 PNG
+  window.render = async (text, size) => {
+    const font = `400 ${size}px "Ma Shan Zheng"`;
+    await document.fonts.load(font, text);
+    const c = document.createElement('canvas');
+    const g = c.getContext('2d');
+    g.font = font;
+    const w = Math.ceil(g.measureText(text).width);
+    const pad = Math.round(size * 0.35);
+    c.width = w + pad * 2;
+    c.height = Math.round(size * 1.3) + pad * 2;
+    g.font = font;
+    g.textBaseline = 'middle';
+    g.textAlign = 'center';
+    const x = c.width / 2;
+    const y = c.height / 2 + size * 0.04;
+    g.lineJoin = 'round';
+    g.shadowColor = 'rgba(0,0,0,0.55)';
+    g.shadowBlur = size * 0.12;
+    g.shadowOffsetY = size * 0.06;
+    g.strokeStyle = '#2a140a';
+    g.lineWidth = size * 0.2;
+    g.strokeText(text, x, y);
+    g.shadowColor = 'transparent';
+    g.strokeStyle = '#c2402c';
+    g.lineWidth = size * 0.09;
+    g.strokeText(text, x, y);
+    g.fillStyle = '#fff3c4';
+    g.fillText(text, x, y);
+    return c.toDataURL('image/png');
+  };
+  const img = (url) => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
+
+  // 手绘圈：两圈略错开的椭圆，起笔收笔不闭合
+  function inkLoop(g, cx, cy, rx, ry, color, width, seed) {
+    let s = seed;
+    const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647) - 0.5;
+    g.save();
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    for (let pass = 0; pass < 2; pass++) {
+      g.beginPath();
+      const a0 = -2.4 + pass * 0.35;
+      const span = Math.PI * 2 + 0.5;
+      for (let k = 0; k <= 64; k++) {
+        const a = a0 + (span * k) / 64;
+        const wob = 1 + rnd() * 0.025 + pass * 0.04;
+        const x = cx + Math.cos(a) * rx * wob + pass * 6;
+        const y = cy + Math.sin(a) * ry * wob - pass * 3;
+        if (k === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.strokeStyle = color;
+      g.lineWidth = width * (pass ? 0.7 : 1);
+      g.stroke();
+    }
+    g.restore();
+  }
+
+  // 3:4 封面：实机底图 + 暗角 + 字标 + 大字 + 血条红圈
+  window.cover = async (o) => {
+    const [bg, logo] = await Promise.all([img(o.bg), img(o.logo)]);
+    const W = o.w, H = o.h;
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const g = c.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(bg, 0, 0, W, H);
+    // 暗角：中间字的位置压暗一点，四周收边
+    const v = g.createRadialGradient(W / 2, H * 0.47, W * 0.15, W / 2, H * 0.47, W * 0.95);
+    v.addColorStop(0, 'rgba(20,8,2,0.0)');
+    v.addColorStop(1, 'rgba(20,8,2,0.55)');
+    g.fillStyle = v;
+    g.fillRect(0, 0, W, H);
+    const band = g.createLinearGradient(0, o.text.y - o.text.size, 0, o.text.y + o.text.size);
+    band.addColorStop(0, 'rgba(20,8,2,0)');
+    band.addColorStop(0.5, 'rgba(20,8,2,0.42)');
+    band.addColorStop(1, 'rgba(20,8,2,0)');
+    g.fillStyle = band;
+    g.fillRect(0, o.text.y - o.text.size, W, o.text.size * 2);
+    // 血条红圈
+    const r = o.ring;
+    inkLoop(g, r.x, r.y, r.rx, r.ry, 'rgba(42,20,10,0.9)', 20, 7);
+    inkLoop(g, r.x, r.y, r.rx, r.ry, '#d23a2a', 11, 7);
+    // 字标（游戏标题横幅原样）
+    const L = o.logoBox;
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,0.5)';
+    g.shadowBlur = 24;
+    g.shadowOffsetY = 8;
+    g.translate(L.x + L.w / 2, L.y + (L.w * logo.height) / logo.width / 2);
+    g.rotate(L.rot);
+    g.drawImage(logo, -L.w / 2, -(L.w * logo.height) / logo.width / 2, L.w, (L.w * logo.height) / logo.width);
+    g.restore();
+    // 大字
+    const t = o.text;
+    const font = `400 ${t.size}px "Ma Shan Zheng"`;
+    await document.fonts.load(font, t.str);
+    g.font = font;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.lineJoin = 'round';
+    g.save();
+    g.translate(t.x, t.y);
+    g.rotate(t.rot);
+    g.shadowColor = 'rgba(0,0,0,0.6)';
+    g.shadowBlur = t.size * 0.14;
+    g.shadowOffsetY = t.size * 0.06;
+    g.strokeStyle = '#2a140a';
+    g.lineWidth = t.size * 0.2;
+    g.strokeText(t.str, 0, 0);
+    g.shadowColor = 'transparent';
+    g.strokeStyle = '#c2402c';
+    g.lineWidth = t.size * 0.09;
+    g.strokeText(t.str, 0, 0);
+    g.fillStyle = '#fff3c4';
+    g.fillText(t.str, 0, 0);
+    g.restore();
+    return c.toDataURL('image/png');
+  };
+  window.ready = true;
+</script>

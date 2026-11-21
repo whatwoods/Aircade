@@ -3,7 +3,7 @@ import './styles.css';
 import { resumeAudio, suspendAudio, unlockAudio } from './audio/audio.ts';
 import { updateMusic } from './audio/music.ts';
 import { QUALITY, SHOP_POOL } from './config.ts';
-import { now } from './platform/now.ts';
+import { filmClock, now } from './platform/now.ts';
 import { adPlaying, initAds } from './platform/ads.ts';
 import { bootOnFirstDraw, claimCanvas } from './platform/yoola/render.ts';
 import { kw } from './platform/yoola/kwai.ts';
@@ -117,7 +117,7 @@ function boot(): void {
   }
   function runWarm(): void {
     const t0 = now();
-    while (warm.length && now() - t0 < 4) warm.shift()!();
+    while (warm.length && (filmClock.on || now() - t0 < 4)) warm.shift()!();
   }
 
   // 自适应画质：连续 2 秒平均帧间隔 > 18ms 且本帧 CPU 偏高 → 粒子减半，DPR 降一档。
@@ -196,6 +196,7 @@ function boot(): void {
   if (import.meta.env.MODE !== 'tap' && !__YOOLA__ && DEBUG) {
     void import('./debug/debug.ts').then((m) => {
       m.installDebug();
+      if (params.get('film') === '1') void import('./debug/film.ts').then((f) => f.installFilm());
       if (roundParam >= 1 && roundParam <= 10) {
         const api = (window as unknown as { __game: { gotoRound: (n: number, b: string) => unknown } }).__game;
         api.gotoRound(roundParam, 'mid');

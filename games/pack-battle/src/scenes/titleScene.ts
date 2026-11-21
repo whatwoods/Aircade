@@ -419,7 +419,7 @@ function star4(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, r
 
 // ---------- 静态精灵 ----------
 
-function bannerSprite(): Sprite {
+export function bannerSprite(): Sprite {
   return cached('title.banner', 330, 180, 16, (ctx, r) => {
     // 羊皮纸横幅（两端卷边）
     drawPaper(ctx, r, 0, 0, 330, 180, { seed: 41, burn: 0.9, r: 6 });
@@ -466,7 +466,7 @@ function bannerSprite(): Sprite {
 }
 
 /** Logo 字（3 帧沸腾：英文描边每帧抖动不同） */
-function logoSprite(frame: number): Sprite {
+export function logoSprite(frame: number): Sprite {
   return cached('title.logo' + frame, 330, 180, 16, (ctx) => {
     const jx = [0, 0.6, -0.5][frame];
     const jy = [0, -0.4, 0.5][frame];

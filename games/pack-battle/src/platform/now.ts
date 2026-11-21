@@ -25,6 +25,10 @@ function yoolaNow(): number {
   return n * unit;
 }
 
+/** 拍摄模式（仅调试）：时间由逐帧时钟给出 */
+export const filmClock = { on: false, ms: 0 };
+
 export function now(): number {
+  if (filmClock.on) return filmClock.ms;
   return __YOOLA__ ? yoolaNow() : performance.now();
 }

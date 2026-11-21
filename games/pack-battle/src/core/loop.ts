@@ -24,13 +24,20 @@ let acc = 0;
 let last = 0;
 let running = false;
 
+/** 拍摄模式（仅调试）：停掉 rAF，由 manualTick 逐帧推进 */
+export const loopCtl = { manual: false, tick: null as ((stamp: number) => void) | null };
+
+export function manualTick(stampMs: number): void {
+  loopCtl.tick?.(stampMs);
+}
+
 export function startLoop(frame: () => void): void {
   if (running) return;
   running = true;
   const tick = (stamp: number): void => {
     if (!running) return;
     // 快手端没有自己的 rAF：帧由 kwaiStandard/main.js 的循环调 AIGCUtils.Render.draw 驱动
-    if (!__YOOLA__) requestAnimationFrame(tick);
+    if (!__YOOLA__ && !loopCtl.manual) requestAnimationFrame(tick);
     const t0 = now();
     const raw = last === 0 ? 1 / 60 : Math.min(0.05, Math.max(0, (stamp - last) / 1000));
     last = stamp;
@@ -46,6 +53,10 @@ export function startLoop(frame: () => void): void {
     if (raw > 0) clock.fps += (1 / raw - clock.fps) * 0.05;
     frame();
     clock.frameMs += (now() - t0 - clock.frameMs) * 0.1;
+  };
+  loopCtl.tick = (stamp: number): void => {
+    if (!loopCtl.manual) return;
+    tick(stamp);
   };
   if (__YOOLA__) bindDraw(() => tick(now()));
   else requestAnimationFrame(tick);

@@ -14,7 +14,12 @@
     "balance": "node scripts/balance.ts",
     "bot": "node scripts/bot.ts",
     "ad-rules": "node scripts/ad-rules.ts",
-    "icons": "node scripts/icons.ts"
+    "icons": "node scripts/icons.ts",
+    "trailer:shoot": "node scripts/trailer/shoot.ts",
+    "trailer:captions": "node scripts/trailer/captions.ts",
+    "trailer:edit": "node scripts/trailer/edit.ts && node scripts/trailer/edit.ts --nocap",
+    "trailer:cover": "node scripts/trailer/shoot.ts cover34 && node scripts/trailer/cover.ts",
+    "trailer": "pnpm trailer:shoot && pnpm trailer:captions && pnpm trailer:edit && node scripts/trailer/cover.ts"
   },
   "dependencies": {
     "@fontsource/kalam": "5.3.0",
@@ -23,6 +28,7 @@
   "devDependencies": {
     "@fontsource/ma-shan-zheng": "5.3.1",
     "@types/node": "~24.19.2",
+    "playwright-core": "^1.65.1",
     "typescript": "~5.9.3",
     "vite": "~8.3.4"
   },

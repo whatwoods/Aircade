@@ -254,7 +254,7 @@ function scheduleStep(t: Track, when: number): void {
 export function setMusic(mode: MusicMode, force = false): void {
   if (mode === want && !force) return;
   want = mode;
-  if (!au.ctx || !au.ready) return;
+  if (!au.ctx || !au.ready || au.film) return;
   const ctx = au.ctx;
   const now = ctx.currentTime;
   for (const tr of tracks) {
@@ -294,7 +294,7 @@ export function musicMode(): MusicMode {
 /** 每帧调用：lookahead 100ms */
 export function updateMusic(): void {
   const ctx = au.ctx;
-  if (!ctx || !au.ready || ctx.state !== 'running') return;
+  if (!ctx || !au.ready || au.film || ctx.state !== 'running') return;
   const now = ctx.currentTime;
   for (let i = tracks.length - 1; i >= 0; i--) {
     const t = tracks[i];

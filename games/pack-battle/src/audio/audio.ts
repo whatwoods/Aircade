@@ -20,6 +20,8 @@ export const au = {
   fast: false,
   ready: false,
   duck: 0,
+  /** 拍摄模式（仅调试）：跑在 OfflineAudioContext 上，暂停态也照常排音效，不放音乐 */
+  film: false,
 };
 
 export const SFX_GAIN = 0.8;
@@ -79,6 +81,7 @@ export function initGraph(ctx: BaseAudioContext): void {
 }
 
 export function unlockAudio(): void {
+  if (au.film) return;
   try {
     if (!au.ctx) {
       const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -126,7 +129,7 @@ export function duckMusic(db = 4, sec = 0.2): void {
 /** 限流检查：同名最短 30ms；返回是否允许播放 */
 export function gate(name: string, minor = false, minGap = 0.03): boolean {
   const ctx = au.ctx;
-  if (!ctx || !au.ready || ctx.state !== 'running') return false;
+  if (!ctx || !au.ready || (ctx.state !== 'running' && !au.film)) return false;
   if (!settings.sfx) return false;
   if (minor && au.fast && Math.random() < 0.5) return false;
   const now = ctx.currentTime;
@@ -153,4 +156,19 @@ export function voice(nodes: AudioScheduledSourceNode[], end: number): void {
     }
   }
   vs.push({ nodes, end });
+}
+
+/** 拍摄模式：把音频图搭到离线上下文上（每个镜头一个） */
+export function initFilmAudio(ctx: OfflineAudioContext): void {
+  au.film = true;
+  au.voices = [];
+  au.last.clear();
+  initGraph(ctx);
+  au.music.gain.value = 0;
+  if (!au.ready) {
+    au.ready = true;
+    const l = onReady;
+    onReady = [];
+    for (const f of l) f();
+  }
 }

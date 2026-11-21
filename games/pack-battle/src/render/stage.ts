@@ -18,6 +18,8 @@ export const stage = {
   oy: 0,
   desktop: false,
   safe: { t: 0, r: 0, b: 0, l: 0 },
+  /** 拍摄模式（仅调试）：不受像素总量上限约束 */
+  film: false,
   /** 每次尺寸变化 +1，用于缓存失效 */
   version: 0,
 };
@@ -56,8 +58,8 @@ export function resizeStage(): boolean {
   const vp = __YOOLA__ ? yoolaViewport() : null;
   const vw = Math.max(1, vp ? vp.w : window.innerWidth);
   const vh = Math.max(1, vp ? vp.h : window.innerHeight);
-  let dpr = Math.min(stage.dprCap, vp ? vp.dpr : window.devicePixelRatio || 1);
-  if (vw * vh * dpr * dpr > 4.2e6) dpr = Math.max(1, Math.sqrt(4.2e6 / (vw * vh)));
+  let dpr = stage.film ? stage.dprCap : Math.min(stage.dprCap, vp ? vp.dpr : window.devicePixelRatio || 1);
+  if (!stage.film && vw * vh * dpr * dpr > 4.2e6) dpr = Math.max(1, Math.sqrt(4.2e6 / (vw * vh)));
   const { t, r, b, l } = stage.safe;
   const aw = vw - l - r;
   const ah = vh - t - b;
