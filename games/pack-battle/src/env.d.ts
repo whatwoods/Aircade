@@ -7,4 +7,8 @@ interface ImportMetaEnv {
   /** TapTap 激励视频 / 插屏广告单元 ID（.env.tap，只有 TapTap 构建用） */
   readonly VITE_TAP_AD_REWARDED?: string;
   readonly VITE_TAP_AD_INTERSTITIAL?: string;
+  /** TapTap 排行榜（最高分 / 每日挑战）与分享模板 ID（官方小游戏 MCP 创建） */
+  readonly VITE_TAP_LB_BEST?: string;
+  readonly VITE_TAP_LB_DAILY?: string;
+  readonly VITE_TAP_SHARE_TEMPLATE?: string;
 }

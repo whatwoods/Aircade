@@ -2,6 +2,7 @@
 import { FX } from '../../config.ts';
 import { settings } from '../../core/storage.ts';
 import { now } from '../../platform/now.ts';
+import { tapVibrate } from '../../platform/tapOpen.ts';
 import { kw } from '../../platform/yoola/kwai.ts';
 import { noise1 } from '../noise.ts';
 
@@ -32,11 +33,11 @@ export function vibrate(p: number | number[]): void {
   if (t - shake.lastVib < FX.vibrateGapMs) return;
   shake.lastVib = t;
   try {
-    if (__YOOLA__) {
-      // 快手没有 navigator.vibrate：按总时长挑强度
-      const ms = Array.isArray(p) ? p.reduce((a, b) => a + b, 0) : p;
-      kw().KwaiDevice.vibrateShort(ms >= 60 ? 'heavy' : ms >= 20 ? 'medium' : 'light');
-    } else if (typeof navigator.vibrate === 'function') navigator.vibrate(p);
+    // 快手、TapTap 走平台震动（iOS 没有 navigator.vibrate）：按总时长挑强度
+    const ms = Array.isArray(p) ? p.reduce((a, b) => a + b, 0) : p;
+    if (__YOOLA__) kw().KwaiDevice.vibrateShort(ms >= 60 ? 'heavy' : ms >= 20 ? 'medium' : 'light');
+    else if (tapVibrate(ms)) return;
+    else if (typeof navigator.vibrate === 'function') navigator.vibrate(p);
   } catch {
     /* ignore */
   }

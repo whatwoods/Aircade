@@ -30,6 +30,8 @@ export function createTapAds(rewardedId: string, interstitialId: string): AdProv
     setTimeout(() => void rewarded?.load?.().then(() => (ready = true)).catch(() => undefined), RELOAD_MS);
   };
   rewarded?.onLoad(() => (ready = true));
+  // 创建后要主动 load 一次，平台只在关闭后自动拉下一份
+  void rewarded?.load?.().catch(() => undefined);
   rewarded?.onError(() => {
     ready = false;
     reload();
@@ -44,8 +46,15 @@ export function createTapAds(rewardedId: string, interstitialId: string): AdProv
   let iReady = false;
   let closeInterstitial: (() => void) | null = null;
   const interstitial = interstitialId && tap.createInterstitialAd ? tap.createInterstitialAd({ adUnitId: interstitialId }) : null;
+  const reloadInterstitial = (): void => {
+    setTimeout(() => void interstitial?.load?.().catch(() => undefined), RELOAD_MS);
+  };
   interstitial?.onLoad(() => (iReady = true));
-  interstitial?.onError(() => (iReady = false));
+  interstitial?.onError(() => {
+    iReady = false;
+    reloadInterstitial();
+  });
+  void interstitial?.load?.().catch(() => undefined);
   interstitial?.onClose(() => {
     iReady = false;
     closeInterstitial?.();
@@ -73,6 +82,7 @@ export function createTapAds(rewardedId: string, interstitialId: string): AdProv
         interstitial.show().catch(() => {
           iReady = false;
           closeInterstitial = null;
+          reloadInterstitial();
           resolve();
         });
       }),

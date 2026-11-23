@@ -1393,9 +1393,21 @@ URL 参数：
 
 **播放期间**：挂起音频，失焦不弹暂停（`adPlaying()`），界面按钮不响应。
 
-**TapTap 构建**：`pnpm build:tap` 用 `--mode tap` 构建到 `dist-tap/`，再由 `scripts/pack-tap.ts` 打成 `release/pack-battle-tap-<版本>.zip`（根目录只有 `pack-battle/`，`index.html` 在它第一层，符合 `taptap-cli upload-h5-package` 的预检）。广告单元 ID 填在 `.env.tap`，没填全只警告，缺的那类广告不出现。
+**广告位 ID**：由 TapTap 官方小游戏 MCP（`@taptap/instant-games-open-mcp`）的 `check_ads_status` 按游戏屏幕方向自动取得，不向平台索要、不手填、不复用别的应用的值。竖屏为 `1054324`，激励视频和插屏共用。`tap.ts` 创建广告后主动 `load()` 一次（平台只在关闭后自动拉下一条），出错或 `show()` 失败 30 秒后重新加载。
 
-和网页版只差平台层，玩法代码共用。TapTap 版去掉调试接口（能白拿广告奖励），URL 参数（`?debug`、`?seed`、`?round`、`?notut`）一律不认；打包脚本发现包里有 `__game` 就报错退出。之后的 TapTap 登录、排行榜、云存档也放进 `src/platform/`，用 `import.meta.env.MODE === 'tap'` 判断，构建时求值，网页包里不留代码。
+**TapTap 构建**：`pnpm build:tap` 用 `--mode tap` 构建到 `dist-tap/`，再由 `scripts/pack-tap.ts` 打成 `release/pack-battle-tap-<版本>.zip`（根目录只有 `pack-battle/`，`index.html` 在它第一层，符合 `taptap-cli upload-h5-package` 的预检）。广告位、排行榜和分享模板 ID 都在 `.env.tap`，广告没填全只警告，缺的那类广告不出现。
+
+**TapTap 开放能力**（`src/platform/tapOpen.ts`，只进 TapTap 包）：
+
+| 能力 | 服务端 | 游戏里 |
+|---|---|---|
+| 排行榜 | MCP `create_leaderboard` 建两张、已发布：「最高分」（永久、取最佳）`if0nxl4td5s344rn0p`；「每日挑战」（每天 0 点重置、取最佳）`p847ywawfrt86t2lf9` | 结局时按模式提交总分（调试局、0 分不提交）；结局页多一个「排行」按钮，打开对应的平台榜单 |
+| 分享 | MCP `create_share_template`，文案「比比谁的背包强」（上限 21 字节 = 7 个汉字），模板 `ST179544930045696WRPX39T`，已通过 | 「分享」拉起 `tap.showShareboard`；不可用时退回网页的系统分享 / 下载证书 |
+| 震动 | — | `vibrate()` 走 `tap.vibrateShort`（按时长选 light / medium / heavy），iOS 也有震感 |
+
+有排行榜时结局页按钮从三个变成四个：「再来一局」144 宽、字号 18，「排行」「分享」「标题」各 56 宽。云存档没做：本地存档够用，跨设备同步的价值不抵两套文件接口的工作量。
+
+和网页版只差平台层，玩法代码共用。TapTap 版去掉调试接口（能白拿广告奖励），URL 参数（`?debug`、`?seed`、`?round`、`?notut`）一律不认；打包脚本发现包里有 `__game` 就报错退出。之后的 TapTap 登录、云存档也放进 `src/platform/`，用 `import.meta.env.MODE === 'tap'` 判断，构建时求值，网页包里不留代码。
 
 **调试**（网页版开发时）：`__game.ads('ended' | 'closed' | 'failed' | null)` 切假广告，`state()` 多了 `adOffer`、`adRevives`、`adBoth`、`adSupply`、`adGold`。规则检查 `pnpm ad-rules`。
 

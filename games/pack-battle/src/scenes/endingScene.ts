@@ -16,6 +16,7 @@ import { C, paper } from '../render/kit.ts';
 import { drawStandee, standeeHeight } from '../render/portraits.ts';
 import { LW, pxRatio, stage } from '../render/stage.ts';
 import { HAND, drawSprite, newCanvas, num, text } from '../render/text.ts';
+import { tapLeaderboardReady, tapOpenLeaderboard, tapShare, tapSubmitScore } from '../platform/tapOpen.ts';
 import { kw } from '../platform/yoola/kwai.ts';
 import { Button, drawStamp, showToast, type UiEl } from '../render/ui/widgets.ts';
 import type { EndingData } from './sceneManager.ts';
@@ -49,6 +50,8 @@ export class EndingScene implements Scene {
   private again: Button;
   private share: Button;
   private title: Button;
+  /** TapTap 构建：平台排行榜（最高分 / 每日挑战） */
+  private rank: Button | null = null;
   /** 刚通关时：进入无尽 */
   private endlessB: Button | null = null;
   /** 分享图（证书画完后预先生成：分享必须在点击的同一时刻发起，不能再等异步出图） */
@@ -84,6 +87,7 @@ export class EndingScene implements Scene {
     this.again.glyph = '↻';
     this.share = new Button('btn.share', { x: 218, y: 728, w: 66, h: 64 }, '分享', 'paper', 33);
     this.title = new Button('btn.title', { x: 292, y: 728, w: 68, h: 64 }, '标题', 'paper', 32);
+    if (tapLeaderboardReady(!!d.daily)) this.rank = new Button('btn.rank', { x: 156, y: 728, w: 64, h: 64 }, '排行', 'paper', 35);
     if (d.resume) {
       this.endlessB = new Button('btn.endless', { x: 30, y: 660, w: 330, h: 56 }, '无尽模式 ›', 'plank', 34);
       this.endlessB.fontSize = 22;
@@ -101,6 +105,7 @@ export class EndingScene implements Scene {
     else if (d.daily) this.isRecord = submitDaily({ date: d.daily, score: d.score, round: d.round, cleared: d.cleared });
     else this.isRecord = submitBest({ score: d.score, round: d.round, cleared: d.cleared, date: Date.now() });
     this.best = this.isRecord ? { score: d.score } : prev;
+    if (!d.debug) tapSubmitScore(!!d.daily, d.score);
     if (!d.debug && !d.daily && d.cleared && unlockTier(d.tier)) this.unlocked = d.tier + 1;
     setMusic(null);
     if (this.d.cleared) {
@@ -127,13 +132,23 @@ export class EndingScene implements Scene {
     this.py = Math.max(40, Math.round((H - total) / 2));
     const by = Math.min(H - 80, this.py + this.ph + 22 + extra);
     if (this.endlessB) this.endlessB.r = { x: 30, y: by - extra, w: 330, h: 56 };
-    this.again.r = { x: 30, y: by, w: 180, h: 64 };
-    this.share.r = { x: 218, y: by, w: 66, h: 64 };
-    this.title.r = { x: 292, y: by, w: 68, h: 64 };
+    if (this.rank) {
+      // 四个按钮：三张纸签各 56 宽，「再来一局」字号收小
+      this.again.r = { x: 30, y: by, w: 144, h: 64 };
+      this.again.fontSize = 18;
+      this.rank.r = { x: 180, y: by, w: 56, h: 64 };
+      this.share.r = { x: 242, y: by, w: 56, h: 64 };
+      this.title.r = { x: 304, y: by, w: 56, h: 64 };
+    } else {
+      this.again.r = { x: 30, y: by, w: 180, h: 64 };
+      this.share.r = { x: 218, y: by, w: 66, h: 64 };
+      this.title.r = { x: 292, y: by, w: 68, h: 64 };
+    }
   }
 
   private buttons(): Button[] {
-    return this.endlessB ? [this.endlessB, this.again, this.share, this.title] : [this.again, this.share, this.title];
+    const row = this.rank ? [this.again, this.rank, this.share, this.title] : [this.again, this.share, this.title];
+    return this.endlessB ? [this.endlessB, ...row] : row;
   }
 
   /** 离开结局页：够格就先放一条插屏 */
@@ -151,7 +166,9 @@ export class EndingScene implements Scene {
       const mode = { tier: this.d.tier, daily: this.d.daily };
       void this.leave(() => gotoScene(() => factories.game({ tutorial: false, mode })));
     }
-    else if (b === this.share) this.doShare();
+    else if (b === this.rank) {
+      if (!tapOpenLeaderboard(!!this.d.daily)) showToast('排行榜暂时打不开', 195, b.r.y - 20);
+    } else if (b === this.share) this.doShare();
     else void this.leave(() => gotoScene(() => factories.title()));
   }
 
@@ -213,6 +230,7 @@ export class EndingScene implements Scene {
       }
       return;
     }
+    if (tapShare()) return;
     const f = this.shareFile;
     if (!f) {
       showToast('证书还在生成', 195, this.share.r.y - 20);
@@ -396,6 +414,7 @@ export class EndingScene implements Scene {
     ctx.globalAlpha *= a;
     this.endlessB?.draw(ctx, this.t, real);
     this.again.draw(ctx, this.t, real);
+    this.rank?.draw(ctx, this.t, real);
     this.share.draw(ctx, this.t, real);
     this.title.draw(ctx, this.t, real);
     ctx.restore();
