@@ -577,7 +577,7 @@ export function bagFrame(o: BagFrameOpts): Sprite {
     // 侧皮带（外框下面）
     if (o.straps) {
       for (const sx of [W * 0.18, W * 0.82]) {
-        const sp = rectPts(sx - 9, -6, 18, H + 12, 3);
+        const sp = rectPts(sx - 9, 0, 18, H + 6, 3);
         fillPts(ctx, sp, pat(ctx, 'leatherDark', ratio));
         inkStroke(ctx, sp, true, 1.4, C.ink, 9, { unit: 1, jitter: 0.5, dry: false });
       }
@@ -721,21 +721,23 @@ export function bagFrame(o: BagFrameOpts): Sprite {
       cornerFill(1, H - 1, 1, -1, 23);
       cornerFill(W - 1, H - 1, -1, -1, 24);
     }
-    // 翻盖 + 扣具
+    // 翻盖 + 扣具：压在上边框里，不伸出外框（伸出去会钻到敌情卡、对决带下面，像一条被挡住的栏）
     if (o.flap) {
       const fw = W * 0.5;
       const fx = (W - fw) / 2;
-      const fp = rectPts(fx, -12, fw, 12 + f * 0.6, 8);
+      const fh = f - 2;
+      const fp = rectPts(fx, 1, fw, fh, 6);
       fillPts(ctx, fp, pat(ctx, 'leatherDark', ratio));
       ctx.fillStyle = 'rgba(0,0,0,0.25)';
-      ctx.fillRect(fx + 4, f * 0.6 - 3, fw - 8, 3);
+      ctx.fillRect(fx + 4, fh - 2, fw - 8, 3);
       inkStroke(ctx, fp, true, 1.6, C.ink, 31, { unit: 1, jitter: 0.5, dry: false });
-      const bw = 26;
-      const bh = 18;
-      const bp = rectPts(W / 2 - bw / 2, -6 - bh / 2 + 2, bw, bh, 4);
-      brassShape(ctx, bp, W / 2 - bw / 2, -6 - bh / 2 + 2, bw, bh, 33, 1.4);
+      const bw = 24;
+      const bh = 11;
+      const by = 1 + (fh - bh) / 2;
+      const bp = rectPts(W / 2 - bw / 2, by, bw, bh, 4);
+      brassShape(ctx, bp, W / 2 - bw / 2, by, bw, bh, 33, 1.4);
       ctx.fillStyle = C.ink;
-      ctx.fillRect(W / 2 - 1.5, -6 - 4 + 2, 3, 8);
+      ctx.fillRect(W / 2 - 1.5, by + 3, 3, bh - 6);
     }
   });
 }

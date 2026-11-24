@@ -177,6 +177,8 @@ export interface RunState {
   adSupply?: boolean;
   /** 败北补给，下次整理时发放 */
   adGold?: number;
+  /** 本局已用过备战金币广告 */
+  adPrep?: boolean;
   /** 通关那一刻剩下的心（结算明细用；无尽里心会再掉） */
   clearHearts?: number;
   /** 被调试接口改过：不存档、不计最高分 */

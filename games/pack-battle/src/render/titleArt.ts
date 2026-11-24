@@ -1,4 +1,4 @@
-// 标题页行囊的手绘图（GPT Image，透明底）；没加载好时标题页用 closedBag() 的程序化画法
+// 标题页行囊的手绘图（GPT Image，透明底）；没加载好之前标题页不画行囊，到手后再播落下动画
 import { kw } from '../platform/yoola/kwai.ts';
 import { TITLE_BAG_URL } from './artUrls.ts';
 

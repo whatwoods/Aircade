@@ -17,7 +17,11 @@ export interface Scene {
   update(dt: number, raw: number): void;
   /** 固定 120Hz 物理子步 */
   step(h: number): void;
-  draw(ctx: CanvasRenderingContext2D): void;
+  /** withOverlays = false：只画场景本身（弹窗冻结底图时用） */
+  draw(ctx: CanvasRenderingContext2D, withOverlays?: boolean): void;
+  /** 有弹窗（含正在关闭的）时返回 true：底下的场景冻结成一张图，每帧只画弹窗 */
+  freezeUnder?(): boolean;
+  drawOverlays?(ctx: CanvasRenderingContext2D): void;
   ui(): UiEl[];
   /** 失焦 / 切后台：自动暂停 */
   autoPause(): void;

@@ -1,46 +1,28 @@
-// 导出应用图标：起一个临时 Vite 开发服务器，用无头 Chrome 截 scripts/icon/ 页面，存到 public/icons/ 和快手 yoola-assets/
-// 用法：pnpm icons（需要本机装有 Chrome；换了行囊图后重跑一次）
-import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
-import { promisify } from 'node:util';
-import { createServer } from 'vite';
+// 导出应用图标：终版图标 marketing/icon/icon.png（1024，不入库）→ 各尺寸 PNG
+//   public/icons/：favicon-32、apple-touch-icon（180）、icon-512（分享卡片）
+//   yoola/package/yoola-assets/icon.png：快手平台素材 220
+// 用法：pnpm icons（macOS 自带 sips 缩放；换了终版图标后重跑）
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 
-const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-if (!existsSync(CHROME)) {
-  console.error('找不到 Chrome，用 CHROME=<路径> 指定');
+const root = resolve(import.meta.dirname, '..');
+const SRC = resolve(root, 'marketing/icon/icon.png');
+if (!existsSync(SRC)) {
+  console.error('找不到终版图标：' + relative(root, SRC));
   process.exit(1);
 }
 
-const OUT = resolve(import.meta.dirname, '../public/icons');
-mkdirSync(OUT, { recursive: true });
-
-const KWAI = resolve(import.meta.dirname, '../yoola/package/yoola-assets');
-const ICONS: { file: string; size: number; bare?: boolean }[] = [
-  { file: resolve(OUT, 'icon-512.png'), size: 512 },
-  { file: resolve(OUT, 'apple-touch-icon.png'), size: 180 },
-  { file: resolve(OUT, 'favicon-32.png'), size: 32, bare: true },
-  // 快手平台素材：220×220 PNG
-  { file: resolve(KWAI, 'icon.png'), size: 220 },
+const OUT: { file: string; size: number }[] = [
+  { file: 'public/icons/icon-512.png', size: 512 },
+  { file: 'public/icons/apple-touch-icon.png', size: 180 },
+  { file: 'public/icons/favicon-32.png', size: 32 },
+  { file: 'yoola/package/yoola-assets/icon.png', size: 220 },
 ];
 
-// 独立的用户目录：否则本机已开着的 Chrome 会接管这次启动，截图不落盘
-const profile = mkdtempSync(resolve(tmpdir(), 'pack-battle-icons-'));
-const server = await createServer({ server: { port: 5194, strictPort: true }, logLevel: 'error' });
-await server.listen();
-try {
-  for (const ic of ICONS) {
-    const url = `http://localhost:5194/scripts/icon/?size=${ic.size}${ic.bare ? '&bare=1' : ''}`;
-    // 必须异步：同步等待会卡住本进程里的 Vite 服务器，Chrome 永远等不到页面
-    await promisify(execFile)(CHROME, [
-      '--headless=new', '--default-background-color=00000000', `--user-data-dir=${profile}`, '--no-first-run', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1',
-      `--window-size=${ic.size},${ic.size}`,
-      '--virtual-time-budget=5000', `--screenshot=${ic.file}`, url,
-    ], { timeout: 60000 });
-    console.log('✓', ic.file.slice(ic.file.indexOf('pack-battle/') + 12));
-  }
-} finally {
-  await server.close();
-  rmSync(profile, { recursive: true, force: true });
+for (const o of OUT) {
+  const file = resolve(root, o.file);
+  mkdirSync(dirname(file), { recursive: true });
+  execFileSync('sips', ['-s', 'format', 'png', '-z', String(o.size), String(o.size), SRC, '--out', file], { stdio: 'ignore' });
+  console.log('✓', o.file);
 }

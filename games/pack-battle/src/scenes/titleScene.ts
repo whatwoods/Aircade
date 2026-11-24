@@ -11,8 +11,7 @@ import { endingData } from './gameScene.ts';
 import type { InputHandler } from '../core/input.ts';
 import { glowOf } from '../render/fx/particles.ts';
 import { titleBagArt } from '../render/titleArt.ts';
-import { ellipsePts, inkStroke, rectPts, type Pts } from '../render/ink.ts';
-import { C, cached, drawPaper, pat, rivet } from '../render/kit.ts';
+import { C, cached, drawPaper, rivet } from '../render/kit.ts';
 import { LW, stage } from '../render/stage.ts';
 import { BRUSH, LOGO, drawSprite, num, text, type Sprite } from '../render/text.ts';
 import { Button, type UiEl } from '../render/ui/widgets.ts';
@@ -42,6 +41,8 @@ export class TitleScene implements Scene {
   private best: BestRecord | null = null;
   private motes: Mote[] = [];
   private time = 0;
+  /** 行囊图到手时的 time（入场动画从这里算起） */
+  private bagT0 = -1;
   private oy = 0;
 
   constructor() {
@@ -221,7 +222,15 @@ export class TitleScene implements Scene {
 
   step(_h: number): void {}
 
-  draw(ctx: CanvasRenderingContext2D): void {
+  freezeUnder(): boolean {
+    return this.ov.stack.length > 0;
+  }
+
+  drawOverlays(ctx: CanvasRenderingContext2D): void {
+    this.ov.draw(ctx, LW, stage.H, this.time, clock.real);
+  }
+
+  draw(ctx: CanvasRenderingContext2D, withOverlays = true): void {
     const t = this.time;
     const real = clock.real;
     const oy = this.oy;
@@ -237,7 +246,12 @@ export class TitleScene implements Scene {
     }
     ctx.restore();
     // 行囊先画：入场时从横幅后面落下来
-    this.drawBag(ctx, t, oy);
+    const art = titleBagArt();
+    if (art) {
+      // 入场下落从图到手那一刻算起（快手端图片异步加载，可能晚于标题页出现）
+      if (this.bagT0 < 0) this.bagT0 = Math.max(0, t - 0.18);
+      this.drawBag(ctx, art, t - this.bagT0, oy);
+    }
     // 横幅：入场从上方落下（回弹 + 阻尼摆动），之后缓慢摆动 ±0.6°
     const drop = ease.outBack(clamp01(t / 0.55));
     const swing = t > 0.45 ? 0.045 * Math.exp(-2.6 * (t - 0.45)) * Math.sin((t - 0.45) * 7.5) : 0;
@@ -245,9 +259,8 @@ export class TitleScene implements Scene {
     ctx.translate(195, 120 + oy - (1 - drop) * 300);
     ctx.rotate(Math.sin((t / 4) * Math.PI * 2) * 0.0105 + swing);
     ctx.translate(-195, -(120 + oy));
-    drawSprite(ctx, bannerSprite(), 30, 120 + oy);
-    const frame = Math.floor(t * 10) % 3;
-    drawSprite(ctx, logoSprite(frame), 30, 120 + oy);
+    // 横幅和字标合成一张（每帧都在转，软件光栅上一次旋转贴图要 3–4ms，两张就翻倍）
+    drawSprite(ctx, bannerLogoSprite(Math.floor(t * 10) % 3), 30, 120 + oy);
     ctx.restore();
     // 按钮：行囊落地后弹出（入场期间照样能点）
     const pop = ease.outBack(clamp01((t - 0.55) / 0.32));
@@ -271,14 +284,14 @@ export class TitleScene implements Scene {
     }
     this.gear.draw(ctx, t, real);
     this.help.draw(ctx, t, real);
-    this.ov.draw(ctx, LW, stage.H, t, real);
+    if (withOverlays) this.ov.draw(ctx, LW, stage.H, t, real);
   }
 
   /**
    * 合着的行囊（底边中心 (195, BAG_BASE)）：
    * 入场从上方落到桌上（压扁回弹 + 扬尘）；待机呼吸，每 6 秒原地一蹦；黄铜扣每 4 秒闪一颗星。
    */
-  private drawBag(ctx: CanvasRenderingContext2D, t: number, oy: number): void {
+  private drawBag(ctx: CanvasRenderingContext2D, art: HTMLImageElement, t: number, oy: number): void {
     const base = BAG_BASE + oy;
     // 入场下落（加速）
     const f = clamp01((t - 0.18) / 0.4);
@@ -303,7 +316,7 @@ export class TitleScene implements Scene {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.16 + 0.04 * Math.sin(t * 0.8);
-    ctx.drawImage(glowOf('#ffb35a'), 195 - 210, base - 130 - 210, 420, 420);
+    drawSprite(ctx, lampSprite(), 195 - 210, base - 130 - 210);
     ctx.restore();
 
     // 接触阴影：离桌越高越小越淡
@@ -325,24 +338,16 @@ export class TitleScene implements Scene {
     ctx.restore();
 
     // 包身
-    const art = titleBagArt();
-    let bx: number;
-    let by: number;
     ctx.save();
     ctx.globalAlpha = clamp01(f * 20);
     ctx.translate(195, base + fallY - hop);
     ctx.scale(sx, sy);
-    if (art) {
-      const w = BAG_ART.w;
-      const h = (w * (art.naturalHeight || art.height)) / (art.naturalWidth || art.width);
-      ctx.drawImage(art, -w / 2, -h + BAG_ART.sink, w, h);
-      bx = BAG_ART.buckle[0] * w;
-      by = -h + BAG_ART.sink + BAG_ART.buckle[1] * h;
-    } else {
-      drawSprite(ctx, closedBag(), -130, -230);
-      bx = 0;
-      by = -87;
-    }
+    const w = BAG_ART.w;
+    const h = (w * (art.naturalHeight || art.height)) / (art.naturalWidth || art.width);
+    // 先缩到显示尺寸缓存：每帧从 840px 原图缩放比 1:1 附近的呼吸缩放贵得多
+    drawSprite(ctx, cached('title.bagArt', w, h, 0, (c) => c.drawImage(art, 0, 0, w, h)), -w / 2, -h + BAG_ART.sink);
+    const bx = BAG_ART.buckle[0] * w;
+    const by = -h + BAG_ART.sink + BAG_ART.buckle[1] * h;
     // 黄铜扣闪星：每 4 秒一次（入场后开始）
     const gk = t > 1 ? ((t - 1) % 4) / 4 : 1;
     if (gk < 0.14) {
@@ -393,7 +398,7 @@ export class TitleScene implements Scene {
 /** 行囊底边 y（逻辑坐标，竖屏 844 基准） */
 const BAG_BASE = 582;
 /** 手绘图：绘制宽度、底边下沉（图底透明留白）、扣具中心（占图宽高的比例，x 相对中心） */
-const BAG_ART = { w: 276, sink: 3, buckle: [-0.004, 0.575] as [number, number] };
+const BAG_ART = { w: 252, sink: 4, buckle: [0.162, 0.664] as [number, number] };
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
 const ease = {
@@ -418,6 +423,18 @@ function star4(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, r
 }
 
 // ---------- 静态精灵 ----------
+
+/** 行囊后的台灯暖光：32px 光斑放大到 420 的结果先烤成精灵，每帧 1:1 贴 */
+function lampSprite(): Sprite {
+  return cached('title.lamp', 420, 420, 0, (ctx) => ctx.drawImage(glowOf('#ffb35a'), 0, 0, 420, 420));
+}
+
+function bannerLogoSprite(frame: number): Sprite {
+  return cached('title.bannerLogo' + frame, 330, 180, 16, (ctx) => {
+    drawSprite(ctx, bannerSprite(), 0, 0);
+    drawLogo(ctx, frame);
+  });
+}
 
 export function bannerSprite(): Sprite {
   return cached('title.banner', 330, 180, 16, (ctx, r) => {
@@ -467,7 +484,12 @@ export function bannerSprite(): Sprite {
 
 /** Logo 字（3 帧沸腾：英文描边每帧抖动不同） */
 export function logoSprite(frame: number): Sprite {
-  return cached('title.logo' + frame, 330, 180, 16, (ctx) => {
+  return cached('title.logo' + frame, 330, 180, 16, (ctx) => drawLogo(ctx, frame));
+}
+
+/** 标题字直接画在目标画布上（快手原生离屏画布延迟光栅化，文字精灵再拷进另一张离屏图会丢自定义字体） */
+function drawLogo(ctx: CanvasRenderingContext2D, frame: number): void {
+  {
     const jx = [0, 0.6, -0.5][frame];
     const jy = [0, -0.4, 0.5][frame];
     // PACK BATTLE：按横幅宽度收字号，最宽 288
@@ -522,134 +544,7 @@ export function logoSprite(frame: number): Sprite {
       x += widths[i] + gap;
     }
     ctx.restore();
-  });
-}
-
-/** 合着的行囊：皮革包身 + 翻盖 + 黄铜扣 + 露出的剑柄和弓梢（中心在 (130, 205-?)） */
-function closedBag(): Sprite {
-  return cached('title.bag', 260, 230, 16, (ctx, r) => {
-    const T = (p: Pts): Pts => p;
-    // 弓梢（在包后面）
-    ctx.save();
-    ctx.strokeStyle = '#7a4a24';
-    ctx.lineWidth = 7;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(196, 70);
-    ctx.quadraticCurveTo(214, 30, 196, 0);
-    ctx.stroke();
-    ctx.strokeStyle = '#e9d8b0';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(196, 2);
-    ctx.lineTo(192, 70);
-    ctx.stroke();
-    inkStroke(ctx, [196, 70, 210, 40, 204, 16, 196, 0], false, 1.6, C.ink, 9, { unit: 1, jitter: 0.3, dry: false });
-    ctx.restore();
-    // 剑柄（在包后面）
-    ctx.save();
-    ctx.translate(74, 0);
-    ctx.rotate(-0.18);
-    ctx.fillStyle = '#5a3a20';
-    ctx.fillRect(-5, 14, 10, 44);
-    ctx.strokeStyle = '#3a2213';
-    ctx.lineWidth = 1;
-    for (let y = 18; y < 56; y += 6) {
-      ctx.beginPath();
-      ctx.moveTo(-5, y);
-      ctx.lineTo(5, y + 3);
-      ctx.stroke();
-    }
-    ctx.fillStyle = C.brass;
-    ctx.beginPath();
-    ctx.roundRect(-22, 56, 44, 9, 4);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(0, 10, 7, 0, Math.PI * 2);
-    ctx.fill();
-    inkStroke(ctx, rectPts(-22, 56, 44, 9, 4), true, 1.4, C.ink, 3, { unit: 1, jitter: 0.3, dry: false });
-    inkStroke(ctx, ellipsePts(0, 10, 7, 7, 14), true, 1.4, C.ink, 4, { unit: 1, jitter: 0.3, dry: false });
-    ctx.restore();
-    // 包身
-    const body = T(rectPts(14, 62, 232, 160, 26));
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(14, 62, 232, 160, 26);
-    ctx.fillStyle = C.leather;
-    ctx.fill();
-    ctx.fillStyle = pat(ctx, 'leather', r);
-    ctx.fill();
-    const sh = ctx.createLinearGradient(0, 62, 0, 222);
-    sh.addColorStop(0, 'rgba(255,220,170,0.12)');
-    sh.addColorStop(1, 'rgba(20,8,2,0.35)');
-    ctx.fillStyle = sh;
-    ctx.fill();
-    ctx.restore();
-    // 缝线
-    ctx.save();
-    ctx.strokeStyle = C.stitch;
-    ctx.lineWidth = 1.6;
-    ctx.setLineDash([5, 4]);
-    ctx.beginPath();
-    ctx.roundRect(24, 72, 212, 140, 20);
-    ctx.stroke();
-    ctx.restore();
-    inkStroke(ctx, body, true, 2.4, C.ink, 11, { unit: 1, jitter: 0.5, dry: false });
-    // 侧带
-    for (const x of [44, 202]) {
-      ctx.fillStyle = C.leatherDark;
-      ctx.fillRect(x, 58, 14, 166);
-      inkStroke(ctx, rectPts(x, 58, 14, 166, 3), true, 1.4, C.ink, x, { unit: 1, jitter: 0.3, dry: false });
-      rivet(ctx, x + 7, 200, 3.5);
-    }
-    // 翻盖
-    const flap: Pts = [];
-    flap.push(10, 60);
-    flap.push(250, 60);
-    flap.push(246, 120);
-    flap.push(170, 146);
-    flap.push(130, 150);
-    flap.push(90, 146);
-    flap.push(14, 120);
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(flap[0], flap[1]);
-    for (let i = 2; i < flap.length; i += 2) ctx.lineTo(flap[i], flap[i + 1]);
-    ctx.closePath();
-    ctx.fillStyle = C.leatherDark;
-    ctx.fill();
-    ctx.fillStyle = pat(ctx, 'leatherDark', r);
-    ctx.fill();
-    ctx.restore();
-    ctx.save();
-    ctx.strokeStyle = C.stitch;
-    ctx.lineWidth = 1.4;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(20, 68);
-    ctx.lineTo(240, 68);
-    ctx.lineTo(237, 114);
-    ctx.lineTo(130, 141);
-    ctx.lineTo(23, 114);
-    ctx.closePath();
-    ctx.stroke();
-    ctx.restore();
-    inkStroke(ctx, flap, true, 2.2, C.ink, 13, { unit: 1, jitter: 0.5, dry: false });
-    // 黄铜扣
-    ctx.save();
-    ctx.fillStyle = C.brass;
-    ctx.beginPath();
-    ctx.roundRect(116, 126, 28, 34, 6);
-    ctx.fill();
-    ctx.fillStyle = C.brassLight;
-    ctx.fillRect(121, 131, 18, 4);
-    ctx.fillStyle = '#3a2213';
-    ctx.beginPath();
-    ctx.roundRect(126, 142, 8, 12, 3);
-    ctx.fill();
-    ctx.restore();
-    inkStroke(ctx, rectPts(116, 126, 28, 34, 6), true, 1.6, C.ink, 17, { unit: 1, jitter: 0.3, dry: false });
-  });
+  }
 }
 
 function bestTag(): Sprite {

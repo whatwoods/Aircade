@@ -8,7 +8,8 @@ import { clock } from '../core/loop.ts';
 import { simulate as runSim } from '../game/battle/sim.ts';
 import { enemyBag, enemyFor, parseBag, playerMaxHp, runEnemy } from '../game/enemies.ts';
 import { fullMask } from '../game/grid.ts';
-import { giveItem, unlockCell } from '../game/run.ts';
+import { fighterInputs, giveItem, unlockCell } from '../game/run.ts';
+import { compareStats } from '../game/stats.ts';
 import { rollShop } from '../game/shop.ts';
 import { markTutorialDone, resetHints, resetTutorialFlag } from '../game/tutorial.ts';
 import type { BattleEvent, BattleResult, ItemId, ItemInst, Lv, Rot } from '../game/types.ts';
@@ -185,7 +186,7 @@ export function installDebug(): void {
         tier: r.tier, daily: r.daily ?? null, locked: r.locked, open: r.open, unlocked: r.unlocked, freeCells: r.freeCells, choice: r.choice, market: r.market, elite: r.elite, enemy: { name: e.name, title: e.title, hp: e.hp, boss: !!e.boss, affixes: e.affixes ?? [] },
         tutorial: g.tut.step, paused: g.paused, speed: g.bc.speed, overlay: g.ov.top ? g.ov.top.kind : null,
         dragging: !!g.ac.drag, links: g.syn.links.map((l) => ({ from: l.from, to: l.to, kind: l.kind, label: l.label })),
-        maxHp: playerMaxHp(r.round), adOffer: g.adOffer(), adRevives: r.adRevives ?? 0, adBoth: !!r.adBoth, adSupply: !!r.adSupply, adGold: r.adGold ?? 0, undo: !!g.undo, outcome: g.outcome, hint: g.hintText(),
+        maxHp: playerMaxHp(r.round), adOffer: g.adOffer(), adRevives: r.adRevives ?? 0, adBoth: !!r.adBoth, adSupply: !!r.adSupply, adGold: r.adGold ?? 0, adPrep: !!r.adPrep, stats: compareStats(...fighterInputs(r)), undo: !!g.undo, outcome: g.outcome, hint: g.hintText(),
       };
     }),
     /** 背景音乐：当前曲式、播的是文件还是程序化、哪些文件已解码 */

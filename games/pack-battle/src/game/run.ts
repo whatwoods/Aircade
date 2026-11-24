@@ -1,7 +1,7 @@
 // 一局的状态与所有规则操作（纯逻辑，无 DOM）
 import { AD, BAG, DIFFICULTY, ECONOMY, ENDLESS, EVENTS, ITEMS, PLAYER, ROUNDS, SCORE, SHOP } from '../config.ts';
 import { derive } from '../core/rng.ts';
-import { simulate } from './battle/sim.ts';
+import { simulate, type FighterInput } from './battle/sim.ts';
 import { receiptFor, sellPrice, type ReceiptLine } from './economy.ts';
 import { enemyBag, enemyFor, playerMaxHp, runEnemy } from './enemies.ts';
 import { buildOcc, canPlace, DIRS, findFit, isOpen, NUDGES, rectMask, type Occ } from './grid.ts';
@@ -287,6 +287,15 @@ export function hasWeapon(run: RunState): boolean {
   return run.bag.some((it) => ITEMS[it.id].tag === 'weapon');
 }
 
+/** 本轮双方的战斗输入（开战与备战对比共用） */
+export function fighterInputs(run: RunState): [FighterInput, FighterInput] {
+  const e = runEnemy(run, run.round);
+  return [
+    { items: run.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(run.round), open: run.open },
+    { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits, affixes: e.affixes, speed: e.speed },
+  ];
+}
+
 export function startBattle(run: RunState): BattleResult {
   run.savedGold = run.gold;
   let pouch = 0;
@@ -296,11 +305,7 @@ export function startBattle(run: RunState): BattleResult {
   for (const it of run.bag) if (it.id === 'charm') cap += ITEMS.charm.lv[it.lv - 1].interest ?? 0;
   run.charmCap = cap;
   run.market = false;
-  const e = runEnemy(run, run.round);
-  const res = simulate(
-    { items: run.bag, cols: BAG.cols, rows: BAG.rows, maxHp: playerMaxHp(run.round), open: run.open },
-    { items: enemyBag(run.round), cols: e.cols, rows: e.rows, maxHp: e.hp, traits: e.traits, affixes: e.affixes, speed: e.speed },
-  );
+  const res = simulate(...fighterInputs(run));
   run.phase = 'battle';
   return res;
 }
@@ -400,6 +405,18 @@ export function takeSupply(run: RunState): boolean {
   if (!canSupply(run)) return false;
   run.adSupply = true;
   run.adGold = AD.supplyGold;
+  return true;
+}
+
+export function canPrepAd(run: RunState): boolean {
+  return !run.daily && !run.adPrep && run.phase === 'arrange' && run.round >= AD.fromRound;
+}
+
+/** 备战金币：直接加到当前金币 */
+export function takePrepAd(run: RunState): boolean {
+  if (!canPrepAd(run)) return false;
+  run.adPrep = true;
+  run.gold += AD.prepGold;
   return true;
 }
 

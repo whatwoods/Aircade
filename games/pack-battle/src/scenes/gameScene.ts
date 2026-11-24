@@ -17,10 +17,11 @@ import { enemyBag, enemyFor, runEnemy } from '../game/enemies.ts';
 import {
   applyChoice, applyResult, beginArrange, canUnlock, mergeTargetFor, smithTarget, cellPrice, find, hasWeapon, newRun, refresh, sellValue, startBattle, undoSell, unlockable, unlockCell,
   type Outcome, type RunMode, type SellRecord,
-  canRevive, canSupply, canTakeBoth, revive, takeBoth, takeSupply,
+  canRevive, canSupply, canTakeBoth, revive, takeBoth, takeSupply, canPrepAd, takePrepAd, fighterInputs,
 } from '../game/run.ts';
 import { fullMask } from '../game/grid.ts';
 import { computeSynergy, type SynergyResult } from '../game/synergy.ts';
+import { compareStats } from '../game/stats.ts';
 import { hintSeen, markHint, markTutorialDone, resetTutorialFlag, HINT_TEXT, Tutorial, type HintId } from '../game/tutorial.ts';
 import type { EventId, ItemInst, Lv, Rot, RunState } from '../game/types.ts';
 import { drawParticles, emit } from '../render/fx/particles.ts';
@@ -114,6 +115,8 @@ export class GameScene implements Scene {
   reportB: Button;
   /** 结算时的广告按钮：心掉光是复活，否则是败北补给 */
   adB: Button;
+  /** 备战金币广告 */
+  prepAdB: Button;
   /** 刚打完这场的战报（结算时可看） */
   report: [SideReport, SideReport] | null = null;
   private battleItems: ItemInst[] = [];
@@ -155,6 +158,10 @@ export class GameScene implements Scene {
     this.adB.fontSize = 19;
     this.adB.pulse = 0.04;
     this.adB.visible = false;
+    this.prepAdB = new Button('btn.prepAd', { x: 146, y: 553, w: 92, h: 34 }, `+${AD.prepGold}`, 'reward', 15);
+    this.prepAdB.glyph = '▶';
+    this.prepAdB.fontSize = 15;
+    this.prepAdB.visible = false;
     this.nextB = new Button('btn.tutNext', { x: 150, y: 470, w: 90, h: 34 }, '下一步', 'tag', 12);
     this.nextB.visible = false;
     this.ac = new ArrangeController(this);
@@ -223,6 +230,7 @@ export class GameScene implements Scene {
     this.skipB.r = L.skip;
     this.refreshB.r = L.refresh;
     this.lockB.r = L.lock;
+    this.prepAdB.r = { x: L.lock.x - 98, y: L.lock.y - 1, w: 92, h: 34 };
     this.speedB.r = B.speed;
     this.reportB.r = { x: B.speed.x, y: B.cont.y + (B.cont.h - 44) / 2, w: B.speed.w, h: 44 };
     this.contB.r = B.cont;
@@ -564,6 +572,16 @@ export class GameScene implements Scene {
     saveRun(this.run);
   }
 
+  private async watchPrepAd(): Promise<void> {
+    if (!canPrepAd(this.run) || !(await showRewarded())) return;
+    if (!takePrepAd(this.run)) return;
+    const r = this.prepAdB.r;
+    this.flyCoins(r.x + r.w / 2, r.y + r.h / 2, AD.prepGold);
+    this.setGold(this.run.gold);
+    sfx('buy');
+    saveRun(this.run);
+  }
+
   private async watchBothAd(panel: ChoicePanel): Promise<void> {
     const ids = this.run.choice;
     if (!ids || !(await showRewarded())) return;
@@ -786,6 +804,7 @@ export class GameScene implements Scene {
     this.adB.visible = !!offer;
     this.adB.label = offer === 'revive' ? '看广告复活' : `看广告 +${AD.supplyGold} 金`;
     this.adB.alpha = this.contB.alpha;
+    this.prepAdB.visible = !this.tut.arranging && canPrepAd(this.run) && rewardedReady();
     this.speedB.visible = this.phase === 'battle' || this.phase === 'toBattle';
     if (this.speedFlip < 1) this.speedFlip = Math.min(1, this.speedFlip + dt / 0.18);
     // 金币飞行
@@ -822,7 +841,16 @@ export class GameScene implements Scene {
 
   // ---------- 绘制 ----------
 
-  draw(ctx: CanvasRenderingContext2D): void {
+  freezeUnder(): boolean {
+    return this.ov.stack.length > 0;
+  }
+
+  drawOverlays(ctx: CanvasRenderingContext2D): void {
+    this.ov.draw(ctx, LW, stage.H, this.time, clock.real);
+    drawToast(ctx);
+  }
+
+  draw(ctx: CanvasRenderingContext2D, withOverlays = true): void {
     const H = stage.H;
     const real = clock.real;
     const time = this.time;
@@ -916,6 +944,7 @@ export class GameScene implements Scene {
         ctx.translate(0, dy);
         this.drawRefresh(ctx, time, real);
         this.lockB.draw(ctx, time, real);
+        if (this.prepAdB.visible) this.prepAdB.draw(ctx, time, real);
         this.fightB.draw(ctx, time, real);
         this.undoB.draw(ctx, time, real);
         if (this.undo) this.drawUndoRing(ctx, real);
@@ -951,6 +980,7 @@ export class GameScene implements Scene {
     // 屏幕效果
     this.bc.drawScreen(ctx);
     setGameTransform(ctx);
+    if (!withOverlays) return;
     this.ov.draw(ctx, LW, H, time, real);
     drawToast(ctx);
   }
@@ -1149,6 +1179,7 @@ export class GameScene implements Scene {
     const out: Button[] = [this.pauseB];
     if (this.phase === 'arrange') {
       out.push(this.fightB, this.refreshB, this.lockB);
+      if (this.prepAdB.visible) out.push(this.prepAdB);
       if (this.undoB.visible) out.push(this.undoB);
       if (this.skipB.visible) out.push(this.skipB);
       if (this.nextB.visible) out.push(this.nextB);
@@ -1169,6 +1200,7 @@ export class GameScene implements Scene {
     else if (b === this.speedB) this.cycleSpeed();
     else if (b === this.reportB) this.openReport();
     else if (b === this.adB) void this.watchResultAd();
+    else if (b === this.prepAdB) void this.watchPrepAd();
     else if (b === this.skipB) {
       markTutorialDone();
       this.tut.stop();
@@ -1315,7 +1347,7 @@ export class GameScene implements Scene {
         this.pressedHud = null;
         if (ph && tap) {
           if (ph === 'round') this.ov.open(new RoutePanel(this.run.round, this.run.round - 1));
-          else if (ph === 'enemy') this.ov.open(new DrawerPanel(this.L.drawer, runEnemy(this.run, this.run.round), this.run.round));
+          else if (ph === 'enemy') this.ov.open(new DrawerPanel(this.L.drawer, runEnemy(this.run, this.run.round), this.run.round, compareStats(...fighterInputs(this.run))));
           return;
         }
         if (this.phase === 'arrange') this.ac.up(x, y, tap);

@@ -20,6 +20,7 @@ import { initKit } from './render/kit.ts';
 import { warmPortrait } from './render/portraits.ts';
 import { warmItem } from './render/sprites.ts';
 import { initStage, resizeStage, setGameTransform, setScreenTransform, stage } from './render/stage.ts';
+import { makeCanvas, textCacheEpoch } from './render/text.ts';
 import { stepWidgets, updateToast } from './render/ui/widgets.ts';
 import { drawBackground } from './render/views/background.ts';
 import { updateTweens } from './core/tween.ts';
@@ -27,6 +28,7 @@ import { EndingScene } from './scenes/endingScene.ts';
 import { GameScene } from './scenes/gameScene.ts';
 import { factories, setScene, sm } from './scenes/sceneManager.ts';
 import { TitleScene } from './scenes/titleScene.ts';
+import { warmPanels, type Panel } from './scenes/overlays.ts';
 
 // TapTap / 快手版不接受任何调试参数
 // 快手运行时没有 URLSearchParams，必须在构造之前就短路
@@ -115,6 +117,29 @@ function boot(): void {
     };
     warm.push(task);
   }
+  // 面板预热：弹窗的纸面、按钮、文字精灵第一次画时才真正光栅化（文字第二次用到才缓存），
+  // 不预热的话会落在弹出动画的头两帧里，手机上整段动画卡一下。
+  // 每帧在背景之前把一个面板画两遍，随后背景整屏盖住，看不到；DPR 或字体变化（stage.version）、
+  // 文字缓存淘汰过精灵之后重来
+  let panelKey = '';
+  let panelQ: (() => Panel)[] = [];
+  function warmPanel(ctx: CanvasRenderingContext2D): void {
+    const key = stage.version + '/' + textCacheEpoch();
+    if (panelKey !== key) {
+      panelKey = key;
+      panelQ = warmPanels(stage.H);
+    }
+    if (!panelQ.length || warm.length || clock.real < 1.5) return;
+    const p = panelQ.shift()!();
+    setGameTransform(ctx);
+    p.drawBody(ctx, 0, 0);
+    p.drawBody(ctx, 0, 0);
+  }
+
+  /** 弹窗底图（见 frame()） */
+  let frozen: HTMLCanvasElement | null = null;
+  let frozenKey = '';
+
   function runWarm(): void {
     const t0 = now();
     while (warm.length && (filmClock.on || now() - t0 < 4)) warm.shift()!();
@@ -177,9 +202,31 @@ function boot(): void {
     updatePopups(dt);
     updateMusic();
     const ctx = stage.ctx;
-    drawBackground(ctx, clock.real);
-    setGameTransform(ctx);
-    if (s) s.draw(ctx);
+    warmPanel(ctx);
+    if (s?.freezeUnder?.() && s.drawOverlays) {
+      // 弹窗打开期间：背景 + 场景只画一次进离屏图，之后每帧贴图 + 画弹窗。
+      // 软件光栅的手机上，标题页（暖光、摆动横幅、行囊缩放）一帧就要 6ms 以上，再叠弹窗动画掉到 30 帧
+      const W = stage.canvas.width;
+      const Hc = stage.canvas.height;
+      const key = stage.version + '/' + W + 'x' + Hc;
+      if (!frozen || frozenKey !== key) {
+        if (!frozen || frozen.width !== W || frozen.height !== Hc) frozen = makeCanvas(W, Hc)[0];
+        const fctx = frozen.getContext('2d')!;
+        drawBackground(fctx, clock.real);
+        setGameTransform(fctx);
+        s.draw(fctx, false);
+        frozenKey = key;
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(frozen, 0, 0);
+      setGameTransform(ctx);
+      s.drawOverlays(ctx);
+    } else {
+      frozenKey = '';
+      drawBackground(ctx, clock.real);
+      setGameTransform(ctx);
+      if (s) s.draw(ctx);
+    }
     setScreenTransform(ctx);
     drawBlot(ctx);
     if (s && !input.touch) {

@@ -9,18 +9,23 @@ import { ease } from '../core/tween.ts';
 import { enemyBag } from '../game/enemies.ts';
 import { rowTotal, type ReportRow, type SideReport } from '../game/report.ts';
 import { shapeOf } from '../game/shapes.ts';
+import { fmtRate, type SideStats } from '../game/stats.ts';
 import type { Derived, EnemyDef, EventId, ItemId, Lv, Placed } from '../game/types.ts';
-import { C, RARITY_COLOR, TAG_COLOR, drawGoldCoin, drawSeal } from '../render/kit.ts';
+import { C, RARITY_COLOR, TAG_COLOR, drawCoin, drawGoldCoin, drawHeart, drawSeal } from '../render/kit.ts';
 import type { Rect } from '../render/layout.ts';
 import { drawEnemyBadge } from '../render/portraits.ts';
 import { drawItem, drawItemAt } from '../render/sprites.ts';
-import { HAND, measure, text, wrap } from '../render/text.ts';
+import { HAND, makeCanvas, measure, text, wrap } from '../render/text.ts';
+import { stage } from '../render/stage.ts';
 import { rgba } from '../render/textures.ts';
 import { Button, Toggle, drawPanel, titleText, type UiEl } from '../render/ui/widgets.ts';
 import { drawEnemyBag } from '../render/views/bagView.ts';
 import { describe, nextLevel } from './describe.ts';
 
 const R = (x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h });
+
+/** 动画图层四周留白（纸面投影、伸出边缘的按钮） */
+const LAYER_PAD = 24;
 
 export abstract class Panel {
   /** 类型名（调试接口用；打包后类名会被压缩） */
@@ -40,12 +45,12 @@ export abstract class Panel {
 
   update(dt: number): void {
     if (this.closing) {
-      this.t -= dt / 0.18;
+      this.t -= Math.min(dt, 1 / 30) / 0.18;
       if (this.t <= 0) {
         this.t = 0;
         this.done = true;
       }
-    } else this.t = Math.min(1, this.t + dt / 0.32);
+    } else this.t = Math.min(1, this.t + Math.min(dt, 1 / 30) / 0.32);
   }
 
   close(): void {
@@ -113,14 +118,35 @@ export abstract class Panel {
       ctx.fillRect(-400, -400, W + 800, H + 800);
     }
     const r = this.rect();
-    const s = this.closing ? 0.9 + 0.1 * k : 0.9 + 0.1 * ease.outBack(k);
     ctx.save();
     ctx.globalAlpha *= Math.min(1, k * 1.6);
-    ctx.translate(r.x + r.w / 2, r.y + r.h / 2 - (1 - k) * 40);
-    ctx.scale(s, s);
-    ctx.translate(-(r.x + r.w / 2), -(r.y + r.h / 2));
-    this.drawBody(ctx, time, real);
+    if (this.closing || this.t < 1) {
+      // 弹出 / 收起：整块面板先画进一张图，每帧只平移这一张（对齐到设备像素，不缩放）。
+      // 原来是 0.9→1 回弹缩放 + 逐项重画，纸面、按钮、十几段文字每帧各自重采样，
+      // 软件光栅的手机上一帧多 10ms 以上，动画只有 30 帧；回弹感改放在上滑位移上
+      const dy = this.closing ? (1 - k) * 24 : (1 - ease.outBack(k)) * 40;
+      const px = stage.dpr * stage.s;
+      ctx.translate(0, Math.round(dy * px) / px);
+      this.drawLayer(ctx, r, time, real);
+    } else {
+      this.layer = null;
+      this.drawBody(ctx, time, real);
+    }
     ctx.restore();
+  }
+
+  private layer: { c: HTMLCanvasElement; key: string } | null = null;
+  private drawLayer(ctx: CanvasRenderingContext2D, r: Rect, time: number, real: number): void {
+    const P = LAYER_PAD;
+    const k = stage.dpr * stage.s;
+    const key = stage.version + '/' + this.closing;
+    if (!this.layer || this.layer.key !== key) {
+      const [c, lc] = makeCanvas((r.w + P * 2) * k, (r.h + P * 2) * k);
+      lc.setTransform(k, 0, 0, k, -(r.x - P) * k, -(r.y - P) * k);
+      this.drawBody(lc, time, real);
+      this.layer = { c, key };
+    }
+    ctx.drawImage(this.layer.c, r.x - P, r.y - P, r.w + P * 2, r.h + P * 2);
   }
 
   els(): UiEl[] {
@@ -273,15 +299,107 @@ export class SettingsPanel extends Panel {
 
 // ---------- 规则速览 ----------
 
-const RULES = [
-  '从摊位把装备拖进行囊，松手即买。',
-  '相邻（共享边）的装备互相加成，连线就是加成。',
-  '轻点装备旋转；同名同级的叠上去，合成升级。',
-  '开战后自动战斗：冷却环转满一圈，装备就出手。',
-  '输了失去 1 颗心，可以调整后再战同一个对手。',
-  '点锁住的格子花金币扩背包；每赢一轮，从两个事件里选一个。',
-  '击败第 10 轮的古龙即通关，之后可以进无尽模式。',
+/** 六格规则：插画 + 标题 + 一句话 */
+const RULES: { title: string; desc: string; art: (ctx: CanvasRenderingContext2D, cx: number, cy: number) => void }[] = [
+  {
+    title: '拖进行囊',
+    desc: '松手即买，轻点旋转',
+    art: (ctx, cx, cy) => {
+      arrowArc(ctx, cx - 44, cy + 14, cx - 14, cy - 6);
+      drawItemAt(ctx, 'dagger', 1, -0.25, cx + 6, cy, 36);
+      drawGoldCoin(ctx, cx + 30, cy + 16, 9);
+    },
+  },
+  {
+    title: '相邻加成',
+    desc: '共享一条边就互相加成',
+    art: (ctx, cx, cy) => {
+      drawItemAt(ctx, 'whetstone', 1, 0, cx - 18, cy, 34);
+      drawItemAt(ctx, 'dagger', 1, 0, cx + 18, cy, 34);
+      ctx.save();
+      ctx.strokeStyle = C.goldLight;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx - 10, cy);
+      ctx.lineTo(cx + 10, cy);
+      ctx.stroke();
+      ctx.restore();
+    },
+  },
+  {
+    title: '合成升级',
+    desc: '同名同级叠在一起',
+    art: (ctx, cx, cy) => {
+      drawItemAt(ctx, 'herb', 1, 0, cx - 46, cy, 28);
+      text(ctx, '+', cx - 23, cy, { size: 18, weight: 900, color: C.inkSoft });
+      drawItemAt(ctx, 'herb', 1, 0, cx, cy, 28);
+      text(ctx, '→', cx + 24, cy, { size: 16, weight: 900, color: C.inkSoft });
+      drawItemAt(ctx, 'herb', 2, 0, cx + 49, cy, 32);
+    },
+  },
+  {
+    title: '自动战斗',
+    desc: '冷却转满一圈就出手',
+    art: (ctx, cx, cy) => {
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = rgba(C.ink, 0.15);
+      ctx.beginPath();
+      ctx.arc(cx, cy, 25, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = C.gold;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 25, -Math.PI / 2, Math.PI);
+      ctx.stroke();
+      ctx.restore();
+      drawItemAt(ctx, 'shuriken', 1, 0, cx, cy, 32);
+    },
+  },
+  {
+    title: '输了掉心',
+    desc: '调整背包，再战同一个对手',
+    art: (ctx, cx, cy) => {
+      for (let i = 0; i < 3; i++) drawHeart(ctx, cx - 30 + i * 30, cy, 24, 22, i < 2, 5 + i);
+    },
+  },
+  {
+    title: '扩包与事件',
+    desc: '金币开新格，赢了二选一',
+    art: (ctx, cx, cy) => {
+      drawCoin(ctx, cx - 16, cy, 19, 'lock', 3);
+      drawGoldCoin(ctx, cx + 20, cy + 4, 13);
+    },
+  },
 ];
+
+/** 弯箭头（规则插画用） */
+function arrowArc(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number): void {
+  ctx.save();
+  ctx.strokeStyle = C.inkSoft;
+  ctx.fillStyle = C.inkSoft;
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.quadraticCurveTo(x0 + 4, y1 - 6, x1, y1);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  const a = Math.atan2(y1 - (y1 - 6), x1 - (x0 + 4));
+  ctx.translate(x1, y1);
+  ctx.rotate(a);
+  ctx.beginPath();
+  ctx.moveTo(3, 0);
+  ctx.lineTo(-5, -5);
+  ctx.lineTo(-5, 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+const RULE_TILE = { w: 149, h: 132, gap: 12 };
 
 export class RulesPanel extends Panel {
   readonly kind = 'RulesPanel';
@@ -290,12 +408,13 @@ export class RulesPanel extends Panel {
   constructor(H: number) {
     super();
     this.oy = (H - 844) / 2;
-    this.closeB = new Button('rules.close', R(312, 158 + this.oy, 40, 40), '', 'coin', 41);
+    const r = this.rect();
+    this.closeB = new Button('rules.close', R(r.x + r.w - 48, r.y + 8, 40, 40), '', 'coin', 41);
     this.closeB.icon = 'close';
     this.buttons = [this.closeB];
   }
   rect(): Rect {
-    return R(30, 150 + this.oy, 330, 520);
+    return R(20, 124 + this.oy, 350, 594);
   }
   activate(): void {
     this.close();
@@ -304,18 +423,36 @@ export class RulesPanel extends Panel {
     const r = this.rect();
     drawPanel(ctx, r, 23);
     titleText(ctx, '规则速览', 195, r.y + 48, 28);
-    let y = r.y + 96;
-    RULES.forEach((s, i) => {
+    const T = RULE_TILE;
+    const x0 = r.x + (r.w - T.w * 2 - T.gap) / 2;
+    const y0 = r.y + 86;
+    RULES.forEach((rule, i) => {
+      const tx = x0 + (i % 2) * (T.w + T.gap);
+      const ty = y0 + Math.floor(i / 2) * (T.h + T.gap);
+      ctx.fillStyle = rgba(C.ink, 0.06);
+      ctx.beginPath();
+      ctx.roundRect(tx, ty, T.w, T.h, 10);
+      ctx.fill();
+      // 角标序号
       ctx.fillStyle = C.wax;
       ctx.beginPath();
-      ctx.arc(64, y + 1, 11, 0, Math.PI * 2);
+      ctx.arc(tx + 14, ty + 14, 9, 0, Math.PI * 2);
       ctx.fill();
-      text(ctx, String(i + 1), 64, y + 2, { size: 15, family: HAND, color: '#fff3e0' });
-      const lines = wrap(ctx, s, 240, 15, 700);
-      lines.forEach((l, j) => text(ctx, l, 84, y + j * 21, { size: 15, weight: 700, align: 'left' }));
-      y += Math.max(1, lines.length) * 21 + 14;
+      text(ctx, String(i + 1), tx + 14, ty + 15, { size: 12, family: HAND, color: '#fff3e0' });
+      rule.art(ctx, tx + T.w / 2, ty + 44);
+      text(ctx, rule.title, tx + T.w / 2, ty + 90, { size: 16, weight: 900 });
+      text(ctx, rule.desc, tx + T.w / 2, ty + 112, { size: 12, weight: 700, color: C.inkSoft, maxW: T.w - 14 });
     });
-    text(ctx, '拖拽中：第二根手指轻点 / R / 右键 / 滚轮 = 旋转', 195, r.y + r.h - 40, { size: 11, weight: 700, color: C.inkSoft });
+    // 通关目标
+    const gy = y0 + 3 * (T.h + T.gap);
+    const gw = T.w * 2 + T.gap;
+    ctx.fillStyle = rgba(C.wax, 0.1);
+    ctx.beginPath();
+    ctx.roundRect(x0, gy, gw, 64, 10);
+    ctx.fill();
+    drawEnemyBadge(ctx, 'dragon', x0 + 36, gy + 32, 22);
+    text(ctx, '第 10 轮击败古龙即通关', x0 + 70, gy + 22, { size: 16, weight: 900, color: C.wax, align: 'left' });
+    text(ctx, '之后开启无尽模式', x0 + 70, gy + 44, { size: 12, weight: 700, color: C.inkSoft, align: 'left' });
     this.closeB.draw(ctx, time, real);
   }
 }
@@ -529,6 +666,9 @@ export class RoutePanel extends Panel {
 
 // ---------- 敌人抽屉 ----------
 
+/** 对比条占用的高度 */
+const CMP_H = 100;
+
 export class DrawerPanel extends Panel {
   readonly kind = 'DrawerPanel';
   closeB: Button;
@@ -537,10 +677,12 @@ export class DrawerPanel extends Panel {
   private list: { id: ItemId; lv: Lv; n: number }[];
   private r: Rect;
   private e: EnemyDef;
-  constructor(r: Rect, e: EnemyDef, round: number) {
+  private stats: [SideStats, SideStats];
+  constructor(r: Rect, e: EnemyDef, round: number, stats: [SideStats, SideStats]) {
     super();
     this.r = r;
     this.e = e;
+    this.stats = stats;
     this.dim = 0.4;
     this.bag = enemyBag(round);
     // 装备清单（同名同级合并）
@@ -554,7 +696,7 @@ export class DrawerPanel extends Panel {
     this.list = [...seen.values()];
     // 高度按内容自适应（底边不动）
     const cell = Math.min(40, Math.floor((r.w - 40) / e.cols));
-    const want = 70 + e.rows * cell + 26 + (e.traits.length + (e.affixes?.length ?? 0)) * 22 + 24 + this.list.length * 40 + 64;
+    const want = 70 + CMP_H + e.rows * cell + 26 + (e.traits.length + (e.affixes?.length ?? 0)) * 22 + 4 + this.list.length * 40 + 64;
     const h = Math.max(300, Math.min(r.h, want));
     this.r = r = { x: r.x, y: r.y + r.h - h, w: r.w, h };
     this.closeB = new Button('drawer.close', R(r.x + r.w - 46, r.y + 6, 40, 40), '', 'coin', 61);
@@ -569,8 +711,8 @@ export class DrawerPanel extends Panel {
   }
   private grid(): { x: number; y: number; cell: number } {
     const e = this.e;
-    const cell = Math.min(40, Math.floor((this.r.w - 40) / e.cols), Math.floor((this.r.h - 170) / e.rows));
-    return { x: this.r.x + (this.r.w - cell * e.cols) / 2, y: this.r.y + 70, cell };
+    const cell = Math.min(40, Math.floor((this.r.w - 40) / e.cols), Math.floor((this.r.h - 170 - CMP_H) / e.rows));
+    return { x: this.r.x + (this.r.w - cell * e.cols) / 2, y: this.r.y + 70 + CMP_H, cell };
   }
   tapInside(x: number, y: number): void {
     const g = this.grid();
@@ -595,13 +737,38 @@ export class DrawerPanel extends Panel {
     this.drawBody(ctx, time, real);
     ctx.restore();
   }
+  /** 我方 / 对手：生命、每秒伤害、每秒防护 */
+  private drawCompare(ctx: CanvasRenderingContext2D, x: number, y: number, w: number): void {
+    const h = CMP_H - 14;
+    ctx.fillStyle = rgba(C.ink, 0.06);
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 10);
+    ctx.fill();
+    const lw = 58;
+    const cw = (w - lw) / 3;
+    const cols = ['生命', '每秒伤害', '每秒防护'];
+    cols.forEach((c, i) => text(ctx, c, x + lw + cw * (i + 0.5), y + 15, { size: 12, weight: 800, color: C.inkSoft }));
+    // 两行之间一道细墨线
+    ctx.fillStyle = rgba(C.ink, 0.12);
+    ctx.fillRect(x + 10, y + 57, w - 20, 1);
+    const rows: [string, string, SideStats][] = [['我方', C.ink, this.stats[0]], ['对手', C.wax, this.stats[1]]];
+    rows.forEach(([name, color, st], j) => {
+      const ry = y + 42 + j * 30;
+      text(ctx, name, x + 14, ry, { size: 14, weight: 900, color, align: 'left' });
+      const vals = [String(st.hp), fmtRate(st.dps), fmtRate(st.guard)];
+      const other = this.stats[1 - j];
+      const better = [st.hp > other.hp, st.dps > other.dps, st.guard > other.guard];
+      vals.forEach((v, i) => text(ctx, v, x + lw + cw * (i + 0.5), ry, { size: better[i] ? 20 : 17, weight: better[i] ? 900 : 700, color: i === 0 ? C.hp : color }));
+    });
+  }
   drawBody(ctx: CanvasRenderingContext2D, time: number, real: number): void {
     const r = this.r;
     const e = this.e;
     drawPanel(ctx, r, 26);
     drawEnemyBadge(ctx, e.portrait, r.x + 36, r.y + 34, 22);
     text(ctx, `${e.title}「${e.name}」`, r.x + 66, r.y + 26, { size: 18, weight: 900, align: 'left' });
-    text(ctx, `♥ ${e.hp}${e.boss ? ' · 首领' : ''}`, r.x + 66, r.y + 47, { size: 13, weight: 800, color: C.hp, align: 'left' });
+    if (e.boss) text(ctx, '首领', r.x + 66, r.y + 47, { size: 13, weight: 800, color: C.wax, align: 'left' });
+    this.drawCompare(ctx, r.x + 16, r.y + 60, r.w - 32);
     const g = this.grid();
     const frame = 12;
     drawEnemyBag(ctx, { x: g.x - frame, y: g.y - frame, w: e.cols * g.cell + frame * 2, h: e.rows * g.cell + frame * 2, gx: g.x, gy: g.y, cell: g.cell, frame }, e.frame, e.cols, e.rows);
@@ -628,8 +795,7 @@ export class DrawerPanel extends Panel {
         text(ctx, '◆ ' + s, r.x + 24, y, { size: 13, weight: 800, color: C.wax, align: 'left', maxW: r.w - 48 });
         y += 22;
       }
-      text(ctx, '轻点装备查看效果', r.x + 24, y, { size: 12, weight: 700, color: C.inkSoft, align: 'left' });
-      y += 24;
+      y += 4;
     }
     // 装备清单
     const bottom = r.y + r.h - 48;
@@ -765,6 +931,19 @@ export class DetailPanel extends Panel {
 }
 
 /** 覆盖层栈 */
+/** 预热用的常用面板（回调都是空的，只画不交互）。见 main.ts 的面板预热 */
+export function warmPanels(H: number): (() => Panel)[] {
+  const no = (): void => {};
+  return [
+    () => new PausePanel(H, { resume: no, settings: no, restart: no, title: no }),
+    () => new SettingsPanel(H, no),
+    () => new ConfirmPanel(H, '确定吗？', '确定', no),
+    () => new RulesPanel(H),
+    () => new RoutePanel(1, 0),
+    () => new StartPanel(H, 0, null, no),
+  ];
+}
+
 export class Overlays {
   stack: Panel[] = [];
   open(p: Panel): Panel {

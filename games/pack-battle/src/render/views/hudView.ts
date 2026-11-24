@@ -157,9 +157,9 @@ export function drawEnemyCard(ctx: CanvasRenderingContext2D, r: Rect, e: EnemyDe
   const cell = 7;
   const mw = e.cols * cell;
   const mh = e.rows * cell;
-  const mx = r.w - 64 - mw / 2;
+  const mx = r.w - 30 - mw;
   drawMiniBag(ctx, mx, r.h / 2 - mh / 2, cell, bag, e.cols, e.rows);
-  text(ctx, '查看 ›', r.w - 14, r.h / 2, { size: 12, weight: 800, color: C.inkSoft, align: 'right', alpha: 0.75 + 0.25 * Math.sin(time * 2.5) });
+  text(ctx, '›', r.w - 14, r.h / 2 - 1, { size: 22, weight: 800, color: C.inkSoft, alpha: 0.75 + 0.25 * Math.sin(time * 2.5) });
   ctx.restore();
 }
 

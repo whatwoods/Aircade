@@ -44,10 +44,26 @@ const spacingStr = new Map<number, string>();
  * 主画布上的文字走缓存：同一段文字连续画到第 2 帧起，就光栅化成小精灵，之后每帧只 drawImage。
  * 原生画布（快手）上 fillText / strokeText 很贵，一帧四五十段文字是主要开销；浏览器里也省。
  * 每帧都在变的文字（滚动数字等）达不到第 2 次命中，照旧直接画，不会反复建画布。
+ * 满了先丢只见过一次的条目，还不够再按最近使用丢掉较旧的一半精灵（不整表清空：
+ * 战斗里血量、伤害数字很快就能塞满，整表清空会连弹窗文字一起丢，下次弹出又在动画里重建）。
  */
 const textCache = new Map<string, Sprite | number>();
 let textVer = -1;
-const TEXT_CACHE_MAX = 500;
+const TEXT_CACHE_MAX = 600;
+/** 丢过精灵就 +1（main.ts 据此重新预热弹窗） */
+let textEpoch = 0;
+export const textCacheEpoch = (): number => textEpoch;
+
+function trimTextCache(): void {
+  for (const [k, v] of textCache) if (typeof v === 'number') textCache.delete(k);
+  if (textCache.size < TEXT_CACHE_MAX * 0.75) return;
+  let n = textCache.size - TEXT_CACHE_MAX / 2;
+  for (const k of textCache.keys()) {
+    if (n-- <= 0) break;
+    textCache.delete(k);
+  }
+  textEpoch++;
+}
 let measureCtx: CanvasRenderingContext2D | null = null;
 
 export function text(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, o: TextOpts = {}): void {
@@ -60,9 +76,12 @@ export function text(ctx: CanvasRenderingContext2D, s: string, x: number, y: num
       (o.stroke ?? '') + '|' + (o.strokeW ?? 3) + '|' + (o.spacing ?? 0) + '|' + (o.maxW ?? 0) + '|' + (o.shadow ? o.shadow.join(',') : '');
     const hit = textCache.get(key);
     if (hit === undefined) {
-      if (textCache.size >= TEXT_CACHE_MAX) textCache.clear();
+      if (textCache.size >= TEXT_CACHE_MAX) trimTextCache();
       textCache.set(key, 1);
     } else {
+      // 命中的挪到表尾（Map 按插入顺序），淘汰时先丢最久没画过的
+      textCache.delete(key);
+      if (typeof hit !== 'number') textCache.set(key, hit);
       const sp = typeof hit === 'number' ? buildText(key, s, o) : hit;
       const a0 = ctx.globalAlpha;
       if (o.alpha !== undefined) ctx.globalAlpha = a0 * o.alpha;

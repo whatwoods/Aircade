@@ -114,7 +114,8 @@ export function arrangeLayout(H: number): ArrangeLayout {
     fight: R(95, fightY, 200, 60),
     undo: R(16, fightY, 72, 60),
     skip: R(302, fightY + 10, 72, 40),
-    drawer: R(16, Math.max(stashY - 10, H - 414), 358, Math.min(370, H - stashY - 4)),
+    // 敌人抽屉：内容多时可以一直长到敌人卡下面（盖住背包也无妨）
+    drawer: R(16, 126 + top * 0.6, 358, H - 24 - (126 + top * 0.6)),
     bubbleY: stashY - 2,
   };
 }

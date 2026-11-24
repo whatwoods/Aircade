@@ -1,7 +1,7 @@
 // 广告奖励规则检查：pnpm ad-rules（限次、每日挑战不给、复活计分、补给发放）
 import assert from 'node:assert/strict';
 import { AD, DIFFICULTY, ECONOMY, EVENTS, PLAYER, SCORE } from '../src/config.ts';
-import { applyResult, beginArrange, canRevive, canSupply, canTakeBoth, enterEndless, newRun, revive, takeBoth, takeSupply } from '../src/game/run.ts';
+import { applyResult, beginArrange, canPrepAd, canRevive, canSupply, canTakeBoth, enterEndless, newRun, revive, takePrepAd, takeBoth, takeSupply } from '../src/game/run.ts';
 import type { BattleResult, RunState } from '../src/game/types.ts';
 
 const battle = (win: boolean): BattleResult => ({
@@ -102,7 +102,24 @@ function loseAll(run: RunState): void {
   assert.ok(!canTakeBoth(early));
 }
 
-// 每日挑战：三项都不给
+// 备战金币：第 3 轮起、整理阶段、每局一次、当场到账；和败北补给合计不超过 12
+{
+  assert.ok(AD.supplyGold + AD.prepGold <= 12, '广告金币每局合计 ≤ 12');
+  const early = atRound(AD.fromRound - 1);
+  assert.ok(!canPrepAd(early));
+  const run = atRound(AD.fromRound);
+  run.gold = 3;
+  assert.ok(takePrepAd(run));
+  assert.equal(run.gold, 3 + AD.prepGold);
+  assert.ok(!canPrepAd(run));
+  run.round++;
+  assert.ok(!canPrepAd(run), '下一轮也不再给');
+  const battling = atRound(AD.fromRound);
+  battling.phase = 'battle';
+  assert.ok(!canPrepAd(battling), '只在整理阶段');
+}
+
+// 每日挑战：四项都不给
 {
   const run = atRound(5, { tier: 2, daily: '2026-11-02' });
   run.choice = ['cache', 'market'];
@@ -112,6 +129,8 @@ function loseAll(run: RunState): void {
   assert.ok(!canSupply(run));
   loseAll(run);
   assert.ok(!canRevive(run));
+  const prep = atRound(5, { tier: 0, daily: '2026-11-02' });
+  assert.ok(!canPrepAd(prep));
 }
 
 console.log('广告规则检查通过');

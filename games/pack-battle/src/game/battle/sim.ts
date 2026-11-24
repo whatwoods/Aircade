@@ -23,7 +23,7 @@ interface Unit {
   order: number;
 }
 
-interface Fighter {
+export interface Fighter {
   side: Side;
   maxHp: number;
   hp: number;
@@ -49,7 +49,7 @@ interface Fighter {
   regenT: number;
 }
 
-function makeFighter(side: Side, inp: FighterInput): Fighter {
+export function makeFighter(side: Side, inp: FighterInput): Fighter {
   const syn = computeSynergy(inp.items, inp.cols, inp.rows, inp.open);
   const sorted = [...inp.items].sort((a, b) => a.y - b.y || a.x - b.x);
   const units: Unit[] = [];
