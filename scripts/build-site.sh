@@ -11,8 +11,12 @@ GAMES=(
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-if ! command -v pnpm >/dev/null 2>&1; then
-  corepack enable pnpm 2>/dev/null || npm install -g pnpm@11.8.0
+# Cloudflare 构建镜像里的 pnpm 是 asdf 垫片，Node 补丁版本和预装的对不上时 `command -v` 找得到却跑不起来，
+# 所以先实际跑一次，不行就走 npx 固定版本
+if pnpm --version >/dev/null 2>&1; then
+  pnpm() { command pnpm "$@"; }
+else
+  pnpm() { npx --yes pnpm@11.8.0 "$@"; }
 fi
 
 rm -rf site
